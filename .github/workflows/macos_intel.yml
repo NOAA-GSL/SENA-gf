@@ -1,10 +1,10 @@
 name: MacOS Intel
-# triggered events (push, pull_request) for the develop branch
+# triggered events (push, pull_request) for the master branch
 on:
   push:
-    branches: [ develop ]
+    branches: [ master ]
   pull_request:
-    branches: [ develop ]
+    branches: [ master ]
   workflow_dispatch:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -16,10 +16,9 @@ jobs:
     runs-on: macos-latest
 
     env:
-      MACOS_HPCKIT_URL: https://registrationcenter-download.intel.com/akdlm/irc_nas/17643/m_HPCKit_p_2021.2.0.2903_offline.dmg
-      CC: icc
-      FC: ifort
-      CXX: icpc
+      MACOS_HPCKIT_URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/c112cca6-12cf-4a0c-9e5e-d0d50d3b0f8b/m_RenderKit_p_2024.1.0.744_offline.dmg
+      CC: icx
+      FC: ifx
 
     steps:
       # Prepare for Intel cache restore
@@ -49,8 +48,8 @@ jobs:
       - name: Check compiler install
         run: |
           source /opt/intel/oneapi/setvars.sh
-          which icc
-          which ifort
+          which icx
+          which ifx
 
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Checkout repository
@@ -64,11 +63,11 @@ jobs:
           rm -rf build
           mkdir build
           cd build
-          export OMP_NUM_THREADS=4
-          export CC=icc
-          export FC=ifort
-          cmake -DCMAKE_BUILD_TYPE=debug ..
-          make
+          #export OMP_NUM_THREADS=4
+          export CC=icx
+          export FC=ifx
+          cmake -DCMAKE_BUILD_TYPE=debug -DENABLE_GPU=off ..
+          make VERBOSE=1
           ulimit -s hard
           ctest --output-on-failure
           
@@ -80,10 +79,10 @@ jobs:
           rm -rf build
           mkdir build
           cd build
-          export OMP_NUM_THREADS=4
-          export CC=icc
-          export FC=ifort
-          cmake -DCMAKE_BUILD_TYPE=release ..
-          make
+          #export OMP_NUM_THREADS=4
+          export CC=icx
+          export FC=ifx
+          cmake -DCMAKE_BUILD_TYPE=release -DENABLE_GPU=off ..
+          make VERBOSE=1
           ulimit -s hard
           ctest --output-on-failure
