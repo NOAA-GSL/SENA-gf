@@ -40,7 +40,7 @@ jobs:
           export CC=gcc-11
           export FC=gfortran-11          
           cmake -DCMAKE_BUILD_TYPE=debug -DENABLE_GPU=off .. 
-          make
+          make VERBOSE=1
           ctest --output-on-failure
           
       # Test release mode 
@@ -54,5 +54,5 @@ jobs:
           export CC=gcc-11
           export FC=gfortran-11           
           cmake -DCMAKE_BUILD_TYPE=release -DENABLE_GPU=off ..
-          make
+          make VERBOSE=1
           ctest --output-on-failure
