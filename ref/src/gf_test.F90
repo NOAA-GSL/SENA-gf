@@ -239,6 +239,7 @@ program test_gf
      cactiv_m(i) = 1 + mod(i,3)
    enddo
    CALL mt19937_real2d(forcet(s:e,:))
+   forcet(s:e,:) = forcet(s:e,:) * 0.001
    CALL mt19937_real2d(forceqv_spechum(s:e,:))
    CALL mt19937_real2d(phil(s:e,:))
    CALL mt19937_real1d(raincv(s:e))
