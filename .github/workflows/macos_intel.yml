@@ -16,7 +16,8 @@ jobs:
     runs-on: macos-latest
 
     env:
-      MACOS_HPCKIT_URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/c112cca6-12cf-4a0c-9e5e-d0d50d3b0f8b/m_RenderKit_p_2024.1.0.744_offline.dmg
+      #MACOS_HPCKIT_URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/c112cca6-12cf-4a0c-9e5e-d0d50d3b0f8b/m_RenderKit_p_2024.1.0.744_offline.dmg
+      MACOS_HPCKIT_URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/edb4dc2f-266f-47f2-8d56-21bc7764e119/m_HPCKit_p_2023.2.0.49443_offline.dmg
       CC: icx
       FC: ifx
 
