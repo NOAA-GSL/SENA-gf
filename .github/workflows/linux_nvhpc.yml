@@ -1,10 +1,10 @@
 name: Linux NVHPC
-# triggered events (push, pull_request) for the develop branch
+# triggered events (push, pull_request) for the master branch
 on:
   push:
-    branches: [ develop ]
+    branches: [ master ]
   pull_request:
-    branches: [ develop ]
+    branches: [ master ]
   workflow_dispatch:
 
 defaults:
@@ -35,10 +35,18 @@ jobs:
           module list
 
       # Install NVIDIA HPC SDK
+      #- name: Install NVIDIA HPC SDK
+      #  run: |
+      #    wget "$NVIDIA_HPC_SDK_URL1" "$NVIDIA_HPC_SDK_URL2"
+      #    sudo apt-get install ./nvhpc-21-9_21.9_amd64.deb ./nvhpc-2021_21.9_amd64.deb
+
+      # Install NVIDIA HPC SDK
       - name: Install NVIDIA HPC SDK
         run: |
-          wget "$NVIDIA_HPC_SDK_URL1" "$NVIDIA_HPC_SDK_URL2"
-          sudo apt-get install ./nvhpc-21-9_21.9_amd64.deb ./nvhpc-2021_21.9_amd64.deb
+          curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
+          echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo tee /etc/apt/sources.list.d/nvhpc.list
+          sudo apt-get update -y
+          sudo apt-get install -y nvhpc-24-7
 
       # Check location of installed NVHPC compilers
       - name: Check compiler install
@@ -63,8 +71,8 @@ jobs:
           rm -rf build
           mkdir build
           cd build
-          export OMP_NUM_THREADS=4
-          cmake -DCMAKE_BUILD_TYPE=debug ..
+          #export OMP_NUM_THREADS=4
+          cmake -DCMAKE_BUILD_TYPE=debug -DENABLE_GPU=off ..
           make
           ctest --output-on-failure
 
@@ -78,7 +86,7 @@ jobs:
           rm -rf build
           mkdir build
           cd build
-          export OMP_NUM_THREADS=4
-          cmake -DCMAKE_BUILD_TYPE=release ..
+          #export OMP_NUM_THREADS=4
+          cmake -DCMAKE_BUILD_TYPE=release -DENABLE_GPU=off ..
           make
           ctest --output-on-failure
