@@ -93,7 +93,8 @@ jobs:
           ulimit -s hard
           ctest --output-on-failure
           
-      # Test release mode 
+      # Test release mode
+      # INTEL CLASSIC COMPILERS HANG WHILE BUILDING cu_gf_deep.F90, TURN OFF FOR NOW
       #- name: Test gf Release
       #  run: |
       #    source /opt/intel/oneapi/setvars.sh
@@ -109,6 +110,7 @@ jobs:
       #    make VERBOSE=1
       #    ulimit -s hard
       #    ctest --output-on-failure
+
       # Debug session for failures
       -
         name: Debug session
