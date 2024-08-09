@@ -13,7 +13,7 @@ jobs:
   macos_Build:
     name: Mac OS Intel Build
     # The type of runner that the job will run on
-    runs-on: macos-latest
+    runs-on: macos-13
 
     env:
       #MACOS_HPCKIT_URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/c112cca6-12cf-4a0c-9e5e-d0d50d3b0f8b/m_RenderKit_p_2024.1.0.744_offline.dmg
