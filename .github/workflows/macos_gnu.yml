@@ -13,7 +13,7 @@ jobs:
   macos_Build:
     name: Mac OS GNU Build
     # The type of runner that the job will run on
-    runs-on: macos-latest
+    runs-on: macos-13
 
     env:
       # Work around bug in OpenMPI: See https://github.com/open-mpi/ompi/issues/6518

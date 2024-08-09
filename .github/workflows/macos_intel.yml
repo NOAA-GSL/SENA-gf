@@ -57,7 +57,7 @@ jobs:
         id:   cache-openmpi
         with:
           path: ~/openmpi
-          key:  openmpi-4.0.2-${{ runner.os }}-intel
+          key:  openmpi-4.1.6-${{ runner.os }}-intel
 
       # Install OpenMPI
       - name: Install OpenMPI
@@ -67,9 +67,9 @@ jobs:
           export CC="icc -m64"
           export FC="ifort -m64"
           export CXX="icpc -m64"
-          wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.2.tar.gz
-          tar -xvf ./openmpi-4.0.2.tar.gz
-          cd openmpi-4.0.2
+          wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.6.tar.gz
+          tar -xvf ./openmpi-4.1.6.tar.gz
+          cd openmpi-4.1.6
           ./configure --prefix=${HOME}/openmpi
           make -j2
           sudo make install
