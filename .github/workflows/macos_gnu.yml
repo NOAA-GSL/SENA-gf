@@ -1,10 +1,10 @@
 name: MacOS GNU
-# triggered events (push, pull_request) for the develop branch
+# triggered events (push, pull_request) for the master branch
 on:
   push:
-    branches: [ develop ]
+    branches: [ master ]
   pull_request:
-    branches: [ develop ]
+    branches: [ master ]
   workflow_dispatch:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -13,16 +13,21 @@ jobs:
   macos_Build:
     name: Mac OS GNU Build
     # The type of runner that the job will run on
-    runs-on: macos-latest
+    runs-on: macos-13
+
+    env:
+      # Work around bug in OpenMPI: See https://github.com/open-mpi/ompi/issues/6518
+      OMPI_MCA_btl: "self,tcp"
+
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Checkout repository
         uses: actions/checkout@v2
-      
-      # Unlink gcc
-      - name: Unlink gcc
-        run: brew unlink gcc@9
+
+      # Install OpenMPI
+      - name: Install OpenMPI
+        run: brew install open-mpi
 
       # Test debug mode 
       - name: Test gf Debug 
@@ -31,11 +36,11 @@ jobs:
           rm -rf build
           mkdir build
           cd build
-          export OMP_NUM_THREADS=4
-          export CC=gcc-10
-          export FC=gfortran-10          
-          cmake -DCMAKE_BUILD_TYPE=debug ..
-          make
+          #export OMP_NUM_THREADS=4
+          export CC=gcc-11
+          export FC=gfortran-11          
+          cmake -DCMAKE_BUILD_TYPE=debug -DENABLE_GPU=off .. 
+          make VERBOSE=1
           ctest --output-on-failure
           
       # Test release mode 
@@ -45,9 +50,17 @@ jobs:
           rm -rf build
           mkdir build
           cd build
-          export OMP_NUM_THREADS=4
-          export CC=gcc-10
-          export FC=gfortran-10           
-          cmake -DCMAKE_BUILD_TYPE=release ..
-          make
+          #export OMP_NUM_THREADS=4
+          export CC=gcc-11
+          export FC=gfortran-11           
+          cmake -DCMAKE_BUILD_TYPE=release -DENABLE_GPU=off ..
+          make VERBOSE=1
           ctest --output-on-failure
+      # Debug session for failures
+      -
+        name: Debug session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 60
+        with:
+          limit-access-to-actor: true

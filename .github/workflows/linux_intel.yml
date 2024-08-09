@@ -83,6 +83,8 @@ jobs:
           cmake -DCMAKE_BUILD_TYPE=release -DENABLE_GPU=off ..
           make VERBOSE=1
           ctest --output-on-failure
+
+      # Debug session for failures
       -
         name: Debug session
         if: ${{ failure() }}
