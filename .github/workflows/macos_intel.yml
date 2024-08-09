@@ -16,10 +16,9 @@ jobs:
     runs-on: macos-13
 
     env:
-      #MACOS_HPCKIT_URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/c112cca6-12cf-4a0c-9e5e-d0d50d3b0f8b/m_RenderKit_p_2024.1.0.744_offline.dmg
       MACOS_HPCKIT_URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/edb4dc2f-266f-47f2-8d56-21bc7764e119/m_HPCKit_p_2023.2.0.49443_offline.dmg
-      CC: icx
-      FC: ifx
+      CC: icc
+      FC: ifort
 
     steps:
       # Prepare for Intel cache restore
@@ -48,8 +47,8 @@ jobs:
       - name: Check compiler install
         run: |
           source /opt/intel/oneapi/setvars.sh
-          which icx
-          which ifx
+          which icc
+          which ifort
 
       # Cache OpenMPI
       - name: Cache OpenMPI
@@ -64,8 +63,8 @@ jobs:
         if: ${{ steps.cache-openmpi.outputs.cache-hit != 'true' }}
         run: |
           source /opt/intel/oneapi/setvars.sh
-          export CC="icx -m64"
-          export FC="ifx -m64"
+          export CC="icc -m64"
+          export FC="ifort -m64"
           wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.6.tar.gz
           tar -xvf ./openmpi-4.1.6.tar.gz
           cd openmpi-4.1.6
@@ -87,8 +86,8 @@ jobs:
           mkdir build
           cd build
           #export OMP_NUM_THREADS=4
-          export CC=icx
-          export FC=ifx
+          export CC=icc
+          export FC=ifort
           cmake -DCMAKE_BUILD_TYPE=debug -DCMAKE_PREFIX_PATH='~;~/openmpi' -DMPIEXEC_PREFLAGS=--oversubscribe -DENABLE_GPU=off ..
           make VERBOSE=1
           ulimit -s hard
@@ -104,8 +103,8 @@ jobs:
       #    mkdir build
       #    cd build
       #    #export OMP_NUM_THREADS=4
-      #    export CC=icx
-      #    export FC=ifx
+      #    export CC=icc
+      #    export FC=ifort
       #    cmake -DCMAKE_BUILD_TYPE=release -DCMAKE_PREFIX_PATH='~;~/openmpi' -DMPIEXEC_PREFLAGS=--oversubscribe -DENABLE_GPU=off ..
       #    make VERBOSE=1
       #    ulimit -s hard
