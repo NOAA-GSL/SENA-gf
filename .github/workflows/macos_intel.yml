@@ -66,6 +66,7 @@ jobs:
           source /opt/intel/oneapi/setvars.sh
           export CC="icc -m64"
           export FC="ifort -m64"
+	  export CXX="icpc -m64"
           wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.2.tar.gz
           tar -xvf ./openmpi-4.0.2.tar.gz
           cd openmpi-4.0.2
