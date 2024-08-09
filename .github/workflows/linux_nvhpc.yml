@@ -19,10 +19,6 @@ jobs:
     # Run on ubuntu-latest
     runs-on: ubuntu-latest
 
-    env:
-      NVIDIA_HPC_SDK_URL1: https://developer.download.nvidia.com/hpc-sdk/21.9/nvhpc-21-9_21.9_amd64.deb
-      NVIDIA_HPC_SDK_URL2: https://developer.download.nvidia.com/hpc-sdk/21.9/nvhpc-2021_21.9_amd64.deb
-
     steps:
 
       # Install Lmod
@@ -33,12 +29,6 @@ jobs:
           echo "source /usr/share/lmod/lmod/init/bash" >> ~/.bash_profile
           source /usr/share/lmod/lmod/init/bash
           module list
-
-      # Install NVIDIA HPC SDK
-      #- name: Install NVIDIA HPC SDK
-      #  run: |
-      #    wget "$NVIDIA_HPC_SDK_URL1" "$NVIDIA_HPC_SDK_URL2"
-      #    sudo apt-get install ./nvhpc-21-9_21.9_amd64.deb ./nvhpc-2021_21.9_amd64.deb
 
       # Install NVIDIA HPC SDK
       - name: Install NVIDIA HPC SDK
@@ -73,7 +63,7 @@ jobs:
           cd build
           #export OMP_NUM_THREADS=4
           cmake -DCMAKE_BUILD_TYPE=debug -DENABLE_GPU=off ..
-          make
+          make VERBOSE=1
           ctest --output-on-failure
 
       # Test release mode
@@ -88,5 +78,5 @@ jobs:
           cd build
           #export OMP_NUM_THREADS=4
           cmake -DCMAKE_BUILD_TYPE=release -DENABLE_GPU=off ..
-          make
+          make VERBOSE=1
           ctest --output-on-failure
