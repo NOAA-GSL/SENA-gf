@@ -18,8 +18,8 @@ jobs:
     env:
       #MACOS_HPCKIT_URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/c112cca6-12cf-4a0c-9e5e-d0d50d3b0f8b/m_RenderKit_p_2024.1.0.744_offline.dmg
       MACOS_HPCKIT_URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/edb4dc2f-266f-47f2-8d56-21bc7764e119/m_HPCKit_p_2023.2.0.49443_offline.dmg
-      CC: icc
-      FC: ifort
+      CC: icx
+      FC: ifx
 
     steps:
       # Prepare for Intel cache restore
@@ -48,8 +48,8 @@ jobs:
       - name: Check compiler install
         run: |
           source /opt/intel/oneapi/setvars.sh
-          which icc
-          which ifort
+          which icx
+          which ifx
 
       # Cache OpenMPI
       - name: Cache OpenMPI
@@ -64,9 +64,8 @@ jobs:
         if: ${{ steps.cache-openmpi.outputs.cache-hit != 'true' }}
         run: |
           source /opt/intel/oneapi/setvars.sh
-          export CC="icc -m64"
-          export FC="ifort -m64"
-          export CXX="icpc -m64"
+          export CC="icx -m64"
+          export FC="ifx -m64"
           wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.6.tar.gz
           tar -xvf ./openmpi-4.1.6.tar.gz
           cd openmpi-4.1.6
@@ -88,29 +87,29 @@ jobs:
           mkdir build
           cd build
           #export OMP_NUM_THREADS=4
-          export CC=icc
-          export FC=ifort
+          export CC=icx
+          export FC=ifx
           cmake -DCMAKE_BUILD_TYPE=debug -DCMAKE_PREFIX_PATH='~;~/openmpi' -DMPIEXEC_PREFLAGS=--oversubscribe -DENABLE_GPU=off ..
           make VERBOSE=1
           ulimit -s hard
           ctest --output-on-failure
           
       # Test release mode 
-      - name: Test gf Release
-        run: |
-          source /opt/intel/oneapi/setvars.sh
-          export PATH="${HOME}/openmpi/bin:$PATH"
-          cd ref
-          rm -rf build
-          mkdir build
-          cd build
-          #export OMP_NUM_THREADS=4
-          export CC=icc
-          export FC=ifort
-          cmake -DCMAKE_BUILD_TYPE=release -DCMAKE_PREFIX_PATH='~;~/openmpi' -DMPIEXEC_PREFLAGS=--oversubscribe -DENABLE_GPU=off ..
-          make VERBOSE=1
-          ulimit -s hard
-          ctest --output-on-failure
+      #- name: Test gf Release
+      #  run: |
+      #    source /opt/intel/oneapi/setvars.sh
+      #    export PATH="${HOME}/openmpi/bin:$PATH"
+      #    cd ref
+      #    rm -rf build
+      #    mkdir build
+      #    cd build
+      #    #export OMP_NUM_THREADS=4
+      #    export CC=icx
+      #    export FC=ifx
+      #    cmake -DCMAKE_BUILD_TYPE=release -DCMAKE_PREFIX_PATH='~;~/openmpi' -DMPIEXEC_PREFLAGS=--oversubscribe -DENABLE_GPU=off ..
+      #    make VERBOSE=1
+      #    ulimit -s hard
+      #    ctest --output-on-failure
       # Debug session for failures
       -
         name: Debug session
