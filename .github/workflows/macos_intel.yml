@@ -51,6 +51,28 @@ jobs:
           which icc
           which ifort
 
+      # Cache OpenMPI
+      - name: Cache OpenMPI
+        uses: actions/cache@v3
+        id:   cache-openmpi
+        with:
+          path: ~/openmpi
+          key:  openmpi-4.0.2-${{ runner.os }}-intel
+
+      # Install OpenMPI
+      - name: Install OpenMPI
+        if: ${{ steps.cache-openmpi.outputs.cache-hit != 'true' }}
+        run: |
+          source /opt/intel/oneapi/setvars.sh
+          export CC="icc -m64"
+          export FC="ifort -m64"
+          wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.2.tar.gz
+          tar -xvf ./openmpi-4.0.2.tar.gz
+          cd openmpi-4.0.2
+          ./configure --prefix=${HOME}/openmpi
+          make -j2
+          sudo make install
+
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Checkout repository
         uses: actions/checkout@v2
