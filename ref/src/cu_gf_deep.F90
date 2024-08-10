@@ -494,7 +494,6 @@ contains
          !- zws for shallow convection closure (grant 2001)
          !- height of the pbl
          zws(i) = max(0.,.001-flux_tun(i)*0.41*buo_flux*zo(i,kpbl(i))*g/t(i,kpbl(i)))
-         write(*,'(I5,E20.10)') i, zws(i)
          zws(i) = 1.2*zws(i)**.3333
          zws(i) = zws(i)*rho(i,kpbl(i)) !check if zrho is correct
       enddo

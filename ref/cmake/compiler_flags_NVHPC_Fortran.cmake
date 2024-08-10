@@ -14,7 +14,7 @@ set( CMAKE_Fortran_FLAGS_RELEASE "-fast -mp -Mnovect" )
 # DEBUG FLAGS
 ####################################################################
 
-set( CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -O0 -Mbounds -Mchkptr -Mchkstk -Ktrap=fp" )
+set( CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -O0 -Mbounds -Mchkptr -Mchkstk" )
 
 ####################################################################
 # FLAGS FOR GPU
