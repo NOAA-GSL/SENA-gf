@@ -1,4 +1,4 @@
-name: Linux GPU NVHPC
+name: Linux NVHPC
 # triggered events (push, pull_request) for the master branch
 on:
   pull_request:
@@ -13,8 +13,8 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
 
-  GPU_build:
-    if: ${{ github.event.label.name == 'GPU_Test' }}
+  ubuntu_build:
+    #if: ${{ github.event.label.name == 'GPU_Test' }}
 
     name: Ubuntu NVHPC GPU Build
     # Run on self-hosted
