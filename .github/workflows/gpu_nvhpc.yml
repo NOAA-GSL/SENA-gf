@@ -26,7 +26,7 @@ jobs:
       - name: Install Lmod
         run: |
           sudo apt-get update -y
-          sudo apt-get install lmod
+          sudo apt-get install -y lmod
           echo "source /usr/share/lmod/lmod/init/bash" >> ~/.bash_profile
           source /usr/share/lmod/lmod/init/bash
           module list
