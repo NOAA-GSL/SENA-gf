@@ -1,4 +1,4 @@
-name: Linux NVHPC
+name: Linux NVHPC GPU
 # triggered events (push, pull_request) for the master branch
 on:
   pull_request:
@@ -22,22 +22,22 @@ jobs:
 
     steps:
 
-      # Install Lmod
-      - name: Install Lmod
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y lmod
-          echo "source /usr/share/lmod/lmod/init/bash" >> ~/.bash_profile
-          source /usr/share/lmod/lmod/init/bash
-          module list
-
-      # Install NVIDIA HPC SDK
-      - name: Install NVIDIA HPC SDK
-        run: |
-          curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
-          echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo tee /etc/apt/sources.list.d/nvhpc.list
-          sudo apt-get update -y
-          sudo apt-get install -y nvhpc-24-7
+      ## Install Lmod
+      #- name: Install Lmod
+      #  run: |
+      #    sudo apt-get update -y
+      #    sudo apt-get install -y lmod
+      #    echo "source /usr/share/lmod/lmod/init/bash" >> ~/.bash_profile
+      #    source /usr/share/lmod/lmod/init/bash
+      #    module list
+      #
+      ## Install NVIDIA HPC SDK
+      #- name: Install NVIDIA HPC SDK
+      #  run: |
+      #    curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
+      #    echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo tee /etc/apt/sources.list.d/nvhpc.list
+      #    sudo apt-get update -y
+      #    sudo apt-get install -y nvhpc-24-7
 
       # Check location of installed NVHPC compilers
       - name: Check compiler install
