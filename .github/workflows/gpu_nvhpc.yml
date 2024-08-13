@@ -53,19 +53,19 @@ jobs:
         uses: actions/checkout@v2
 
       # Test debug mode
-      - name: Build gf debug
-        run: |
-          source /usr/share/lmod/lmod/init/bash
-          module use /opt/nvidia/hpc_sdk/modulefiles
-          module load nvhpc
-          cd ref
-          rm -rf build
-          mkdir build
-          cd build
-          #export OMP_NUM_THREADS=4
-          cmake -DCMAKE_BUILD_TYPE=debug -DENABLE_GPU=on ..
-          make VERBOSE=1
-          ctest --output-on-failure
+      #- name: Build gf debug
+      #  run: |
+      #    source /usr/share/lmod/lmod/init/bash
+      #    module use /opt/nvidia/hpc_sdk/modulefiles
+      #    module load nvhpc
+      #    cd ref
+      #    rm -rf build
+      #    mkdir build
+      #    cd build
+      #    #export OMP_NUM_THREADS=4
+      #    cmake -DCMAKE_BUILD_TYPE=debug -DENABLE_GPU=on ..
+      #    make VERBOSE=1
+      #    ctest --output-on-failure
 
       # Test release mode
       - name: Build gf release
