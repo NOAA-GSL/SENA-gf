@@ -80,6 +80,7 @@ jobs:
           #export OMP_NUM_THREADS=4
           cmake -DCMAKE_BUILD_TYPE=release -DENABLE_GPU=on ..
           make VERBOSE=1
+          ulimit -s hard
           ctest --output-on-failure
 
       # Debug session for failures
