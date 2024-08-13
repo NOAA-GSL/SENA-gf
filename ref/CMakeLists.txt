@@ -24,7 +24,7 @@ find_package( OpenMP COMPONENTS C Fortran )
 find_package( MPI COMPONENTS C Fortran )
 
 if ( ENABLE_GPU )
-  set( OpenACC_ACCEL_TARGET tesla )
+  #set( OpenACC_ACCEL_TARGET tesla )
   find_package( OpenACC REQUIRED )
   find_package( CUDAToolkit REQUIRED )
   add_compile_definitions(ENABLE_GPU)
