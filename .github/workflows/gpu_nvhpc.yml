@@ -14,7 +14,7 @@ on:
 jobs:
 
   ubuntu_build:
-    #if: ${{ github.event.label.name == 'GPU_Test' }}
+    if: ${{ github.event.label.name == 'GPU-CI' }}
 
     name: Ubuntu NVHPC GPU Build
     # Run on self-hosted
@@ -53,6 +53,7 @@ jobs:
         uses: actions/checkout@v2
 
       # Test debug mode
+      # Turn this off because the compiler hangs while building in debug mode
       #- name: Build gf debug
       #  run: |
       #    source /usr/share/lmod/lmod/init/bash
@@ -91,18 +92,3 @@ jobs:
         timeout-minutes: 60
         with:
           limit-access-to-actor: true
-
-      ## Test release mode
-      #- name: Build gf release
-      #  run: |
-      #    source /usr/share/lmod/lmod/init/bash
-      #    module use /opt/nvidia/hpc_sdk/modulefiles
-      #    module load nvhpc
-      #    cd ref
-      #    rm -rf build
-      #    mkdir build
-      #    cd build
-      #    export OMP_NUM_THREADS=4
-      #    cmake -DCMAKE_BUILD_TYPE=release -DENABLE_GPU=on ..
-      #    make
-      #    ctest --output-on-failure -R gpu_kernel

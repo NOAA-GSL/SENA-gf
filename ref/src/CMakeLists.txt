@@ -14,10 +14,8 @@ add_executable( gf_kernel_cpu ${gf_kernel_common_files} )
 
 if(ENABLE_GPU)
   add_executable( gf_kernel_gpu ${gf_kernel_common_files} )
-  #target_compile_options(gf_kernel_gpu PUBLIC ${OpenACC_Fortran_OPTIONS}:cc${CUDA_ARCH_LIST},cuda${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR})
-  #target_link_options(gf_kernel_gpu PUBLIC ${OpenACC_Fortran_OPTIONS}:cc${CUDA_ARCH_LIST})
-  target_compile_options(gf_kernel_gpu PUBLIC ${OpenACC_Fortran_OPTIONS}=gpu -gpu=ccnative -gpu=cuda${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR})
-  target_link_options(gf_kernel_gpu PUBLIC ${OpenACC_Fortran_OPTIONS}=gpu -gpu=ccnative -gpu=cuda${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR})
+  target_compile_options(gf_kernel_gpu PUBLIC -Minfo=accel ${OpenACC_Fortran_OPTIONS}=gpu -gpu=ccnative -gpu=cuda${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR})
+  target_link_options(gf_kernel_gpu PUBLIC -Minfo=accel ${OpenACC_Fortran_OPTIONS}=gpu -gpu=ccnative -gpu=cuda${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR})
 endif()
 
 if(OpenMP_FOUND)
