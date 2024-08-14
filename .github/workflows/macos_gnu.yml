@@ -37,8 +37,8 @@ jobs:
           mkdir build
           cd build
           #export OMP_NUM_THREADS=4
-          export CC=gcc-11
-          export FC=gfortran-11          
+          export CC=gcc-13
+          export FC=gfortran-13
           cmake -DCMAKE_BUILD_TYPE=debug -DENABLE_GPU=off .. 
           make VERBOSE=1
           ctest --output-on-failure
@@ -51,8 +51,8 @@ jobs:
           mkdir build
           cd build
           #export OMP_NUM_THREADS=4
-          export CC=gcc-11
-          export FC=gfortran-11           
+          export CC=gcc-13
+          export FC=gfortran-13
           cmake -DCMAKE_BUILD_TYPE=release -DENABLE_GPU=off ..
           make VERBOSE=1
           ctest --output-on-failure
