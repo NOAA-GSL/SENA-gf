@@ -1,7 +1,7 @@
 ####################################################################
 # COMMON FLAGS
 ####################################################################
-set( CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -traceback -Mnofma")
+set( CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -traceback -Mnofma -Kieee" )
 
 ####################################################################
 # RELEASE FLAGS
@@ -14,7 +14,7 @@ set( CMAKE_Fortran_FLAGS_RELEASE "-fast -mp -Mnovect" )
 # DEBUG FLAGS
 ####################################################################
 
-set( CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -O0 -Mbounds -Mchkptr -Mchkstk" )
+set( CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -O0 -Mbounds -Mchkptr -Mchkstk -Ktrap=fp" )
 
 ####################################################################
 # FLAGS FOR GPU

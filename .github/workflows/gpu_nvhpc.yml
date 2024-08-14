@@ -1,9 +1,9 @@
-name: Linux GPU NVHPC
-# triggered events (push, pull_request) for the develop branch
+name: Linux NVHPC GPU
+# triggered events (push, pull_request) for the master branch
 on:
   pull_request:
-    branches: [ develop ]
-    types: [ labeled ]
+    branches: [ master ]
+    types: [ labeled, opened, synchronize, reopened ]
   workflow_dispatch:
 
 #defaults:
@@ -13,29 +13,62 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
 
-  GPU_build:
-    if: ${{ github.event.label.name == 'GPU_Test' }}
+  ubuntu_build:
+    if: contains(github.event.pull_request.labels.*.name, 'GPU-CI')
 
-    name: GPU Build
+    name: Ubuntu NVHPC GPU Build
     # Run on self-hosted
     runs-on: self-hosted
 
     steps:
 
-      # Load NVHPC module
-      - name: Load NVHPC Module
+      ## Install Lmod
+      #- name: Install Lmod
+      #  run: |
+      #    sudo apt-get update -y
+      #    sudo apt-get install -y lmod
+      #    echo "source /usr/share/lmod/lmod/init/bash" >> ~/.bash_profile
+      #    source /usr/share/lmod/lmod/init/bash
+      #    module list
+      #
+      ## Install NVIDIA HPC SDK
+      #- name: Install NVIDIA HPC SDK
+      #  run: |
+      #    curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
+      #    echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo tee /etc/apt/sources.list.d/nvhpc.list
+      #    sudo apt-get update -y
+      #    sudo apt-get install -y nvhpc-24-7
+
+      # Remove label
+      #- name: Remove GPU-CI label
+      #  - uses: actions-ecosystem/action-remove-labels@v1
+      #  with:
+      #    labels: GPU-CI
+
+      # Check location of installed NVHPC compilers
+      - name: Check compiler install
         run: |
-          pwd
-          ls -al
-          echo $SHELL
+          source /usr/share/lmod/lmod/init/bash
           module use /opt/nvidia/hpc_sdk/modulefiles
           module load nvhpc
           which nvc
           which nvfortran
 
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - name: Checkout repository
-        uses: actions/checkout@v2
+      # Test debug mode
+      # Turn this off because the compiler hangs while building in debug mode
+      #- name: Build gf debug
+      #  run: |
+      #    source /usr/share/lmod/lmod/init/bash
+      #    module use /opt/nvidia/hpc_sdk/modulefiles
+      #    module load nvhpc
+      #    cd ref
+      #    rm -rf build
+      #    mkdir build
+      #    cd build
+      #    #export OMP_NUM_THREADS=4
+      #    cmake -DCMAKE_BUILD_TYPE=debug -DENABLE_GPU=on ..
+      #    make VERBOSE=1
+      #    ctest --output-on-failure
 
       # Test release mode
       - name: Build gf release
@@ -47,7 +80,17 @@ jobs:
           rm -rf build
           mkdir build
           cd build
-          export OMP_NUM_THREADS=4
+          #export OMP_NUM_THREADS=4
           cmake -DCMAKE_BUILD_TYPE=release -DENABLE_GPU=on ..
-          make
-          ctest --output-on-failure -R gpu_kernel
+          make VERBOSE=1
+          ulimit -s hard
+          ctest --output-on-failure
+
+      # Debug session for failures
+      -
+        name: Debug session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 60
+        with:
+          limit-access-to-actor: true

@@ -25,6 +25,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
+      # Install gcc11
+      - name: Install GCC
+        run: brew install gcc@11
+
       # Install OpenMPI
       - name: Install OpenMPI
         run: brew install open-mpi
@@ -38,7 +42,7 @@ jobs:
           cd build
           #export OMP_NUM_THREADS=4
           export CC=gcc-11
-          export FC=gfortran-11          
+          export FC=gfortran-11
           cmake -DCMAKE_BUILD_TYPE=debug -DENABLE_GPU=off .. 
           make VERBOSE=1
           ctest --output-on-failure
@@ -52,7 +56,7 @@ jobs:
           cd build
           #export OMP_NUM_THREADS=4
           export CC=gcc-11
-          export FC=gfortran-11           
+          export FC=gfortran-11
           cmake -DCMAKE_BUILD_TYPE=release -DENABLE_GPU=off ..
           make VERBOSE=1
           ctest --output-on-failure
