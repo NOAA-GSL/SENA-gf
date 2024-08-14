@@ -3,7 +3,7 @@ name: Linux NVHPC GPU
 on:
   pull_request:
     branches: [ master ]
-    types: [ labeled ]
+    types: [ labeled, opened, synchronize, reopened ]
   workflow_dispatch:
 
 #defaults:
@@ -14,7 +14,7 @@ on:
 jobs:
 
   ubuntu_build:
-    #if: ${{ github.event.label.name == 'GPU-CI' }}
+    if: contains(github.event.pull_request.labels.*.name, 'GPU-CI')
 
     name: Ubuntu NVHPC GPU Build
     # Run on self-hosted
