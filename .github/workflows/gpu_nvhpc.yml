@@ -14,7 +14,7 @@ on:
 jobs:
 
   ubuntu_build:
-    if: ${{ github.event.label.name == 'GPU-CI' }}
+    #if: ${{ github.event.label.name == 'GPU-CI' }}
 
     name: Ubuntu NVHPC GPU Build
     # Run on self-hosted
@@ -40,10 +40,10 @@ jobs:
       #    sudo apt-get install -y nvhpc-24-7
 
       # Remove label
-      - name: Remove GPU-CI label
-        - uses: actions-ecosystem/action-remove-labels@v1
-        with:
-          labels: GPU-CI
+      #- name: Remove GPU-CI label
+      #  - uses: actions-ecosystem/action-remove-labels@v1
+      #  with:
+      #    labels: GPU-CI
 
       # Check location of installed NVHPC compilers
       - name: Check compiler install
