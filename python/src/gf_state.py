@@ -32,10 +32,10 @@ class GFState:
         self.qv2di_spechum = np.zeros((self.ix, self.km), dtype=self.rkind)
         self.p2di = np.zeros((self.ix, self.km), dtype=self.rkind)
         self.psuri = np.zeros(self.im, dtype=self.rkind)
-        self.hbot = np.zeros(self.im, dtype=np.int)
-        self.htop = np.zeros(self.im, dtype=np.int)
-        self.kcnv = np.zeros(self.im, dtype=np.int)
-        self.xland = np.zeros(self.im, dtype=np.int)
+        self.hbot = np.ones(self.im, dtype=np.int)
+        self.htop = np.ones(self.im, dtype=np.int)
+        self.kcnv = np.ones(self.im, dtype=np.int)
+        self.xland = np.ones(self.im, dtype=np.int)
         self.hfx2 = np.zeros(self.im, dtype=self.rkind)
         self.qfx2 = np.zeros(self.im, dtype=self.rkind)
         self.aod_gf = np.zeros(self.im, dtype=self.rkind)
@@ -48,9 +48,9 @@ class GFState:
         self.cnvw_moist = np.zeros((self.ix, self.km), dtype=self.rkind)
         self.cnvc = np.zeros((self.ix, self.km), dtype=self.rkind)
         self.dtend = np.zeros((self.im, self.km, self.DTEND_DIM), dtype=self.rkind)
-        self.dtidx = np.zeros((113, 18), dtype=np.int)
+        self.dtidx = np.ones((113, 18), dtype=np.int)
         self.qci_conv = np.zeros((self.im, self.km), dtype=self.rkind)
-        self.ix_dfi_radar = np.zeros(self.num_dfi_radar, dtype=np.int)
+        self.ix_dfi_radar = np.ones(self.num_dfi_radar, dtype=np.int)
         self.fh_dfi_radar = np.zeros(self.num_dfi_radar+1, dtype=self.rkind)
         self.cap_suppress = np.zeros((self.im, self.num_dfi_radar), dtype=self.rkind)
 
@@ -62,13 +62,53 @@ class GFState:
             self.cactiv_m[i] = 1 + (1 + i) % 3
         mt.mt19937_real2d(self.forcet)
         self.forcet = self.forcet * 0.001
+        mt.mt19937_real2d(self.forceqv_spechum)
+        mt.mt19937_real2d(self.phil)
+        mt.mt19937_real1d(self.raincv)
+        mt.mt19937_real2d(self.qv_spechum)
+        mt.mt19937_real2d(self.t)
+        self.t = self.t + 510
+        mt.mt19937_real1d(self.cld1d)
+        mt.mt19937_real2d(self.us)
+        mt.mt19937_real2d(self.vs)
+        mt.mt19937_real2d(self.t2di)
+        self.t2di = self.t2di + 500
+        mt.mt19937_real2d(self.w)
+        mt.mt19937_real2d(self.qv2di_spechum)
+        mt.mt19937_real2d(self.p2di)
+        mt.mt19937_real1d(self.psuri)
+        self.htop = self.htop * 4
+        for i in range(self.kcnv.size):
+            self.kcnv[i] = 1 + (i + 1) % 2
+            self.xland[i] = 1 + (i + 1) % 3
+        mt.mt19937_real1d(self.hfx2)
+        mt.mt19937_real1d(self.qfx2)
+        mt.mt19937_real2d(self.cliw)
+        mt.mt19937_real2d(self.clcw)
+        mt.mt19937_real1d(self.pbl)
+        mt.mt19937_real2d(self.ud_mf)
+        mt.mt19937_real2d(self.dd_mf)
+        mt.mt19937_real2d(self.dt_mf)
+        mt.mt19937_real2d(self.cnvw_moist)
+        mt.mt19937_real2d(self.cnvc)
+        mt.mt19937_real3d(self.dtend)
+        mt.mt19937_real2d(self.qci_conv)
+        mt.mt19937_real1d(self.aod_gf)
+        for i in range(113):
+            for j in range(18):
+                self.dtidx[i,j] = 1 + ((j + 1) % 4) + ((i + 1) % 4)
+        for i in range(self.num_dfi_radar):
+            self.ix_dfi_radar[i] = 1 + (i + 1) % 3
+        mt.mt19937_real1d(self.fh_dfi_radar)
+        mt.mt19937_real2d(self.cap_suppress)
+
 
     def print_state(self, msg):
         print("TEST")
         print("TEST " + "=" * 137)
         print(f"TEST {msg:>32}")
         print("TEST " + "=" * 137)
-        print("TEST {:>17}{:>20}{:>20}{:>20}{:>20}{:>20}{:>20}".format("VARIABLE","Min","Max","Avg","First","Last","RMS"))
+        print("TEST {:>17}{:>20}{:>20}{:>20}{:>20}{:>20}{:>20}".format("Variable","Min","Max","Avg","First","Last","RMS"))
         print("TEST " + "-" * 137)
 
         self.print_1d_variable("garea", self.garea)
@@ -110,7 +150,7 @@ class GFState:
         self.print_1d_variable("fh_dfi_radar", self.fh_dfi_radar)
         self.print_2d_variable("cap_suppress", self.cap_suppress)
 
-        print("TEST" + "-" * 137)
+        print("TEST " + "-" * 137)
         print("TEST")
 
     #!------------------------------------------------------------------
