@@ -201,7 +201,7 @@ CONTAINS
     avg = SUM(data) / SIZE(data)
     WRITE(*,'(A5,A17,6ES20.10)') "TEST ", name, MINVAL(data), MAXVAL(data), avg, data(1,1,1),  &
                             data(SIZE(data,1), SIZE(data,2), SIZE(data,3)), &
-                            SQRT((SUM(data**2) - avg**2) / SIZE(data))
+                            SQRT(SUM(data**2 - avg**2) / SIZE(data))
 
   END SUBROUTINE print_3d_variable
 

@@ -130,8 +130,7 @@ contains
 
     mt(1) = seed
     do i = 1, nn-1
-       mt(i+1) = 6364136223846793005_i8 * ieor(mt(i), ishft(mt(i), -62)) + i
-       !write(*,'(I3,5I25)') i, mt(i+1), mt(i), ishft(mt(i), -62), ieor(mt(i), ishft(mt(i), -62))
+      mt(i+1) = 6364136223846793005_i8 * ieor(mt(i), ishft(mt(i), -62)) + i
     end do
 
     mti = nn

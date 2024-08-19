@@ -16,8 +16,8 @@ class GFState:
 
         # Allocate state data
         self.garea = np.zeros(self.im, dtype=self.rkind)
-        self.cactiv = np.ones(self.im, dtype=np.int)
-        self.cactiv_m = np.ones(self.im, dtype=np.int)
+        self.cactiv = np.ones(self.im, dtype=np.int32)
+        self.cactiv_m = np.ones(self.im, dtype=np.int32)
         self.forcet = np.zeros((self.ix, self.km), dtype=self.rkind)
         self.forceqv_spechum = np.zeros((self.ix, self.km), dtype=self.rkind)
         self.phil = np.zeros((self.ix, self.km), dtype=self.rkind)
@@ -32,10 +32,10 @@ class GFState:
         self.qv2di_spechum = np.zeros((self.ix, self.km), dtype=self.rkind)
         self.p2di = np.zeros((self.ix, self.km), dtype=self.rkind)
         self.psuri = np.zeros(self.im, dtype=self.rkind)
-        self.hbot = np.ones(self.im, dtype=np.int)
-        self.htop = np.ones(self.im, dtype=np.int)
-        self.kcnv = np.ones(self.im, dtype=np.int)
-        self.xland = np.ones(self.im, dtype=np.int)
+        self.hbot = np.ones(self.im, dtype=np.int32)
+        self.htop = np.ones(self.im, dtype=np.int32)
+        self.kcnv = np.ones(self.im, dtype=np.int32)
+        self.xland = np.ones(self.im, dtype=np.int32)
         self.hfx2 = np.zeros(self.im, dtype=self.rkind)
         self.qfx2 = np.zeros(self.im, dtype=self.rkind)
         self.aod_gf = np.zeros(self.im, dtype=self.rkind)
@@ -48,9 +48,9 @@ class GFState:
         self.cnvw_moist = np.zeros((self.ix, self.km), dtype=self.rkind)
         self.cnvc = np.zeros((self.ix, self.km), dtype=self.rkind)
         self.dtend = np.zeros((self.im, self.km, self.DTEND_DIM), dtype=self.rkind)
-        self.dtidx = np.ones((113, 18), dtype=np.int)
+        self.dtidx = np.ones((113, 18), dtype=np.int32)
         self.qci_conv = np.zeros((self.im, self.km), dtype=self.rkind)
-        self.ix_dfi_radar = np.ones(self.num_dfi_radar, dtype=np.int)
+        self.ix_dfi_radar = np.ones(self.num_dfi_radar, dtype=np.int32)
         self.fh_dfi_radar = np.zeros(self.num_dfi_radar+1, dtype=self.rkind)
         self.cap_suppress = np.zeros((self.im, self.num_dfi_radar), dtype=self.rkind)
 
@@ -61,18 +61,18 @@ class GFState:
             self.cactiv[i] = 1 + (i + 1) % 2
             self.cactiv_m[i] = 1 + (1 + i) % 3
         mt.mt19937_real2d(self.forcet)
-        self.forcet = self.forcet * 0.001
+        self.forcet *= 0.001
         mt.mt19937_real2d(self.forceqv_spechum)
         mt.mt19937_real2d(self.phil)
         mt.mt19937_real1d(self.raincv)
         mt.mt19937_real2d(self.qv_spechum)
         mt.mt19937_real2d(self.t)
-        self.t = self.t + 510
+        self.t += 510.0
         mt.mt19937_real1d(self.cld1d)
         mt.mt19937_real2d(self.us)
         mt.mt19937_real2d(self.vs)
         mt.mt19937_real2d(self.t2di)
-        self.t2di = self.t2di + 500
+        self.t2di += 500.0
         mt.mt19937_real2d(self.w)
         mt.mt19937_real2d(self.qv2di_spechum)
         mt.mt19937_real2d(self.p2di)
@@ -160,7 +160,7 @@ class GFState:
     #!------------------------------------------------------------------
     def print_1d_variable(self, name, data):
         avg = np.sum(data) / data.size
-        rms = math.sqrt(np.sum(data**2 - avg**2) / data.size)
+        rms = np.sqrt(np.sum(data**2 - avg**2) / data.size)
         print(f"TEST {name:>17}{np.min(data):>20.10E}{np.max(data):>20.10E}{avg:>20.10E}{data[0]:>20.10E}{data[-1]:>20.10E}{rms:>20.10E}")
         
 
@@ -171,7 +171,7 @@ class GFState:
     #!------------------------------------------------------------------
     def print_2d_variable(self, name, data):
         avg = np.sum(data) / data.size
-        rms = math.sqrt(np.sum(data**2 - avg**2) / data.size)
+        rms = np.sqrt(np.sum(data**2 - avg**2) / data.size)
         print(f"TEST {name:>17}{np.min(data):>20.10E}{np.max(data):>20.10E}{avg:>20.10E}{data[0][0]:>20.10E}{data[-1][-1]:>20.10E}{rms:>20.10E}")
 
 
@@ -182,7 +182,7 @@ class GFState:
     #!------------------------------------------------------------------
     def print_3d_variable(self, name, data):
         avg = np.sum(data) / data.size
-        rms = math.sqrt(np.sum(data**2 - avg**2) / data.size)
+        rms = np.sqrt(np.sum(data**2 - avg**2) / data.size)
         print(f"TEST {name:>17}{np.min(data):>20.10E}{np.max(data):>20.10E}{avg:>20.10E}{data[0][0][0]:>20.10E}{data[-1][-1][-1]:>20.10E}{rms:>20.10E}")
 
 
@@ -193,7 +193,7 @@ class GFState:
     #!------------------------------------------------------------------
     def print_4d_variable(self, name, data):
         avg = np.sum(data) / data.size
-        rms = math.sqrt(np.sum(data**2 - avg**2) / data.size)
+        rms = np.sqrt(np.sum(data**2 - avg**2) / data.size)
         print(f"TEST {name:>17}{np.min(data):>20.10E}{np.max(data):>20.10E}{avg:>20.10E}{data[0][0][0][0]:>20.10E}{data[-1][-1][-1][-1]:>20.10E}{rms:>20.10E}")
 
 
@@ -204,7 +204,7 @@ class GFState:
     #!------------------------------------------------------------------
     def print_5d_variable(self, name, data):
         avg = np.sum(data) / data.size
-        rms = math.sqrt(np.sum(data**2 - avg**2) / data.size)
+        rms = np.sqrt(np.sum(data**2 - avg**2) / data.size)
         print(f"TEST {name:>17}{np.min(data):>20.10E}{np.max(data):>20.10E}{avg:>20.10E}{data[0][0][0][0][0]:>20.10E}{data[-1][-1][-1][-1][-1]:>20.10E}{rms:>20.10E}")
 
 
@@ -215,7 +215,7 @@ class GFState:
     #!------------------------------------------------------------------
     def print_1d_variable_int(self, name, data):
         avg = int(np.sum(data) // data.size)
-        rms = math.sqrt(np.sum(data**2 - avg**2) // data.size)
+        rms = np.sqrt(np.sum(data**2 - avg**2) // data.size)
         print(f"TEST {name:>17}{np.min(data):>20}{np.max(data):>20}{avg:>20}{data[0]:>20}{data[-1]:>20}{rms:>20.10E}")
 
 
@@ -226,7 +226,7 @@ class GFState:
     #!------------------------------------------------------------------
     def print_2d_variable_int(self, name, data):
         avg = int(np.sum(data) // data.size)
-        rms = math.sqrt(np.sum(data**2 - avg**2) // data.size)
+        rms = np.sqrt(np.sum(data**2 - avg**2) // data.size)
         print(f"TEST {name:>17}{np.min(data):>20}{np.max(data):>20}{avg:>20}{data[0][0]:>20}{data[-1][-1]:>20}{rms:>20.10E}")
     #SUBROUTINE print_2d_variable_int(name, data)
     #

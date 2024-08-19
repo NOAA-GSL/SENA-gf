@@ -245,12 +245,12 @@ program test_gf
    CALL mt19937_real1d(raincv(s:e))
    CALL mt19937_real2d(qv_spechum(s:e,:))
    CALL mt19937_real2d(t(s:e,:))
-   t(s:e,:) = t(s:e,:) + 510
+   t(s:e,:) = t(s:e,:) + 510.0
    CALL mt19937_real1d(cld1d(s:e))
    CALL mt19937_real2d(us(s:e,:))
    CALL mt19937_real2d(vs(s:e,:))
    CALL mt19937_real2d(t2di(s:e,:))
-   t2di(s:e,:) = t2di(s:e,:) + 500
+   t2di(s:e,:) = t2di(s:e,:) + 500.0
    CALL mt19937_real2d(w(s:e,:))
    CALL mt19937_real2d(qv2di_spechum(s:e,:))
    CALL mt19937_real2d(p2di(s:e,:))
@@ -532,50 +532,50 @@ program test_gf
 !!$acc update self( fh_dfi_radar(:) )        
 !!$acc update self( cap_suppress(s:e,:) )
 !#endif
-!
-!   !--- Print state
-!   CALL print_state("Output state",   &
-!       garea,                   &
-!       cactiv,                  &
-!       cactiv_m,                &
-!       forcet,                  &
-!       forceqv_spechum,         &
-!       phil,                    &
-!       raincv,                  &
-!       qv_spechum,              &
-!       t,                       &
-!       cld1d,                   &
-!       us,                      &
-!       vs,                      &
-!       t2di,                    &
-!       w,                       &
-!       qv2di_spechum,           &
-!       p2di,                    &
-!       psuri,                   &
-!       hbot,                    &
-!       htop,                    &
-!       kcnv,                    &
-!       xland,                   &
-!       hfx2,                    &
-!       qfx2,                    &
-!       aod_gf,                  &
-!       cliw,                    &
-!       clcw,                    &
-!       pbl,                     &
-!       ud_mf,                   &
-!       dd_mf,                   &
-!       dt_mf,                   &
-!       cnvw_moist,              &
-!       cnvc,                    &
-!       dtend,                   &
-!       dtidx,                   &
-!       qci_conv,                &
-!       ix_dfi_radar,            &
-!       fh_dfi_radar,            &
-!       cap_suppress             &
-!       )
-!   !-------------
-!
+
+   !--- Print state
+   CALL print_state("Output state",   &
+       garea,                   &
+       cactiv,                  &
+       cactiv_m,                &
+       forcet,                  &
+       forceqv_spechum,         &
+       phil,                    &
+       raincv,                  &
+       qv_spechum,              &
+       t,                       &
+       cld1d,                   &
+       us,                      &
+       vs,                      &
+       t2di,                    &
+       w,                       &
+       qv2di_spechum,           &
+       p2di,                    &
+       psuri,                   &
+       hbot,                    &
+       htop,                    &
+       kcnv,                    &
+       xland,                   &
+       hfx2,                    &
+       qfx2,                    &
+       aod_gf,                  &
+       cliw,                    &
+       clcw,                    &
+       pbl,                     &
+       ud_mf,                   &
+       dd_mf,                   &
+       dt_mf,                   &
+       cnvw_moist,              &
+       cnvc,                    &
+       dtend,                   &
+       dtidx,                   &
+       qci_conv,                &
+       ix_dfi_radar,            &
+       fh_dfi_radar,            &
+       cap_suppress             &
+       )
+   !-------------
+
 !#ifdef _OPENACC
 !   s = 1
 !   e = im
