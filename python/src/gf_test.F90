@@ -3,6 +3,9 @@ program test_gf
    USE gf_utils
    USE cu_gf_driver
    USE machine, only: kind_phys
+#ifdef _OPENMP
+   USE omp_lib
+#endif
 
    IMPLICIT NONE
 
@@ -62,6 +65,24 @@ program test_gf
    integer ncol,nlev,ierror
    character(64) :: str
 
+   ! MPI information
+   integer                    :: mpicomm
+   integer, parameter         :: mpirank = 0
+   integer, parameter         :: mpiroot = 0
+   integer                    :: mpisize
+
+   !===============================
+   gpuid = 0
+
+#ifdef _OPENMP
+!$omp parallel
+!$omp single
+   n_omp_threads = omp_get_num_threads()
+!$omp end single
+!$omp end parallel
+#endif
+
+   N_GPUS = 0
 
    !===============================
    if (COMMAND_ARGUMENT_COUNT().GE.1) THEN
@@ -76,7 +97,7 @@ program test_gf
    else
       nlev = 64
    endif
-   !print*, ncol, nlev
+
    !===============================
    !===============================
    ntracer = 13
@@ -110,13 +131,10 @@ program test_gf
    ldiag3d = .TRUE.
    do_cap_suppress = .TRUE.
 
-   !WRITE(6,'(" (im,km) = (",i5,",",i4,")")') im,km
-
-   !PRINT*, "Allocating arrays"
    ALLOCATE(                        &
        garea(im),                   &
        cactiv(im),                  & !integer
-       cactiv_m(im),                  & !integer
+       cactiv_m(im),                & !integer
        forcet(ix, km),              &
        forceqv_spechum(ix, km),     &
        phil(ix, km),                &
@@ -146,8 +164,8 @@ program test_gf
        dt_mf(im, km),               &
        cnvw_moist(ix, km),          &
        cnvc(ix, km),                &
-       dtend(im, km, DTEND_DIM),           & !confirm
-       dtidx(113, 18),               & !integer
+       dtend(im, km, DTEND_DIM),    & !confirm
+       dtidx(113, 18),              & !integer
        qci_conv(im, km),            & !confirm
        ix_dfi_radar(num_dfi_radar), &
        fh_dfi_radar(num_dfi_radar+1), &
@@ -156,7 +174,7 @@ program test_gf
    IF (alloc_stat /= 0) STOP "Error allocating arrays"
 
    !=============================================================
-   !PRINT*, "Initializing arrays"
+
    s = 1
    e = im
 
@@ -174,12 +192,12 @@ program test_gf
    CALL mt19937_real1d(raincv(s:e))
    CALL mt19937_real2d(qv_spechum(s:e,:))
    CALL mt19937_real2d(t(s:e,:))
-   t(s:e,:) = t(s:e,:) + 510.0
+   t(s:e,:) = t(s:e,:) + 510
    CALL mt19937_real1d(cld1d(s:e))
    CALL mt19937_real2d(us(s:e,:))
    CALL mt19937_real2d(vs(s:e,:))
    CALL mt19937_real2d(t2di(s:e,:))
-   t2di(s:e,:) = t2di(s:e,:) + 500.0
+   t2di(s:e,:) = t2di(s:e,:) + 500
    CALL mt19937_real2d(w(s:e,:))
    CALL mt19937_real2d(qv2di_spechum(s:e,:))
    CALL mt19937_real2d(p2di(s:e,:))
@@ -217,6 +235,7 @@ program test_gf
    enddo
    CALL mt19937_real1d(fh_dfi_radar(:))
    CALL mt19937_real2d(cap_suppress(s:e,:))
+
    !=============================================================
 
    !--- Print state
@@ -262,118 +281,36 @@ program test_gf
        )
    !-------------
 
+   CALL cu_gf_driver_init(imfshalcnv, imfshalcnv_gf, imfdeepcnv, &
+                          imfdeepcnv_gf, 0, 0, errmsg, errflg)
 
-   !--- write state
-   CALL write_state("input_state.nc",   &
-       garea,                   &
-       cactiv,                  &
-       cactiv_m,                &
-       forcet,                  &
-       forceqv_spechum,         &
-       phil,                    &
-       raincv,                  &
-       qv_spechum,              &
-       t,                       &
-       cld1d,                   &
-       us,                      &
-       vs,                      &
-       t2di,                    &
-       w,                       &
-       qv2di_spechum,           &
-       p2di,                    &
-       psuri,                   &
-       hbot,                    &
-       htop,                    &
-       kcnv,                    &
-       xland,                   &
-       hfx2,                    &
-       qfx2,                    &
-       aod_gf,                  &
-       cliw,                    &
-       clcw,                    &
-       pbl,                     &
-       ud_mf,                   &
-       dd_mf,                   &
-       dt_mf,                   &
-       cnvw_moist,              &
-       cnvc,                    &
-       dtend,                   &
-       dtidx,                   &
-       qci_conv,                &
-       ix_dfi_radar,            &
-       fh_dfi_radar,            &
-       cap_suppress             &
-       )
-   !-------------
+#ifndef _OPENACC
+!$omp parallel do private(tid,s,e)
+#endif
+   DO tid = 0, n_omp_threads - 1
+       s = tid * (im / n_omp_threads) + 1
+       e = (tid + 1) * (im / n_omp_threads)
+       e = MIN(e, im)
 
-   !--- read state
-   CALL read_state("input_state.nc",   &
-       garea,                   &
-       cactiv,                  &
-       cactiv_m,                &
-       forcet,                  &
-       forceqv_spechum,         &
-       phil,                    &
-       raincv,                  &
-       qv_spechum,              &
-       t,                       &
-       cld1d,                   &
-       us,                      &
-       vs,                      &
-       t2di,                    &
-       w,                       &
-       qv2di_spechum,           &
-       p2di,                    &
-       psuri,                   &
-       hbot,                    &
-       htop,                    &
-       kcnv,                    &
-       xland,                   &
-       hfx2,                    &
-       qfx2,                    &
-       aod_gf,                  &
-       cliw,                    &
-       clcw,                    &
-       pbl,                     &
-       ud_mf,                   &
-       dd_mf,                   &
-       dt_mf,                   &
-       cnvw_moist,              &
-       cnvc,                    &
-       dtend,                   &
-       dtidx,                   &
-       qci_conv,                &
-       ix_dfi_radar,            &
-       fh_dfi_radar,            &
-       cap_suppress             &
-       )
-   !-------------
-!   PRINT*, "Calling init"
-!   CALL cu_gf_driver_init(imfshalcnv, imfshalcnv_gf, imfdeepcnv, &
-!                          imfdeepcnv_gf,mpirank, mpiroot, errmsg, errflg)
-!
-!   DO tid = 0, n_omp_threads - 1
-!       s = tid * (im / n_omp_threads) + 1
-!       e = (tid + 1) * (im / n_omp_threads)
-!       e = MIN(e, im)
-!
-!       CALL cu_gf_driver_run(ntracer,garea(s:e),e-s+1,km,dt,flag_init,flag_restart,&
-!               cactiv(s:e),cactiv_m(s:e),g,cp,xlv,r_v,forcet(s:e,:),forceqv_spechum(s:e,:),phil(s:e,:),raincv(s:e), &
-!               qv_spechum(s:e,:),t(s:e,:),cld1d(s:e),us(s:e,:),vs(s:e,:),t2di(s:e,:),w(s:e,:), &
-!               qv2di_spechum(s:e,:),p2di(s:e,:),psuri(s:e),        &
-!               hbot(s:e),htop(s:e),kcnv(s:e),xland(s:e),hfx2(s:e),qfx2(s:e),aod_gf(s:e),cliw(s:e,:),clcw(s:e,:),                 &
-!               pbl(s:e),ud_mf(s:e,:),dd_mf(s:e,:),dt_mf(s:e,:),cnvw_moist(s:e,:),cnvc(s:e,:),imfshalcnv,                &
-!               flag_for_scnv_generic_tend,flag_for_dcnv_generic_tend,           &
-!               dtend(s:e,:,:),dtidx(:,:),ntqv,ntiw,ntcw,index_of_temperature,index_of_x_wind, &
-!               index_of_y_wind,index_of_process_scnv,index_of_process_dcnv,     &
-!               fhour,fh_dfi_radar(:),ix_dfi_radar(:),num_dfi_radar,cap_suppress(s:e,:),      &
-!               dfi_radar_max_intervals,ldiag3d,qci_conv(s:e,:),do_cap_suppress,        &
-!               errmsg,errflg)
-!
-!   ENDDO
-!
-!   PRINT*, "Calling finalize"
-!   CALL cu_gf_driver_finalize()
+       CALL cu_gf_driver_run(ntracer,garea(s:e),e-s+1,km,dt,flag_init,flag_restart,&
+               cactiv(s:e),cactiv_m(s:e),g,cp,xlv,r_v,forcet(s:e,:),forceqv_spechum(s:e,:),phil(s:e,:),raincv(s:e), &
+               qv_spechum(s:e,:),t(s:e,:),cld1d(s:e),us(s:e,:),vs(s:e,:),t2di(s:e,:),w(s:e,:), &
+               qv2di_spechum(s:e,:),p2di(s:e,:),psuri(s:e),        &
+               hbot(s:e),htop(s:e),kcnv(s:e),xland(s:e),hfx2(s:e),qfx2(s:e),aod_gf(s:e),cliw(s:e,:),clcw(s:e,:),                 &
+               pbl(s:e),ud_mf(s:e,:),dd_mf(s:e,:),dt_mf(s:e,:),cnvw_moist(s:e,:),cnvc(s:e,:),imfshalcnv,                &
+               flag_for_scnv_generic_tend,flag_for_dcnv_generic_tend,           &
+               dtend(s:e,:,:),dtidx(:,:),ntqv,ntiw,ntcw,index_of_temperature,index_of_x_wind, &
+               index_of_y_wind,index_of_process_scnv,index_of_process_dcnv,     &
+               fhour,fh_dfi_radar(:),ix_dfi_radar(:),num_dfi_radar,cap_suppress(s:e,:),      &
+               dfi_radar_max_intervals,ldiag3d,qci_conv(s:e,:),do_cap_suppress,        &
+               errmsg,errflg)
+
+   ENDDO
+#ifndef _OPENACC
+!$omp end parallel do
+#endif
+
+   CALL cu_gf_driver_finalize()
 
    !--- Print state
    CALL print_state("Output state",   &

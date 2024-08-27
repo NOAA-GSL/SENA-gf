@@ -1,0 +1,5 @@
+# Ignore object and module files and executables
+*.o
+*.mod
+*.exe
+a.out
