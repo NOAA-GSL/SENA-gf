@@ -279,7 +279,6 @@ program test_gf
        fh_dfi_radar,            &
        cap_suppress             &
        )
-   !-------------
 
    !--- Print state
    CALL print_state("Input state",   &

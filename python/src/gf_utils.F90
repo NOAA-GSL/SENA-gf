@@ -577,7 +577,7 @@ CONTAINS
 
     ! Define the psuri field
     call nc_check(nf90_def_var(ncid=ncFileID,name="psuri", xtype=nf90_double, &
-                  dimids=(/ixDimID, kmDimID/), varid=psuriVarID))
+                  dimids=(/imDimID/), varid=psuriVarID))
     call nc_check(nf90_put_att(ncFileID, psuriVarID, "long_name", "psuri"))
     call nc_check(nf90_put_att(ncFileID, psuriVarID, "units",     "Nondimensional"))
 
