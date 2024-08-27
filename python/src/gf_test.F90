@@ -262,6 +262,92 @@ program test_gf
        )
    !-------------
 
+
+   !--- write state
+   CALL write_state("input_state.nc",   &
+       garea,                   &
+       cactiv,                  &
+       cactiv_m,                &
+       forcet,                  &
+       forceqv_spechum,         &
+       phil,                    &
+       raincv,                  &
+       qv_spechum,              &
+       t,                       &
+       cld1d,                   &
+       us,                      &
+       vs,                      &
+       t2di,                    &
+       w,                       &
+       qv2di_spechum,           &
+       p2di,                    &
+       psuri,                   &
+       hbot,                    &
+       htop,                    &
+       kcnv,                    &
+       xland,                   &
+       hfx2,                    &
+       qfx2,                    &
+       aod_gf,                  &
+       cliw,                    &
+       clcw,                    &
+       pbl,                     &
+       ud_mf,                   &
+       dd_mf,                   &
+       dt_mf,                   &
+       cnvw_moist,              &
+       cnvc,                    &
+       dtend,                   &
+       dtidx,                   &
+       qci_conv,                &
+       ix_dfi_radar,            &
+       fh_dfi_radar,            &
+       cap_suppress             &
+       )
+   !-------------
+
+   !--- read state
+   CALL read_state("input_state.nc",   &
+       garea,                   &
+       cactiv,                  &
+       cactiv_m,                &
+       forcet,                  &
+       forceqv_spechum,         &
+       phil,                    &
+       raincv,                  &
+       qv_spechum,              &
+       t,                       &
+       cld1d,                   &
+       us,                      &
+       vs,                      &
+       t2di,                    &
+       w,                       &
+       qv2di_spechum,           &
+       p2di,                    &
+       psuri,                   &
+       hbot,                    &
+       htop,                    &
+       kcnv,                    &
+       xland,                   &
+       hfx2,                    &
+       qfx2,                    &
+       aod_gf,                  &
+       cliw,                    &
+       clcw,                    &
+       pbl,                     &
+       ud_mf,                   &
+       dd_mf,                   &
+       dt_mf,                   &
+       cnvw_moist,              &
+       cnvc,                    &
+       dtend,                   &
+       dtidx,                   &
+       qci_conv,                &
+       ix_dfi_radar,            &
+       fh_dfi_radar,            &
+       cap_suppress             &
+       )
+   !-------------
 !   PRINT*, "Calling init"
 !   CALL cu_gf_driver_init(imfshalcnv, imfshalcnv_gf, imfdeepcnv, &
 !                          imfdeepcnv_gf,mpirank, mpiroot, errmsg, errflg)
