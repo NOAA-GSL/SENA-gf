@@ -3,3 +3,6 @@
 *.mod
 *.exe
 a.out
+
+# Ignore backup files
+*~

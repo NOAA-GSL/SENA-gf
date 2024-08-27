@@ -175,68 +175,111 @@ program test_gf
 
    !=============================================================
 
-   s = 1
-   e = im
-
-   CALL mt19937_real1d(garea(s:e))
-   cactiv(s:e) = 1
-   cactiv_m(s:e) = 1
-   do i=s,e
-     cactiv  (i) = 1 + mod(i,2)
-     cactiv_m(i) = 1 + mod(i,3)
-   enddo
-   CALL mt19937_real2d(forcet(s:e,:))
-   forcet(s:e,:) = forcet(s:e,:) * 0.001
-   CALL mt19937_real2d(forceqv_spechum(s:e,:))
-   CALL mt19937_real2d(phil(s:e,:))
-   CALL mt19937_real1d(raincv(s:e))
-   CALL mt19937_real2d(qv_spechum(s:e,:))
-   CALL mt19937_real2d(t(s:e,:))
-   t(s:e,:) = t(s:e,:) + 510
-   CALL mt19937_real1d(cld1d(s:e))
-   CALL mt19937_real2d(us(s:e,:))
-   CALL mt19937_real2d(vs(s:e,:))
-   CALL mt19937_real2d(t2di(s:e,:))
-   t2di(s:e,:) = t2di(s:e,:) + 500
-   CALL mt19937_real2d(w(s:e,:))
-   CALL mt19937_real2d(qv2di_spechum(s:e,:))
-   CALL mt19937_real2d(p2di(s:e,:))
-   CALL mt19937_real1d(psuri(s:e))
-   hbot(s:e) = 1
-   htop(s:e) = 4
-   kcnv(s:e) = 1
-   xland(s:e) = 1
-   do i=s,e
-     kcnv (i) = 1 + mod(i,2)
-     xland(i) = 1 + mod(i,3)
-   enddo
-   CALL mt19937_real1d(hfx2(s:e))
-   CALL mt19937_real1d(qfx2(s:e))
-   CALL mt19937_real2d(cliw(s:e,:))
-   CALL mt19937_real2d(clcw(s:e,:))
-   CALL mt19937_real1d(pbl(s:e))
-   CALL mt19937_real2d(ud_mf(s:e,:))
-   CALL mt19937_real2d(dd_mf(s:e,:))
-   CALL mt19937_real2d(dt_mf(s:e,:))
-   CALL mt19937_real2d(cnvw_moist(s:e,:))
-   CALL mt19937_real2d(cnvc(s:e,:))
-   CALL mt19937_real3d(dtend(s:e,:,:))
-   dtidx(:,:) = 1
-   CALL mt19937_real2d(qci_conv(s:e,:))
-   CALL mt19937_real1d(aod_gf(s:e))
-   ix_dfi_radar(:) = 1
-   do i=1,113
-     do j=1,18
-        dtidx(i,j) = 1 + mod(j,4) + mod(i,4)
-     enddo
-   enddo
-   do i=1,num_dfi_radar
-     ix_dfi_radar(i) = 1 + mod(i,3)
-   enddo
-   CALL mt19937_real1d(fh_dfi_radar(:))
-   CALL mt19937_real2d(cap_suppress(s:e,:))
+   !s = 1
+   !e = im
+   !
+   !CALL mt19937_real1d(garea(s:e))
+   !cactiv(s:e) = 1
+   !cactiv_m(s:e) = 1
+   !do i=s,e
+   !  cactiv  (i) = 1 + mod(i,2)
+   !  cactiv_m(i) = 1 + mod(i,3)
+   !enddo
+   !CALL mt19937_real2d(forcet(s:e,:))
+   !forcet(s:e,:) = forcet(s:e,:) * 0.001
+   !CALL mt19937_real2d(forceqv_spechum(s:e,:))
+   !CALL mt19937_real2d(phil(s:e,:))
+   !CALL mt19937_real1d(raincv(s:e))
+   !CALL mt19937_real2d(qv_spechum(s:e,:))
+   !CALL mt19937_real2d(t(s:e,:))
+   !t(s:e,:) = t(s:e,:) + 510
+   !CALL mt19937_real1d(cld1d(s:e))
+   !CALL mt19937_real2d(us(s:e,:))
+   !CALL mt19937_real2d(vs(s:e,:))
+   !CALL mt19937_real2d(t2di(s:e,:))
+   !t2di(s:e,:) = t2di(s:e,:) + 500
+   !CALL mt19937_real2d(w(s:e,:))
+   !CALL mt19937_real2d(qv2di_spechum(s:e,:))
+   !CALL mt19937_real2d(p2di(s:e,:))
+   !CALL mt19937_real1d(psuri(s:e))
+   !hbot(s:e) = 1
+   !htop(s:e) = 4
+   !kcnv(s:e) = 1
+   !xland(s:e) = 1
+   !do i=s,e
+   !  kcnv (i) = 1 + mod(i,2)
+   !  xland(i) = 1 + mod(i,3)
+   !enddo
+   !CALL mt19937_real1d(hfx2(s:e))
+   !CALL mt19937_real1d(qfx2(s:e))
+   !CALL mt19937_real2d(cliw(s:e,:))
+   !CALL mt19937_real2d(clcw(s:e,:))
+   !CALL mt19937_real1d(pbl(s:e))
+   !CALL mt19937_real2d(ud_mf(s:e,:))
+   !CALL mt19937_real2d(dd_mf(s:e,:))
+   !CALL mt19937_real2d(dt_mf(s:e,:))
+   !CALL mt19937_real2d(cnvw_moist(s:e,:))
+   !CALL mt19937_real2d(cnvc(s:e,:))
+   !CALL mt19937_real3d(dtend(s:e,:,:))
+   !dtidx(:,:) = 1
+   !CALL mt19937_real2d(qci_conv(s:e,:))
+   !CALL mt19937_real1d(aod_gf(s:e))
+   !ix_dfi_radar(:) = 1
+   !do i=1,113
+   !  do j=1,18
+   !     dtidx(i,j) = 1 + mod(j,4) + mod(i,4)
+   !  enddo
+   !enddo
+   !do i=1,num_dfi_radar
+   !  ix_dfi_radar(i) = 1 + mod(i,3)
+   !enddo
+   !CALL mt19937_real1d(fh_dfi_radar(:))
+   !CALL mt19937_real2d(cap_suppress(s:e,:))
 
    !=============================================================
+
+   !--- Read state
+   CALL read_state("input_state.nc",   &
+       garea,                   &
+       cactiv,                  &
+       cactiv_m,                &
+       forcet,                  &
+       forceqv_spechum,         &
+       phil,                    &
+       raincv,                  &
+       qv_spechum,              &
+       t,                       &
+       cld1d,                   &
+       us,                      &
+       vs,                      &
+       t2di,                    &
+       w,                       &
+       qv2di_spechum,           &
+       p2di,                    &
+       psuri,                   &
+       hbot,                    &
+       htop,                    &
+       kcnv,                    &
+       xland,                   &
+       hfx2,                    &
+       qfx2,                    &
+       aod_gf,                  &
+       cliw,                    &
+       clcw,                    &
+       pbl,                     &
+       ud_mf,                   &
+       dd_mf,                   &
+       dt_mf,                   &
+       cnvw_moist,              &
+       cnvc,                    &
+       dtend,                   &
+       dtidx,                   &
+       qci_conv,                &
+       ix_dfi_radar,            &
+       fh_dfi_radar,            &
+       cap_suppress             &
+       )
+   !-------------
 
    !--- Print state
    CALL print_state("Input state",   &
@@ -314,6 +357,49 @@ program test_gf
 
    !--- Print state
    CALL print_state("Output state",   &
+       garea,                   &
+       cactiv,                  &
+       cactiv_m,                &
+       forcet,                  &
+       forceqv_spechum,         &
+       phil,                    &
+       raincv,                  &
+       qv_spechum,              &
+       t,                       &
+       cld1d,                   &
+       us,                      &
+       vs,                      &
+       t2di,                    &
+       w,                       &
+       qv2di_spechum,           &
+       p2di,                    &
+       psuri,                   &
+       hbot,                    &
+       htop,                    &
+       kcnv,                    &
+       xland,                   &
+       hfx2,                    &
+       qfx2,                    &
+       aod_gf,                  &
+       cliw,                    &
+       clcw,                    &
+       pbl,                     &
+       ud_mf,                   &
+       dd_mf,                   &
+       dt_mf,                   &
+       cnvw_moist,              &
+       cnvc,                    &
+       dtend,                   &
+       dtidx,                   &
+       qci_conv,                &
+       ix_dfi_radar,            &
+       fh_dfi_radar,            &
+       cap_suppress             &
+       )
+   !-------------
+
+   !--- Write state
+   CALL write_state("output_state.nc",   &
        garea,                   &
        cactiv,                  &
        cactiv_m,                &

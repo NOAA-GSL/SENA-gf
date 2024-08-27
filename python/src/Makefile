@@ -1,5 +1,6 @@
 FC=gfortran
-FFLAGS=-DNDEBUG -fbacktrace -ffp-contract=off -fno-sign-zero  -g -O0 -g -fcheck=bounds -ffpe-trap=invalid,zero,overflow,underflow -fopenmp -I$(NETCDF)/include
+#FFLAGS=-DNDEBUG -fbacktrace -ffp-contract=off -fno-sign-zero  -g -O0 -g -fcheck=bounds -ffpe-trap=invalid,zero,overflow,underflow -fopenmp -I$(NETCDF)/include
+FFLAGS=-DNDEBUG -fbacktrace -ffp-contract=off -fno-sign-zero  -g -O0 -g -fcheck=bounds -fopenmp -I$(NETCDF)/include
 LDFLAGS=-L$(NETCDF)/lib -lnetcdf -lnetcdff
 OBJS=machine.o mt19937.o gf_utils.o cu_gf_driver.o cu_gf_deep.F90 cu_gf_sh.F90
 
