@@ -239,7 +239,7 @@ program test_gf
    !=============================================================
 
    !--- Read state
-   CALL read_state("input_state.nc",   &
+   CALL read_state("../../test/test_input/input_state.nc",   &
        garea,                   &
        cactiv,                  &
        cactiv_m,                &
