@@ -334,18 +334,18 @@ program test_gf
        e = (tid + 1) * (im / n_omp_threads)
        e = MIN(e, im)
 
-       CALL cu_gf_driver_run(ntracer,garea(s:e),e-s+1,km,dt,flag_init,flag_restart,&
-               cactiv(s:e),cactiv_m(s:e),g,cp,xlv,r_v,forcet(s:e,:),forceqv_spechum(s:e,:),phil(s:e,:),raincv(s:e), &
-               qv_spechum(s:e,:),t(s:e,:),cld1d(s:e),us(s:e,:),vs(s:e,:),t2di(s:e,:),w(s:e,:), &
-               qv2di_spechum(s:e,:),p2di(s:e,:),psuri(s:e),        &
-               hbot(s:e),htop(s:e),kcnv(s:e),xland(s:e),hfx2(s:e),qfx2(s:e),aod_gf(s:e),cliw(s:e,:),clcw(s:e,:),                 &
-               pbl(s:e),ud_mf(s:e,:),dd_mf(s:e,:),dt_mf(s:e,:),cnvw_moist(s:e,:),cnvc(s:e,:),imfshalcnv,                &
-               flag_for_scnv_generic_tend,flag_for_dcnv_generic_tend,           &
-               dtend(s:e,:,:),dtidx(:,:),ntqv,ntiw,ntcw,index_of_temperature,index_of_x_wind, &
-               index_of_y_wind,index_of_process_scnv,index_of_process_dcnv,     &
-               fhour,fh_dfi_radar(:),ix_dfi_radar(:),num_dfi_radar,cap_suppress(s:e,:),      &
-               dfi_radar_max_intervals,ldiag3d,qci_conv(s:e,:),do_cap_suppress,        &
-               errmsg,errflg)
+!       CALL cu_gf_driver_run(ntracer,garea(s:e),e-s+1,km,dt,flag_init,flag_restart,&
+!               cactiv(s:e),cactiv_m(s:e),g,cp,xlv,r_v,forcet(s:e,:),forceqv_spechum(s:e,:),phil(s:e,:),raincv(s:e), &
+!               qv_spechum(s:e,:),t(s:e,:),cld1d(s:e),us(s:e,:),vs(s:e,:),t2di(s:e,:),w(s:e,:), &
+!               qv2di_spechum(s:e,:),p2di(s:e,:),psuri(s:e),        &
+!               hbot(s:e),htop(s:e),kcnv(s:e),xland(s:e),hfx2(s:e),qfx2(s:e),aod_gf(s:e),cliw(s:e,:),clcw(s:e,:),                 &
+!               pbl(s:e),ud_mf(s:e,:),dd_mf(s:e,:),dt_mf(s:e,:),cnvw_moist(s:e,:),cnvc(s:e,:),imfshalcnv,                &
+!               flag_for_scnv_generic_tend,flag_for_dcnv_generic_tend,           &
+!               dtend(s:e,:,:),dtidx(:,:),ntqv,ntiw,ntcw,index_of_temperature,index_of_x_wind, &
+!               index_of_y_wind,index_of_process_scnv,index_of_process_dcnv,     &
+!               fhour,fh_dfi_radar(:),ix_dfi_radar(:),num_dfi_radar,cap_suppress(s:e,:),      &
+!               dfi_radar_max_intervals,ldiag3d,qci_conv(s:e,:),do_cap_suppress,        &
+!               errmsg,errflg)
 
    ENDDO
 #ifndef _OPENACC
@@ -398,7 +398,7 @@ program test_gf
    !-------------
 
    !--- Write state
-   CALL write_state("output_state.nc",   &
+   CALL write_state("output_state_fortran.nc",   &
        garea,                   &
        cactiv,                  &
        cactiv_m,                &
