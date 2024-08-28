@@ -55,52 +55,55 @@ class GFState:
         self.cap_suppress = np.zeros((self.im, self.num_dfi_radar), dtype=self.rkind)
 
         # Initialize state
-        mt = MT19937()
-        mt.mt19937_real1d(self.garea)
-        for i in range(self.cactiv.size):
-            self.cactiv[i] = 1 + (i + 1) % 2
-            self.cactiv_m[i] = 1 + (1 + i) % 3
-        mt.mt19937_real2d(self.forcet)
-        self.forcet *= 0.001
-        mt.mt19937_real2d(self.forceqv_spechum)
-        mt.mt19937_real2d(self.phil)
-        mt.mt19937_real1d(self.raincv)
-        mt.mt19937_real2d(self.qv_spechum)
-        mt.mt19937_real2d(self.t)
-        self.t += 510.0
-        mt.mt19937_real1d(self.cld1d)
-        mt.mt19937_real2d(self.us)
-        mt.mt19937_real2d(self.vs)
-        mt.mt19937_real2d(self.t2di)
-        self.t2di += 500.0
-        mt.mt19937_real2d(self.w)
-        mt.mt19937_real2d(self.qv2di_spechum)
-        mt.mt19937_real2d(self.p2di)
-        mt.mt19937_real1d(self.psuri)
-        self.htop = self.htop * 4
-        for i in range(self.kcnv.size):
-            self.kcnv[i] = 1 + (i + 1) % 2
-            self.xland[i] = 1 + (i + 1) % 3
-        mt.mt19937_real1d(self.hfx2)
-        mt.mt19937_real1d(self.qfx2)
-        mt.mt19937_real2d(self.cliw)
-        mt.mt19937_real2d(self.clcw)
-        mt.mt19937_real1d(self.pbl)
-        mt.mt19937_real2d(self.ud_mf)
-        mt.mt19937_real2d(self.dd_mf)
-        mt.mt19937_real2d(self.dt_mf)
-        mt.mt19937_real2d(self.cnvw_moist)
-        mt.mt19937_real2d(self.cnvc)
-        mt.mt19937_real3d(self.dtend)
-        mt.mt19937_real2d(self.qci_conv)
-        mt.mt19937_real1d(self.aod_gf)
-        for i in range(113):
-            for j in range(18):
-                self.dtidx[i,j] = 1 + ((j + 1) % 4) + ((i + 1) % 4)
-        for i in range(self.num_dfi_radar):
-            self.ix_dfi_radar[i] = 1 + (i + 1) % 3
-        mt.mt19937_real1d(self.fh_dfi_radar)
-        mt.mt19937_real2d(self.cap_suppress)
+        self.read_state("../../test/test_input/input_state.nc")
+
+        # Initialize state
+        #mt = MT19937()
+        #mt.mt19937_real1d(self.garea)
+        #for i in range(self.cactiv.size):
+        #    self.cactiv[i] = 1 + (i + 1) % 2
+        #    self.cactiv_m[i] = 1 + (1 + i) % 3
+        #mt.mt19937_real2d(self.forcet)
+        #self.forcet *= 0.001
+        #mt.mt19937_real2d(self.forceqv_spechum)
+        #mt.mt19937_real2d(self.phil)
+        #mt.mt19937_real1d(self.raincv)
+        #mt.mt19937_real2d(self.qv_spechum)
+        #mt.mt19937_real2d(self.t)
+        #self.t += 510.0
+        #mt.mt19937_real1d(self.cld1d)
+        #mt.mt19937_real2d(self.us)
+        #mt.mt19937_real2d(self.vs)
+        #mt.mt19937_real2d(self.t2di)
+        #self.t2di += 500.0
+        #mt.mt19937_real2d(self.w)
+        #mt.mt19937_real2d(self.qv2di_spechum)
+        #mt.mt19937_real2d(self.p2di)
+        #mt.mt19937_real1d(self.psuri)
+        #self.htop = self.htop * 4
+        #for i in range(self.kcnv.size):
+        #    self.kcnv[i] = 1 + (i + 1) % 2
+        #    self.xland[i] = 1 + (i + 1) % 3
+        #mt.mt19937_real1d(self.hfx2)
+        #mt.mt19937_real1d(self.qfx2)
+        #mt.mt19937_real2d(self.cliw)
+        #mt.mt19937_real2d(self.clcw)
+        #mt.mt19937_real1d(self.pbl)
+        #mt.mt19937_real2d(self.ud_mf)
+        #mt.mt19937_real2d(self.dd_mf)
+        #mt.mt19937_real2d(self.dt_mf)
+        #mt.mt19937_real2d(self.cnvw_moist)
+        #mt.mt19937_real2d(self.cnvc)
+        #mt.mt19937_real3d(self.dtend)
+        #mt.mt19937_real2d(self.qci_conv)
+        #mt.mt19937_real1d(self.aod_gf)
+        #for i in range(113):
+        #    for j in range(18):
+        #        self.dtidx[i,j] = 1 + ((j + 1) % 4) + ((i + 1) % 4)
+        #for i in range(self.num_dfi_radar):
+        #    self.ix_dfi_radar[i] = 1 + (i + 1) % 3
+        #mt.mt19937_real1d(self.fh_dfi_radar)
+        #mt.mt19937_real2d(self.cap_suppress)
 
 
     def print_state(self, msg):
@@ -580,13 +583,119 @@ class GFState:
         # Open new file for reading
         _dataset = Dataset(filename, "r")
 
-        # Read the model dimensions
-        _ix = len(_dataset.dimensions["ix"])
-
         # Get garea
         self.garea[:] = np.transpose(_dataset.variables["garea"][:])
 
-        pass
+        # Get cactiv
+        self.cactiv[:] = np.transpose(_dataset.variables["cactiv"][:])
+
+        # Get cactiv_m
+        self.cactiv_m[:] = np.transpose(_dataset.variables["cactiv_m"][:])
+
+        # Get forcet
+        self.forcet[:,:] = np.transpose(_dataset.variables["forcet"][:,:])
+
+        # Get forceqv_spechum
+        self.forceqv_spechum[:,:] = np.transpose(_dataset.variables["forceqv_spechum"][:,:])
+
+        # Get phil
+        self.phil[:,:] = np.transpose(_dataset.variables["phil"][:,:])
+
+        # Get raincv
+        self.raincv[:] = np.transpose(_dataset.variables["raincv"][:])
+
+        # Get qv_spechum
+        self.qv_spechum[:,:] = np.transpose(_dataset.variables["qv_spechum"][:,:])
+
+        # Get t
+        self.t[:,:] = np.transpose(_dataset.variables["t"][:,:])
+
+        # Get cld1d
+        self.cld1d[:] = np.transpose(_dataset.variables["cld1d"][:])
+
+        # Get us
+        self.us[:,:] = np.transpose(_dataset.variables["us"][:,:])
+
+        # Get vs
+        self.vs[:,:] = np.transpose(_dataset.variables["vs"][:,:])
+
+        # Get t2di
+        self.t2di[:,:] = np.transpose(_dataset.variables["t2di"][:,:])
+
+        # Get w
+        self.w[:,:] = np.transpose(_dataset.variables["w"][:,:])
+
+        # Get qv2di_spechum
+        self.qv2di_spechum[:,:] = np.transpose(_dataset.variables["qv2di_spechum"][:,:])
+
+        # Get p2di
+        self.p2di[:,:] = np.transpose(_dataset.variables["p2di"][:,:])
+
+        # Get psuri
+        self.psuri[:] = np.transpose(_dataset.variables["psuri"][:])
+
+        # Get hbot
+        self.hbot[:] = np.transpose(_dataset.variables["hbot"][:])
+
+        # Get htop
+        self.htop[:] = np.transpose(_dataset.variables["htop"][:])
+
+        # Get kcnv
+        self.kcnv[:] = np.transpose(_dataset.variables["kcnv"][:])
+
+        # Get xland
+        self.xland[:] = np.transpose(_dataset.variables["xland"][:])
+
+        # Get hfx2
+        self.hfx2[:] = np.transpose(_dataset.variables["hfx2"][:])
+
+        # Get qfx2
+        self.qfx2[:] = np.transpose(_dataset.variables["qfx2"][:])
+
+        # Get aod_gf
+        self.aod_gf[:] = np.transpose(_dataset.variables["aod_gf"][:])
+
+        # Get cliw
+        self.cliw[:,:] = np.transpose(_dataset.variables["cliw"][:,:])
+
+        # Get clcw
+        self.clcw[:,:] = np.transpose(_dataset.variables["clcw"][:,:])
+
+        # Get pbl
+        self.pbl[:] = np.transpose(_dataset.variables["pbl"][:])
+
+        # Get ud_mf
+        self.ud_mf[:,:] = np.transpose(_dataset.variables["ud_mf"][:,:])
+
+        # Get dd_mf
+        self.dd_mf[:,:] = np.transpose(_dataset.variables["dd_mf"][:,:])
+
+        # Get dt_mf
+        self.dt_mf[:,:] = np.transpose(_dataset.variables["dt_mf"][:,:])
+
+        # Get cnvw_moist
+        self.cnvw_moist[:,:] = np.transpose(_dataset.variables["cnvw_moist"][:,:])
+
+        # Get cnvc
+        self.cnvc[:,:] = np.transpose(_dataset.variables["cnvc"][:,:])
+
+        # Get dtend
+        self.dtend[:,:,:] = np.transpose(_dataset.variables["dtend"][:,:,:])
+
+        # Get dtidx
+        self.dtidx[:,:] = np.transpose(_dataset.variables["dtidx"][:,:])
+
+        # Get qci_conv
+        self.qci_conv[:,:] = np.transpose(_dataset.variables["qci_conv"][:,:])
+
+        # Get ix_dfi_radar
+        self.ix_dfi_radar[:] = np.transpose(_dataset.variables["ix_dfi_radar"][:])
+
+        # Get fh_dfi_radar
+        self.fh_dfi_radar[:] = np.transpose(_dataset.variables["fh_dfi_radar"][:])
+
+        # Get cap_suppress
+        self.cap_suppress[:,:] = np.transpose(_dataset.variables["cap_suppress"][:,:])
 
 
     #SUBROUTINE print_2d_variable_int(name, data)
