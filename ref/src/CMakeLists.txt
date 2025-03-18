@@ -1,13 +1,15 @@
 list( APPEND gf_kernel_common_files
-machine.F90
-mt19937.F90
-cu_gf_driver_pre.F90
-cu_gf_driver_post.F90
-gf_utils.F90
-cu_gf_deep.F90
-cu_gf_sh.F90
-cu_gf_driver.F90
-gf_test.F90
+  machine.F90
+  physcons.F90
+  mt19937.F90
+  cu_gf_driver_pre.F90
+  cu_gf_driver_post.F90
+  gf_utils.F90
+  cu_gf_io.F90
+  cu_gf_deep.F90
+  cu_gf_sh.F90
+  cu_gf_driver.F90
+  gf_test.F90
 )
 
 add_executable( gf_kernel_cpu ${gf_kernel_common_files} )
@@ -16,6 +18,13 @@ if(ENABLE_GPU)
   add_executable( gf_kernel_gpu ${gf_kernel_common_files} )
   target_compile_options(gf_kernel_gpu PUBLIC -Minfo=accel ${OpenACC_Fortran_OPTIONS}=gpu -gpu=ccnative -gpu=cuda${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR})
   target_link_options(gf_kernel_gpu PUBLIC -Minfo=accel ${OpenACC_Fortran_OPTIONS}=gpu -gpu=ccnative -gpu=cuda${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR})
+endif()
+
+target_link_libraries(gf_kernel_cpu PUBLIC NetCDF::NetCDF_C)
+target_link_libraries(gf_kernel_cpu PUBLIC NetCDF::NetCDF_Fortran)
+if(ENABLE_GPU)
+  target_link_libraries(gf_kernel_gpu PUBLIC NetCDF::NetCDF_C)
+  target_link_libraries(gf_kernel_gpu PUBLIC NetCDF::NetCDF_Fortran)
 endif()
 
 if(OpenMP_FOUND)

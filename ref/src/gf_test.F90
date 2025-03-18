@@ -21,7 +21,7 @@ program test_gf
    integer  :: imfdeepcnv, imfdeepcnv_gf
    character(len=512)  :: errmsg
    integer             :: errflg
-   integer             :: i,j,k
+   integer             :: i,j
 
    !---For run
    integer :: ix, im, km, ntracer
@@ -60,6 +60,20 @@ program test_gf
    integer, dimension(:), allocatable :: ix_dfi_radar
    real(kind=kind_phys), dimension(:), allocatable :: fh_dfi_radar
    real(kind=kind_phys), dimension(:,:), allocatable :: cap_suppress
+
+   ! new
+   real(kind=kind_phys), dimension (:), allocatable :: maxupmf
+   real(kind=kind_phys),    dimension (:), allocatable :: maxMF
+   logical :: do_mynnedmf
+   integer :: ichoice_in,ichoicem_in,ichoice_s_in
+   real(kind_phys), dimension(:,:), allocatable :: spp_wts_cu_deep
+   integer :: spp_cu_deep
+   integer :: nchem,kdt
+   real(kind_phys), dimension(:,:,:), allocatable :: chem3d
+   real(kind_phys), dimension(:), allocatable :: fscav
+   real(kind_phys), dimension(:,:), allocatable   :: wetdpc_deep
+   logical :: do_smoke_transport
+
 
    integer :: count_rate, count_start, count_end
    real :: elapsed
@@ -162,6 +176,15 @@ program test_gf
    dfi_radar_max_intervals = 4
    ldiag3d = .TRUE.
    do_cap_suppress = .TRUE.
+   do_mynnedmf = .TRUE.
+   ichoice_in = 0
+   ichoicem_in = 13
+   ichoice_s_in = 3
+   spp_cu_deep = 0
+   nchem = 3
+   kdt = 1
+   do_smoke_transport = .TRUE.
+
 
    WRITE(6,'(" (im,km) = (",i5,",",i4,")")') im,km
 
@@ -223,8 +246,15 @@ program test_gf
        ix_dfi_radar(num_dfi_radar), &
        fh_dfi_radar(num_dfi_radar+1), &
        cap_suppress(im, num_dfi_radar), &
+       maxupmf(im), &
+       maxMF(im), &
+       spp_wts_cu_deep(im,1), &
+       chem3d(im,km-1,nchem), &
+       fscav(nchem), &
+       wetdpc_deep(im,nchem), &
        STAT=alloc_stat)
    IF (alloc_stat /= 0) STOP "Error allocating arrays"
+
 
    !=============================================================
    PRINT*, "Initializing arrays"
@@ -288,6 +318,13 @@ program test_gf
    enddo
    CALL mt19937_real1d(fh_dfi_radar(:))
    CALL mt19937_real2d(cap_suppress(s:e,:))
+   CALL mt19937_real1d(maxupmf(s:e))
+   CALL mt19937_real1d(maxMF(s:e))
+   CALL mt19937_real2d(spp_wts_cu_deep(s:e,:))
+   CALL mt19937_real3d(chem3d(s:e,:,:))
+   CALL mt19937_real1d(fscav(:))
+   CALL mt19937_real2d(wetdpc_deep(s:e,:))
+   wetdpc_deep(s:e,:) = wetdpc_deep(s:e,:) + 500
    !=============================================================
    
    !=============================================================
@@ -384,7 +421,12 @@ program test_gf
 !$acc enter data copyin( ix_dfi_radar(:) )        
 !$acc enter data copyin( fh_dfi_radar(:) )        
 !$acc enter data copyin( cap_suppress(s:e,:) )
-
+!$acc enter data copyin( maxupmf(s:e) )
+!$acc enter data copyin( maxMF(s:e) )
+!$acc enter data copyin( spp_wts_cu_deep(s:e,:) )
+!$acc enter data copyin( chem3d(s:e,:,:) )
+!$acc enter data copyin( fscav(:) )
+!$acc enter data copyin( wetdpc_deep(s:e,:) )
 #endif
 
    CALL SYSTEM_CLOCK (count=count_end)
@@ -435,7 +477,13 @@ program test_gf
        qci_conv,                &
        ix_dfi_radar,            &
        fh_dfi_radar,            &
-       cap_suppress             &
+       cap_suppress,            &
+       maxupmf,                 &
+       maxMF,                   &
+       spp_wts_cu_deep,         &
+       chem3d,                  &
+       fscav,                   &
+       wetdpc_deep              &
        )
    !-------------
 
@@ -459,18 +507,87 @@ program test_gf
        e = (tid + 1) * (im / n_omp_threads)
        e = MIN(e, im)
 
-       CALL cu_gf_driver_run(ntracer,garea(s:e),e-s+1,km,dt,flag_init,flag_restart,&
-               cactiv(s:e),cactiv_m(s:e),g,cp,xlv,r_v,forcet(s:e,:),forceqv_spechum(s:e,:),phil(s:e,:),raincv(s:e), &
-               qv_spechum(s:e,:),t(s:e,:),cld1d(s:e),us(s:e,:),vs(s:e,:),t2di(s:e,:),w(s:e,:), &
-               qv2di_spechum(s:e,:),p2di(s:e,:),psuri(s:e),        &
-               hbot(s:e),htop(s:e),kcnv(s:e),xland(s:e),hfx2(s:e),qfx2(s:e),aod_gf(s:e),cliw(s:e,:),clcw(s:e,:),                 &
-               pbl(s:e),ud_mf(s:e,:),dd_mf(s:e,:),dt_mf(s:e,:),cnvw_moist(s:e,:),cnvc(s:e,:),imfshalcnv,                &
-               flag_for_scnv_generic_tend,flag_for_dcnv_generic_tend,           &
-               dtend(s:e,:,:),dtidx(:,:),ntqv,ntiw,ntcw,index_of_temperature,index_of_x_wind, &
-               index_of_y_wind,index_of_process_scnv,index_of_process_dcnv,     &
-               fhour,fh_dfi_radar(:),ix_dfi_radar(:),num_dfi_radar,cap_suppress(s:e,:),      &
-               dfi_radar_max_intervals,ldiag3d,qci_conv(s:e,:),do_cap_suppress,        &
-               errmsg,errflg)
+       CALL cu_gf_driver_run( &
+            ntracer=ntracer, &
+            garea=garea(s:e), &
+            im=e-s+1, &
+            km=km, &
+            dt=dt, &
+            flag_init=flag_init, &
+            flag_restart=flag_restart,&
+            cactiv=cactiv(s:e), &
+            cactiv_m=cactiv_m(s:e), &
+            g=g, &
+            cp=cp, &
+            xlv=xlv, &
+            r_v=r_v, &
+            forcet=forcet(s:e,:), &
+            forceqv_spechum=forceqv_spechum(s:e,:), &
+            phil=phil(s:e,:), &
+            raincv=raincv(s:e), &
+            qv_spechum=qv_spechum(s:e,:), &
+            t=t(s:e,:), &
+            cld1d=cld1d(s:e), &
+            us=us(s:e,:), &
+            vs=vs(s:e,:), &
+            t2di=t2di(s:e,:), &
+            w=w(s:e,:), &
+            qv2di_spechum=qv2di_spechum(s:e,:), &
+            p2di=p2di(s:e,:), &
+            psuri=psuri(s:e),        &
+            hbot=hbot(s:e), &
+            htop=htop(s:e), &
+            kcnv=kcnv(s:e), &
+            xland=xland(s:e), &
+            hfx2=hfx2(s:e), &
+            qfx2=qfx2(s:e), &
+            aod_gf=aod_gf(s:e), &
+            cliw=cliw(s:e,:), &
+            clcw=clcw(s:e,:),                 &
+            pbl=pbl(s:e), &
+            ud_mf=ud_mf(s:e,:), &
+            dd_mf=dd_mf(s:e,:), &
+            dt_mf=dt_mf(s:e,:), &
+            cnvw_moist=cnvw_moist(s:e,:), &
+            cnvc=cnvc(s:e,:), &
+            imfshalcnv=imfshalcnv,                &
+            flag_for_scnv_generic_tend=flag_for_scnv_generic_tend, &
+            flag_for_dcnv_generic_tend=flag_for_dcnv_generic_tend,           &
+            dtend=dtend(s:e,:,:), &
+            dtidx=dtidx(:,:), &
+            ntqv=ntqv, &
+            ntiw=ntiw, &
+            ntcw=ntcw, &
+            index_of_temperature=index_of_temperature, &
+            index_of_x_wind=index_of_x_wind, &
+            index_of_y_wind=index_of_y_wind, &
+            index_of_process_scnv=index_of_process_scnv, &
+            index_of_process_dcnv=index_of_process_dcnv,     &
+            fhour=fhour, &
+            fh_dfi_radar=fh_dfi_radar(:), &
+            ix_dfi_radar=ix_dfi_radar(:), &
+            num_dfi_radar=num_dfi_radar, &
+            cap_suppress=cap_suppress(s:e,:),      &
+            dfi_radar_max_intervals=dfi_radar_max_intervals, &
+            ldiag3d=ldiag3d, &
+            qci_conv=qci_conv(s:e,:), &
+            do_cap_suppress=do_cap_suppress,        &
+            maxupmf=maxupmf, &
+            maxMF=maxMF, &
+            do_mynnedmf=do_mynnedmf, &
+            ichoice_in=ichoice_in, &
+            ichoicem_in=ichoicem_in, &
+            ichoice_s_in=ichoice_s_in,   &
+            spp_cu_deep=spp_cu_deep, &
+            spp_wts_cu_deep=spp_wts_cu_deep, &
+            nchem=nchem, &
+            chem3d=chem3d, &
+            fscav=fscav, &
+            wetdpc_deep=wetdpc_deep,      &
+            do_smoke_transport=do_smoke_transport, &
+            kdt=kdt, &            
+            errmsg=errmsg, &
+            errflg=errflg)
 
    ENDDO
 #ifndef _OPENACC
@@ -486,9 +603,6 @@ program test_gf
 #ifdef MPI
    CALL MPI_Barrier(MPI_COMM_WORLD,ierror)
 #endif
-
-   PRINT*, "Calling finalize"
-   CALL cu_gf_driver_finalize()
 
 #ifdef _OPENACC
    s = 1
@@ -531,6 +645,12 @@ program test_gf
 !$acc update self( ix_dfi_radar(:) )        
 !$acc update self( fh_dfi_radar(:) )        
 !$acc update self( cap_suppress(s:e,:) )
+!$acc update self( maxupmf(s:e) )
+!$acc update self( maxMF(s:e) )
+!$acc update self( spp_wts_cu_deep(s:e,:) )
+!$acc update self( chem3d(s:e,:,:) )
+!$acc update self( fscav(:) )
+!$acc update self( wetdpc_deep(s:e,:) )
 #endif
 
    !--- Print state
@@ -572,7 +692,13 @@ program test_gf
        qci_conv,                &
        ix_dfi_radar,            &
        fh_dfi_radar,            &
-       cap_suppress             &
+       cap_suppress,            &
+       maxupmf,                 &
+       maxMF,                   &
+       spp_wts_cu_deep,         &
+       chem3d,                  &
+       fscav,                   &
+       wetdpc_deep              &
        )
    !-------------
 
@@ -617,6 +743,12 @@ program test_gf
 !$acc exit data delete( ix_dfi_radar(:) )        
 !$acc exit data delete( fh_dfi_radar(:) )        
 !$acc exit data delete( cap_suppress(s:e,:) )
+!$acc exit data delete( maxupmf(s:e) )
+!$acc exit data delete( maxMF(s:e) )
+!$acc exit data delete( spp_wts_cu_deep(s:e,:) )
+!$acc exit data delete( chem3d(s:e,:,:) )
+!$acc exit data delete( fscav(:) )
+!$acc exit data delete( wetdpc_deep(s:e,:) )
 #endif
 
 #ifdef MPI

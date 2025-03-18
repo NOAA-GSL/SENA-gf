@@ -20,6 +20,7 @@ enable_testing()
 
 include(${PROJECT_NAME}_compiler_flags)
 
+find_package( NetCDF REQUIRED COMPONENTS C Fortran )
 find_package( OpenMP COMPONENTS C Fortran )
 find_package( MPI COMPONENTS C Fortran )
 

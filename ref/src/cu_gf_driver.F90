@@ -1,24 +1,30 @@
 !>\file cu_gf_driver.F90
 !! This file is scale-aware Grell-Freitas cumulus scheme driver.
 
-
+!> This module contains the scale-aware Grell-Freitas cumulus scheme driver.
 module cu_gf_driver
 
    ! DH* TODO: replace constants with arguments to cu_gf_driver_run
    !use physcons  , g => con_g, cp => con_cp, xlv => con_hvap, r_v => con_rv
    use machine   , only: kind_phys
-   use cu_gf_deep, only: cu_gf_deep_run,neg_check,autoconv,aeroevap,fct1d3
+   use cu_gf_deep, only: cu_gf_deep_run,neg_check,fct1d3
    use cu_gf_sh  , only: cu_gf_sh_run
+   use cu_gf_io  , only: cu_gf_io_write_state, cu_gf_io_read_state
 
    implicit none
 
    private
 
-   public :: cu_gf_driver_init, cu_gf_driver_run, cu_gf_driver_finalize
+   public :: cu_gf_driver_init, cu_gf_driver_run
 
 contains
 
-!> \brief Brief description of the subroutine
+!> \defgroup cu_gf_group Grell-Freitas Convection Module
+!! This is the Grell-Freitas scale and aerosol aware scheme.
+!>@{
+!>\defgroup cu_gf_driver  Grell-Freitas Convection Driver Module
+!> \ingroup cu_gf_group
+!> This is Grell-Freitas cumulus scheme driver module.
 !!
 !! \section arg_table_cu_gf_driver_init Argument Table
 !! \htmlinclude cu_gf_driver_init.html
@@ -39,45 +45,18 @@ contains
          errmsg = ''
          errflg = 0
 
-         ! DH* temporary
-         ! if (mpirank==mpiroot) then
-         !    write(0,*) ' ----------------------------------------------------------'//&
-         !                '-------------------------------------------------------------------'
-         !    write(0,*) ' --- WARNING --- the CCPP Grell Freitas convection scheme is'//&
-         !                ' currently under development, use at your own risk --- WARNING ---'
-         !    write(0,*) ' --------------------------------------------------------------------'//&
-         !                '---------------------------------------------------------'
-         ! end if
-         ! *DH temporary
-
-         ! Consistency checks
-         if (.not. (imfshalcnv == imfshalcnv_gf .or.                       &
-        &        imfdeepcnv == imfdeepcnv_gf)) then
-           write(errmsg,'(*(a))') 'Logic error: namelist choice of',       &
-        &    ' convection is different from Grell-Freitas scheme'
-           errflg = 1
-           return
-         end if
-
       end subroutine cu_gf_driver_init
 
-      subroutine cu_gf_driver_finalize()
-      end subroutine cu_gf_driver_finalize
 !
 ! t2di is temp after advection, but before physics
 ! t = current temp (t2di + physics up to now)
 !===================
 
-!> \defgroup cu_gf_group Grell-Freitas Convection Scheme Module
-!! This is the Grell-Freitas scale and aerosol aware scheme.
-!>\defgroup cu_gf_driver  Grell-Freitas Convection Scheme Driver Module
-!> \ingroup cu_gf_group
-!! This is the Grell-Freitas convection scheme driver module.
+!> This is the Grell-Freitas convection scheme driver module.
 !! \section arg_table_cu_gf_driver_run Argument Table
 !! \htmlinclude cu_gf_driver_run.html
 !!
-!>\section gen_gf_driver GSD GF Cumulus Scheme General Algorithm
-!> @{
+!>\section gen_gf_driver Grell-Freitas Cumulus Scheme Driver General Algorithm
       subroutine cu_gf_driver_run(ntracer,garea,im,km,dt,flag_init,flag_restart,&
                cactiv,cactiv_m,g,cp,xlv,r_v,forcet,forceqv_spechum,phil,raincv, &
                qv_spechum,t,cld1d,us,vs,t2di,w,qv2di_spechum,p2di,psuri,        &
@@ -88,7 +67,9 @@ contains
                index_of_y_wind,index_of_process_scnv,index_of_process_dcnv,     &
                fhour,fh_dfi_radar,ix_dfi_radar,num_dfi_radar,cap_suppress,      &
                dfi_radar_max_intervals,ldiag3d,qci_conv,do_cap_suppress,        &
-               errmsg,errflg)
+               maxupmf,maxMF,do_mynnedmf,ichoice_in,ichoicem_in,ichoice_s_in,   &
+               spp_cu_deep,spp_wts_cu_deep,nchem,chem3d,fscav,wetdpc_deep,      &
+               do_smoke_transport,kdt,errmsg,errflg)
 !-------------------------------------------------------------
       implicit none
       integer, parameter :: maxiens=1
@@ -96,14 +77,17 @@ contains
       integer, parameter :: maxens2=1
       integer, parameter :: maxens3=16
       integer, parameter :: ensdim=16
-      integer, parameter :: imid_gf=1    ! testgf2 turn on middle gf conv.
+      integer            :: imid_gf=1    ! gf congest conv.
       integer, parameter :: ideep=1
-      integer, parameter :: ichoice=0	! 0 2 5 13 8
-     !integer, parameter :: ichoicem=5	! 0 2 5 13
-      integer, parameter :: ichoicem=13	! 0 2 5 13
-      integer, parameter :: ichoice_s=3	! 0 1 2 3
+      integer            :: ichoice=0    ! 0 2 5 13 8
+      integer            :: ichoicem=13  ! 0 2 5 13
+      integer            :: ichoice_s=3  ! 0 1 2 3
+      integer, intent(in) :: spp_cu_deep ! flag for using SPP perturbations
+      real(kind_phys), dimension(:,:), intent(in),optional ::        &
+     &                    spp_wts_cu_deep
+      real(kind=kind_phys) :: spp_wts_cu_deep_tmp
 
-      logical, intent(in) :: do_cap_suppress
+      logical, intent(in) :: do_cap_suppress, do_smoke_transport
       real(kind=kind_phys), parameter :: aodc0=0.14
       real(kind=kind_phys), parameter :: aodreturn=30.
       real(kind=kind_phys) :: dts,fpi,fp
@@ -112,21 +96,23 @@ contains
       integer            :: ishallow_g3 ! depend on imfshalcnv
 !-------------------------------------------------------------
    integer      :: its,ite, jts,jte, kts,kte
-   integer, intent(in   ) :: im,km,ntracer
-   logical, intent(in   ) :: flag_init, flag_restart
+   integer, intent(in   ) :: im,km,ntracer,nchem,kdt
+   integer, intent(in   ) :: ichoice_in,ichoicem_in,ichoice_s_in
+   logical, intent(in   ) :: flag_init, flag_restart, do_mynnedmf
    logical, intent(in   ) :: flag_for_scnv_generic_tend,flag_for_dcnv_generic_tend
    real (kind=kind_phys), intent(in) :: g,cp,xlv,r_v
    logical, intent(in   ) :: ldiag3d
 
-   real(kind=kind_phys), intent(inout)                      :: dtend(:,:,:)
+   real(kind=kind_phys), intent(inout), optional            :: dtend(:,:,:)
 !$acc declare copy(dtend)
    integer, intent(in)                                      :: dtidx(:,:), &
         index_of_x_wind, index_of_y_wind, index_of_temperature,            &
         index_of_process_scnv, index_of_process_dcnv, ntqv, ntcw, ntiw
 !$acc declare copyin(dtidx)
-   real(kind=kind_phys),  dimension( : , : ), intent(in    ) :: forcet,forceqv_spechum,w,phil
+   real(kind=kind_phys),  dimension( : , : ), intent(in    ), optional :: forcet,forceqv_spechum
+   real(kind=kind_phys),  dimension( : , : ), intent(in    ) :: w,phil
    real(kind=kind_phys),  dimension( : , : ), intent(inout ) :: t,us,vs
-   real(kind=kind_phys),  dimension( : , : ), intent(inout ) :: qci_conv
+   real(kind=kind_phys),  dimension( : , : ), intent(inout ), optional :: qci_conv
    real(kind=kind_phys),  dimension( : , : ), intent(out   ) :: cnvw_moist,cnvc
    real(kind=kind_phys),  dimension( : , : ), intent(inout ) :: cliw, clcw
 !$acc declare copyin(forcet,forceqv_spechum,w,phil)
@@ -138,37 +124,46 @@ contains
    integer, intent(in) :: dfi_radar_max_intervals
    real(kind=kind_phys), intent(in) :: fhour, fh_dfi_radar(:)
    integer, intent(in) :: num_dfi_radar, ix_dfi_radar(:)
-   real(kind=kind_phys), intent(in) :: cap_suppress(:,:)
+   real(kind=kind_phys), intent(in), optional :: cap_suppress(:,:)
 !$acc declare copyin(fh_dfi_radar,ix_dfi_radar,cap_suppress)
 
    integer, dimension (:), intent(out) :: hbot,htop,kcnv
    integer, dimension (:), intent(in)  :: xland
    real(kind=kind_phys),    dimension (:), intent(in) :: pbl
+   real(kind=kind_phys),    dimension (:), intent(in), optional :: maxMF
 !$acc declare copyout(hbot,htop,kcnv)
 !$acc declare copyin(xland,pbl)
    integer, dimension (im) :: tropics
+!$acc declare create(tropics)
 !  ruc variable
    real(kind=kind_phys), dimension (:),   intent(in)  :: hfx2,qfx2,psuri
-   real(kind=kind_phys), dimension (:,:), intent(out) :: ud_mf,dd_mf,dt_mf
+   real(kind=kind_phys), dimension (:,:), intent(out) :: dd_mf,dt_mf
+   real(kind=kind_phys), dimension (:,:), intent(out), optional :: ud_mf
    real(kind=kind_phys), dimension (:),   intent(out) :: raincv,cld1d
+   real(kind=kind_phys), dimension (:),   intent(out), optional :: maxupmf
    real(kind=kind_phys), dimension (:,:), intent(in)  :: t2di,p2di
 !$acc declare copyin(hfx2,qfx2,psuri,t2di,p2di)
 !$acc declare copyout(ud_mf,dd_mf,dt_mf,raincv,cld1d)
    ! Specific humidity from FV3
    real(kind=kind_phys), dimension (:,:), intent(in) :: qv2di_spechum
    real(kind=kind_phys), dimension (:,:), intent(inout) :: qv_spechum
-   real(kind=kind_phys), dimension (:), intent(inout) :: aod_gf
+   real(kind=kind_phys), dimension (:), intent(inout), optional :: aod_gf
 !$acc declare copyin(qv2di_spechum) copy(qv_spechum,aod_gf)
    ! Local water vapor mixing ratios and cloud water mixing ratios
    real(kind=kind_phys), dimension (im,km) :: qv2di, qv, forceqv, cnvw
+!$acc declare create(qv2di, qv, forceqv, cnvw)
    !
    real(kind=kind_phys), dimension(:),intent(in) :: garea
 !$acc declare copyin(garea)
    real(kind=kind_phys), intent(in   ) :: dt
 
    integer, intent(in   ) :: imfshalcnv
-   integer, dimension(:), intent(inout) :: cactiv,cactiv_m
-!$acc declare copy(cactiv,cactiv_m)
+   integer, dimension(:), intent(inout), optional :: cactiv,cactiv_m
+   real(kind_phys), dimension(:), intent(in) :: fscav
+!$acc declare copyin(fscav)
+   real(kind_phys), dimension(:,:,:), intent(inout), optional :: chem3d
+   real(kind_phys), dimension(:,:), intent(inout), optional   :: wetdpc_deep
+!$acc declare copy(cactiv,cactiv_m,chem3d,wetdpc_deep)
 
    character(len=*), intent(out) :: errmsg
    integer,          intent(out) :: errflg
@@ -193,15 +188,28 @@ contains
    real(kind=kind_phys), dimension (im)    :: tau_ecmwf,edt,edtm,edtd,ter11,aa0,xlandi
    real(kind=kind_phys), dimension (im)    :: pret,prets,pretm,hexec
    real(kind=kind_phys), dimension (im,10) :: forcing,forcing2
+   real(kind=kind_phys), dimension (im,nchem) :: wetdpc_mid
 
    integer, dimension (im) :: kbcon, ktop,ierr,ierrs,ierrm,kpbli
    integer, dimension (im) :: k22s,kbcons,ktops,k22,jmin,jminm
    integer, dimension (im) :: kbconm,ktopm,k22m
+!$acc declare create(k22_shallow,kbcon_shallow,ktop_shallow,rand_mom,rand_vmas,        &
+!$acc                rand_clos,gdc,gdc2,ht,ccn_gf,ccn_m,dx,frhm,frhd,wetdpc_mid, &
+!$acc                outt,outq,outqc,phh,subm,cupclw,cupclws, &
+!$acc                dhdt,zu,zus,zd,phf,zum,zdm,outum,outvm,   &
+!$acc                outts,outqs,outqcs,outu,outv,outus,outvs, &
+!$acc                outtm,outqm,outqcm,submm,cupclwm,         &
+!$acc                cnvwt,cnvwts,cnvwtm,hco,hcdo,zdo,zdd,hcom,hcdom,zdom, &
+!$acc                tau_ecmwf,edt,edtm,edtd,ter11,aa0,xlandi, &
+!$acc                pret,prets,pretm,hexec,forcing,forcing2,wetdpc_mid,  &
+!$acc                kbcon, ktop,ierr,ierrs,ierrm,kpbli, &
+!$acc                k22s,kbcons,ktops,k22,jmin,jminm,kbconm,ktopm,k22m)
 
    integer :: iens,ibeg,iend,jbeg,jend,n
    integer :: ibegh,iendh,jbegh,jendh
    integer :: ibegc,iendc,jbegc,jendc,kstop
    real(kind=kind_phys), dimension(im,km) :: rho_dryar
+!$acc declare create(rho_dryar)
    real(kind=kind_phys) :: pten,pqen,paph,zrho,pahfs,pqhfl,zkhvfl,pgeoh
    integer, parameter :: ipn = 0
 
@@ -215,6 +223,9 @@ contains
    real(kind=kind_phys), dimension (im)    :: z1,psur,cuten,cutens,cutenm
    real(kind=kind_phys), dimension (im)    :: umean,vmean,pmean
    real(kind=kind_phys), dimension (im)    :: xmbs,xmbs2,xmb,xmbm,xmb_dumm,mconv
+!$acc declare create(qcheck,zo,t2d,q2d,po,p2d,rhoi,clw_ten,tn,qo,tshall,qshall,dz8w,omeg, &
+!$acc                z1,psur,cuten,cutens,cutenm,umean,vmean,pmean,           &
+!$acc                xmbs,xmbs2,xmb,xmbm,xmb_dumm,mconv)
 
    integer :: i,j,k,icldck,ipr,jpr,jpr_deep,ipr_deep,uidx,vidx,tidx,qidx
    integer :: itf,jtf,ktf,iss,jss,nbegin,nend,cliw_idx,clcw_idx
@@ -224,6 +235,7 @@ contains
    real(kind=kind_phys), dimension(km)   :: massflx,trcflx_in1,clw_in1,po_cup
 !  real(kind=kind_phys), dimension(km)   :: trcflx_in2,clw_in2,clw_ten2
    real(kind=kind_phys), dimension (im)  :: flux_tun,tun_rad_mid,tun_rad_shall,tun_rad_deep
+!$acc declare create(flux_tun,tun_rad_mid,tun_rad_shall,tun_rad_deep)
    character*50 :: ierrc(im),ierrcm(im)
    character*50 :: ierrcs(im)
 !  ruc variable
@@ -231,46 +243,115 @@ contains
 !  qfx2 -- latent heat flux (kg/kg m/s), positive upward from sfc
 !  gf needs them in w/m2. define hfx and qfx after simple unit conversion
    real(kind=kind_phys), dimension (im)  :: hfx,qfx
-   real(kind=kind_phys) tem,tem1,tf,tcr,tcrf
+!$acc declare create(hfx,qfx)
+   real(kind=kind_phys) tem,tem1,tf,tcr,tcrf,psum
    real(kind=kind_phys) :: cliw_shal,clcw_shal,tem_shal, cliw_both, weight_sum
    real(kind=kind_phys) :: cliw_deep,clcw_deep,tem_deep, clcw_both
    integer :: cliw_deep_idx, clcw_deep_idx, cliw_shal_idx, clcw_shal_idx
 
    real(kind=kind_phys) :: cap_suppress_j(im)
+!$acc declare create(cap_suppress_j)
    integer :: itime, do_cap_suppress_here
-   logical :: exit_func
+   logical :: exit_func, exist
+   integer, save :: counter = 0
+   character(len=255) :: state_input_file, state_output_file
 
   !parameter (tf=243.16, tcr=270.16, tcrf=1.0/(tcr-tf)) ! FV3 original
   !parameter (tf=263.16, tcr=273.16, tcrf=1.0/(tcr-tf))
   !parameter (tf=233.16, tcr=263.16, tcrf=1.0/(tcr-tf))
   parameter (tf=258.16, tcr=273.16, tcrf=1.0/(tcr-tf)) ! as fim, HCB tuning
+
+     counter = counter + 1
+     ! --- Set name of input and output state files
+     write(state_input_file, "(A,I0.4,A)") "input_state_", counter, ".nc"
+     write(state_output_file, "(A,I0.4,A)") "output_state_", counter, ".nc"
+
+     !--- Write input state for this time step
+     call cu_gf_io_write_state(trim(state_input_file),        &
+         ntracer,                 &
+         garea,                   &
+         dt,                      &
+         flag_init,               &
+         flag_restart,            &
+         cactiv,                  &
+         cactiv_m,                &
+         g,                       &
+         cp,                      &
+         xlv,                     &
+         r_v,                     &
+         forcet,                  &
+         forceqv_spechum,         &
+         phil,                    &
+         raincv,                  &
+         qv_spechum,              &
+         t,                       &
+         cld1d,                   &
+         us,                      &
+         vs,                      &
+         t2di,                    &
+         w,                       &
+         qv2di_spechum,           &
+         p2di,                    &
+         psuri,                   &
+         hbot,                    &
+         htop,                    &
+         kcnv,                    &
+         xland,                   &
+         hfx2,                    &
+         qfx2,                    &
+         aod_gf,                  &
+         cliw,                    &
+         clcw,                    &
+         pbl,                     &
+         ud_mf,                   &
+         dd_mf,                   &
+         dt_mf,                   &
+         cnvw_moist,              &
+         cnvc,                    &
+         imfshalcnv,              &
+         flag_for_scnv_generic_tend, &
+         flag_for_dcnv_generic_tend, &
+         dtend,                   &
+         dtidx,                   &
+         ntqv,                    &
+         ntiw,                    &
+         ntcw,                    &
+         index_of_temperature,    &
+         index_of_x_wind,         &
+         index_of_y_wind,         &
+         index_of_process_scnv,   &
+         index_of_process_dcnv,   &
+         fhour,                   &
+         fh_dfi_radar,            &
+         ix_dfi_radar,            &
+         cap_suppress,            &
+         dfi_radar_max_intervals, &
+         ldiag3d,                 &
+         qci_conv,                &
+         do_cap_suppress,         &
+         maxupmf,                 &
+         maxMF,                   &
+         do_mynnedmf,             &
+         ichoice_in,              &
+         ichoicem_in,             &
+         ichoice_s_in,            &
+         spp_cu_deep,             &
+         spp_wts_cu_deep,         &
+         nchem,                   &
+         chem3d,                  &
+         fscav,                   &
+         wetdpc_deep,             &
+         do_smoke_transport,      &
+         kdt                      &
+     )
+
   ! initialize ccpp error handling variables
      errmsg = ''
      errflg = 0
 
-   !-----allocate on heap ------
-!$acc enter data create(tropics)
-!$acc enter data create(qv2di, qv, forceqv, cnvw)
-!$acc enter data create(k22_shallow,kbcon_shallow,ktop_shallow,rand_mom,rand_vmas,        &
-!$acc                rand_clos,gdc,gdc2,ht,ccn_gf,ccn_m,dx,frhm,frhd, &
-!$acc                outt,outq,outqc,phh,subm,cupclw,cupclws, &
-!$acc                dhdt,zu,zus,zd,phf,zum,zdm,outum,outvm,   &
-!$acc                outts,outqs,outqcs,outu,outv,outus,outvs, &
-!$acc                outtm,outqm,outqcm,submm,cupclwm,         &
-!$acc                cnvwt,cnvwts,cnvwtm,hco,hcdo,zdo,zdd,hcom,hcdom,zdom, &
-!$acc                tau_ecmwf,edt,edtm,edtd,ter11,aa0,xlandi, &
-!$acc                pret,prets,pretm,hexec,forcing,forcing2,  &
-!$acc                kbcon, ktop,ierr,ierrs,ierrm,kpbli, &
-!$acc                k22s,kbcons,ktops,k22,jmin,jminm,kbconm,ktopm,k22m)
-!$acc enter data create(rho_dryar)
-!$acc enter data create(qcheck,zo,t2d,q2d,po,p2d,rhoi,clw_ten,tn,qo,tshall,qshall,dz8w,omeg, &
-!$acc                z1,psur,cuten,cutens,cutenm,umean,vmean,pmean,           &
-!$acc                xmbs,xmbs2,xmb,xmbm,xmb_dumm,mconv)
-!$acc enter data create(flux_tun,tun_rad_mid,tun_rad_shall,tun_rad_deep)
-!$acc enter data create(hfx,qfx)
-!$acc enter data create(cap_suppress_j)
-   !-----allocate on heap ------
-
+     ichoice   = ichoice_in
+     ichoicem  = ichoicem_in
+     ichoice_s = ichoice_s_in
      if(do_cap_suppress) then
 !$acc serial
        do itime=1,num_dfi_radar
@@ -298,19 +379,15 @@ contains
          cliw_deep_idx=0
          clcw_deep_idx=0
        else
-!$acc serial
          cliw_deep_idx=dtidx(100+ntiw,index_of_process_dcnv)
          clcw_deep_idx=dtidx(100+ntcw,index_of_process_dcnv)
-!$acc end serial
        endif
        if(flag_for_scnv_generic_tend) then
          cliw_shal_idx=0
          clcw_shal_idx=0
        else
-!$acc serial
          cliw_shal_idx=dtidx(100+ntiw,index_of_process_scnv)
          clcw_shal_idx=dtidx(100+ntcw,index_of_process_scnv)
-!$acc end serial
        endif
        if(cliw_deep_idx>=1 .or. clcw_deep_idx>=1 .or. &
             cliw_shal_idx>=1 .or.  clcw_shal_idx>=1) then
@@ -338,9 +415,18 @@ contains
 ! these should be coming in from outside
 !
 !    cactiv(:)      = 0
-     rand_mom(:)    = 0.
-     rand_vmas(:)   = 0.
-     rand_clos(:,:) = 0.
+     if (spp_cu_deep == 0) then
+       rand_mom(:)    = 0.
+       rand_vmas(:)   = 0.
+       rand_clos(:,:) = 0.
+     else 
+       do i=1,im
+         spp_wts_cu_deep_tmp=min(max(-1.0_kind_phys, spp_wts_cu_deep(i,1)),1.0_kind_phys)
+         rand_mom(i)    = spp_wts_cu_deep_tmp 
+         rand_vmas(i)   = spp_wts_cu_deep_tmp 
+         rand_clos(i,:) = spp_wts_cu_deep_tmp
+       end do
+     end if
 !$acc end kernels
 !
      its=1
@@ -366,10 +452,7 @@ contains
      edtd(:)=0.
      zdd(:,:)=0.
      flux_tun(:)=5.
-! 10/11/2016 dx and tscl_kf are replaced with input dx(i), is dlength.
 ! dx for scale awareness
-!    dx=40075000./float(lonf)
-!    tscl_kf=dx/25000.
 !$acc end kernels
 
      if (imfshalcnv == 3) then
@@ -566,6 +649,9 @@ contains
      subm(:,:)=0.
      dhdt(:,:)=0.
 
+     frhm(:)=0.
+     frhd(:)=0.
+
      do k=kts,ktf
       do i=its,itf
         p2d(i,k)=0.01*p2di(i,k)
@@ -630,17 +716,33 @@ contains
        endif
       enddo
      enddo
+     do i = its,itf
+       psum=0.
+       do k=kts,ktf-3
+        if (clcw(i,k) .gt. -999.0 .and. clcw(i,k+1) .gt. -999.0 )then
+           dp=(p2d(i,k)-p2d(i,k+1))
+           psum=psum+dp
+           clwtot = cliw(i,k) + clcw(i,k)
+           if(clwtot.lt.1.e-32)clwtot=0.
+           forcing(i,7)=forcing(i,7)+clwtot*dp
+        endif
+       enddo
+       if(psum.gt.0)forcing(i,7)=forcing(i,7)/psum
+       forcing2(i,7)=forcing(i,7)
+     enddo
      do k=kts,ktf-1
       do i = its,itf
         omeg(i,k)= w(i,k) !-g*rhoi(i,k)*w(i,k)
-!       dq=(q2d(i,k+1)-q2d(i,k))
-!       mconv(i)=mconv(i)+omeg(i,k)*dq/g
       enddo
      enddo
      do i = its,itf
       if(mconv(i).lt.0.)mconv(i)=0.
+      if((dx(i)<6500.).and.do_mynnedmf.and.(maxMF(i).gt.0.))ierr(i)=555
      enddo
 !$acc end kernels
+     if (dx(its)<6500.) then
+       imid_gf=0
+     endif
 !
 !---- call cumulus parameterization
 !
@@ -669,7 +771,13 @@ contains
 
 !$acc kernels
           do i=its,itf
-           if(xmbs(i).gt.0.)cutens(i)=1.
+           if(xmbs(i).gt.0.)then
+            cutens(i)=1.
+            if (dx(i)<6500.) then
+             ierrm(i)=555
+             ierr (i)=555
+            endif
+           endif
           enddo
 !$acc end kernels
 !> - Call neg_check() for GF shallow convection
@@ -683,8 +791,8 @@ contains
       if(imid_gf == 1)then
        call cu_gf_deep_run(        &
                itf,ktf,its,ite, kts,kte  &
-              ,dicycle_m       &
-              ,ichoicem       &
+              ,dicycle_m     &
+              ,ichoicem      &
               ,ipr           &
               ,ccn_m         &
               ,ccnclean      &
@@ -693,25 +801,23 @@ contains
               ,kpbli         &
               ,dhdt          &
               ,xlandi        &
-
               ,zo            &
-              ,forcing2      &
+              ,forcing       &
               ,t2d           &
               ,q2d           &
               ,ter11         &
               ,tshall        &
               ,qshall        &
-              ,p2d          &
+              ,p2d           &
               ,psur          &
               ,us            &
               ,vs            &
               ,rhoi          &
               ,hfx           &
               ,qfx           &
-              ,dx            & !hj dx(im)
+              ,dx            &
               ,mconv         &
               ,omeg          &
-
               ,cactiv_m      &
               ,cnvwtm        &
               ,zum           &
@@ -734,11 +840,16 @@ contains
               ,frhm          &
               ,ierrm         &
               ,ierrcm        &
+              ,nchem         &
+              ,fscav         &
+              ,chem3d        &
+              ,wetdpc_mid    &
+              ,do_smoke_transport   &
 !    the following should be set to zero if not available
               ,rand_mom      & ! for stochastics mom, if temporal and spatial patterns exist
               ,rand_vmas     & ! for stochastics vertmass, if temporal and spatial patterns exist
               ,rand_clos     & ! for stochastics closures, if temporal and spatial patterns exist
-              ,0             & ! flag to what you want perturbed
+              ,spp_cu_deep   & ! flag to what you want perturbed
                                ! 1 = momentum transport
                                ! 2 = normalized vertical mass flux profile
                                ! 3 = closures
@@ -747,7 +858,7 @@ contains
                                ! betwee -1 and +1
               ,do_cap_suppress_here,cap_suppress_j &
               ,k22m          &
-              ,jminm,tropics)
+              ,jminm,kdt,tropics)
 !$acc kernels
             do i=its,itf
              do k=kts,ktf
@@ -777,7 +888,7 @@ contains
               ,xlandi        &
 
               ,zo            &
-              ,forcing       &
+              ,forcing2      &
               ,t2d           &
               ,q2d           &
               ,ter11         &
@@ -790,37 +901,41 @@ contains
               ,rhoi          &
               ,hfx           &
               ,qfx           &
-              ,dx            & !hj replace dx(im)
+              ,dx            &
               ,mconv         &
               ,omeg          &
-
-              ,cactiv       &
-              ,cnvwt        &
-              ,zu           &
-              ,zd           &
-              ,zdm          & ! hli
-              ,edt          &
-              ,edtm         & ! hli
-              ,xmb          &
-              ,xmbm         &
-              ,xmbs         &
-              ,pret         &
-              ,outu         &
-              ,outv         &
-              ,outt         &
-              ,outq         &
-              ,outqc        &
-              ,kbcon        &
-              ,ktop         &
-              ,cupclw       &
-              ,frhd         &
-              ,ierr         &
-              ,ierrc        &
+              ,cactiv        &
+              ,cnvwt         &
+              ,zu            &
+              ,zd            &
+              ,zdm           & ! hli
+              ,edt           &
+              ,edtm          & ! hli
+              ,xmb           &
+              ,xmbm          &
+              ,xmbs          &
+              ,pret          &
+              ,outu          &
+              ,outv          &
+              ,outt          &
+              ,outq          &
+              ,outqc         &
+              ,kbcon         &
+              ,ktop          &
+              ,cupclw        &
+              ,frhd          &
+              ,ierr          &
+              ,ierrc         &
+              ,nchem         &
+              ,fscav         &
+              ,chem3d        &
+              ,wetdpc_deep   &
+              ,do_smoke_transport     &
 !    the following should be set to zero if not available
               ,rand_mom      & ! for stochastics mom, if temporal and spatial patterns exist
               ,rand_vmas     & ! for stochastics vertmass, if temporal and spatial patterns exist
               ,rand_clos     & ! for stochastics closures, if temporal and spatial patterns exist
-              ,0             & ! flag to what you want perturbed
+              ,spp_cu_deep   & ! flag to what you want perturbed
                                ! 1 = momentum transport
                                ! 2 = normalized vertical mass flux profile
                                ! 3 = closures
@@ -829,7 +944,7 @@ contains
                                ! betwee -1 and +1
               ,do_cap_suppress_here,cap_suppress_j &
               ,k22          &
-              ,jmin,tropics)
+              ,jmin,kdt,tropics)
           jpr=0
           ipr=0
 !$acc kernels
@@ -844,25 +959,6 @@ contains
                       outqc,pret,its,ite,kts,kte,itf,ktf,ktop)
 !
       endif
-!            do i=its,itf
-!              kcnv(i)=0
-!              if(pret(i).gt.0.)then
-!                 cuten(i)=1.
-!                 kcnv(i)= 1 !jmin(i)
-!              else
-!                 kbcon(i)=0
-!                 ktop(i)=0
-!                 cuten(i)=0.
-!              endif   ! pret > 0
-!              if(pretm(i).gt.0.)then
-!                 kcnv(i)= 1 !jmin(i)
-!                 cutenm(i)=1.
-!              else
-!                 kbconm(i)=0
-!                 ktopm(i)=0
-!                 cutenm(i)=0.
-!              endif   ! pret > 0
-!            enddo
 !$acc kernels
             do i=its,itf
               kcnv(i)=0
@@ -909,6 +1005,7 @@ contains
             endif
 
             dtime_max=dt
+            forcing2(i,3)=0.
             do k=kts,kstop
                cnvc(i,k) = 0.04 * log(1. + 675. * zu(i,k) * xmb(i)) +   &
                            0.04 * log(1. + 675. * zum(i,k) * xmbm(i)) + &
@@ -926,9 +1023,8 @@ contains
 
                gdc(i,k,1)= max(0.,tun_rad_shall(i)*cupclws(i,k)*cutens(i))      ! my mod
                !gdc2(i,k,1)=max(0.,tun_rad_deep(i)*(cupclwm(i,k)*cutenm(i)+cupclw(i,k)*cuten(i)))
-               !gdc2(i,k,1)=max(0.,tun_rad_mid(i)*cupclwm(i,k)*cutenm(i)+tun_rad_deep(i)*cupclw(i,k)*cuten(i)+tun_rad_shall(i)*cupclws(i,k)*cutens(i))
-               gdc2(i,k,1) = min(0.1, max(0.01, tun_rad_mid(i)*frhm(i)))*cupclwm(i,k)*cutenm(i) + &
-                 min(0.1, max(0.01, tun_rad_deep(i)*(frhd(i))))*cupclw(i,k)*cuten(i) + tun_rad_shall(i)*cupclws(i,k)*cutens(i)
+               gdc2(i,k,1)=max(0.,tun_rad_mid(i)*cupclwm(i,k)*cutenm(i)+frhd(i)*cupclw(i,k)*cuten(i)+tun_rad_shall(i)*cupclws(i,k)*cutens(i))
+               !gdc2(i,k,1) = min(0.1, max(0.01, tun_rad_mid(i)*frhm(i)))*cupclwm(i,k)*cutenm(i) + min(0.1, max(0.01, tun_rad_deep(i)*(frhd(i))))*cupclw(i,k)*cuten(i) + tun_rad_shall(i)*cupclws(i,k)*cutens(i)
                qci_conv(i,k)=gdc2(i,k,1)
                gdc(i,k,2)=(outt(i,k))*86400.
                gdc(i,k,3)=(outtm(i,k))*86400.
@@ -937,38 +1033,6 @@ contains
               !gdc(i,k,8)=(outq(i,k))*86400.*xlv/cp
                gdc(i,k,8)=(outqm(i,k)+outqs(i,k)+outq(i,k))*86400.*xlv/cp
                gdc(i,k,9)=gdc(i,k,2)+gdc(i,k,3)+gdc(i,k,4)
-!
-!> - Calculate subsidence effect on clw
-!
-!              dsubclw=0.
-!              dsubclwm=0.
-!              dsubclws=0.
-!              dp=100.*(p2d(i,k)-p2d(i,k+1))
-!              if (clcw(i,k) .gt. -999.0 .and. clcw(i,k+1) .gt. -999.0 )then
-!                 clwtot = cliw(i,k) + clcw(i,k)
-!                 clwtot1= cliw(i,k+1) + clcw(i,k+1)
-!                 dsubclw=((-edt(i)*zd(i,k+1)+zu(i,k+1))*clwtot1   &
-!                      -(-edt(i)*zd(i,k)  +zu(i,k))  *clwtot  )*g/dp
-!                 dsubclwm=((-edtm(i)*zdm(i,k+1)+zum(i,k+1))*clwtot1   &
-!                      -(-edtm(i)*zdm(i,k)  +zum(i,k))  *clwtot  )*g/dp
-!                 dsubclws=(zus(i,k+1)*clwtot1-zus(i,k)*clwtot)*g/dp
-!                 dsubclw=dsubclw+(zu(i,k+1)*clwtot1-zu(i,k)*clwtot)*g/dp
-!                 dsubclwm=dsubclwm+(zum(i,k+1)*clwtot1-zum(i,k)*clwtot)*g/dp
-!                 dsubclws=dsubclws+(zus(i,k+1)*clwtot1-zus(i,k)*clwtot)*g/dp
-!              endif
-!              tem  = dt*(outqcs(i,k)*cutens(i)+outqc(i,k)*cuten(i)       &
-!                    +outqcm(i,k)*cutenm(i)                           &
-!                     +dsubclw*xmb(i)+dsubclws*xmbs(i)+dsubclwm*xmbm(i) &
-!                    )
-!              tem1 = max(0.0, min(1.0, (tcr-t(i,k))*tcrf))
-!              if (clcw(i,k) .gt. -999.0) then
-!               cliw(i,k) = max(0.,cliw(i,k) + tem * tem1)            ! ice
-!               clcw(i,k) = max(0.,clcw(i,k) + tem *(1.0-tem1))       ! water
-!              else
-!                cliw(i,k) = max(0.,cliw(i,k) + tem)
-!              endif
-!
-!            enddo
 
 !> - FCT treats subsidence effect to cloud ice/water (begin)
                dp=100.*(p2d(i,k)-p2d(i,k+1))
@@ -984,6 +1048,7 @@ contains
                              -(xmbm(i)*(zdm(i,k)-edtm(i)*zdm(i,k)))   &
                              -(xmbs(i)*zus(i,k))
                   trcflx_in1(k)=massflx(k)*.5*(clwtot+clwtot1)
+                  forcing2(i,3)=forcing2(i,3)+clwtot
                endif
              enddo
 
@@ -1021,6 +1086,12 @@ contains
             gdc(i,13,10)=hfx(i)
             gdc(i,15,10)=qfx(i)
             gdc(i,16,10)=pret(i)*3600.
+
+            maxupmf(i)=0.
+            if(forcing2(i,6).gt.0.)then
+              maxupmf(i)=maxval(xmb(i)*zu(i,kts:ktf)/forcing2(i,6))
+            endif
+
             if(ktop(i).gt.2 .and.pret(i).gt.0.)dt_mf(i,ktop(i)-1)=ud_mf(i,ktop(i))
             endif
             enddo
@@ -1072,12 +1143,10 @@ contains
 !
         if(ldiag3d) then
           if(ishallow_g3.eq.1 .and. .not.flag_for_scnv_generic_tend) then
-!$acc serial
             uidx=dtidx(index_of_x_wind,index_of_process_scnv)
             vidx=dtidx(index_of_y_wind,index_of_process_scnv)
             tidx=dtidx(index_of_temperature,index_of_process_scnv)
             qidx=dtidx(100+ntqv,index_of_process_scnv)
-!$acc end serial
             if(uidx>=1) then
 !$acc kernels
               do k=kts,ktf
@@ -1112,11 +1181,9 @@ contains
             endif
           endif
           if((ideep.eq.1. .or. imid_gf.eq.1) .and. .not.flag_for_dcnv_generic_tend) then
-!$acc serial
             uidx=dtidx(index_of_x_wind,index_of_process_dcnv)
             vidx=dtidx(index_of_y_wind,index_of_process_dcnv)
             tidx=dtidx(index_of_temperature,index_of_process_dcnv)
-!$acc end serial
             if(uidx>=1) then
 !$acc kernels
               do k=kts,ktf
@@ -1139,9 +1206,7 @@ contains
 !$acc end kernels
             endif
 
-!$acc serial
             qidx=dtidx(100+ntqv,index_of_process_dcnv)
-!$acc end serial
             if(qidx>=1) then
 !$acc kernels
               do k=kts,ktf
@@ -1192,29 +1257,85 @@ contains
           endif
         endif
 
-   !-----allocate on heap ------
-!$acc exit data delete(tropics)
-!$acc exit data delete(qv2di, qv, forceqv, cnvw)
-!$acc exit data delete(k22_shallow,kbcon_shallow,ktop_shallow,rand_mom,rand_vmas,        &
-!$acc                rand_clos,gdc,gdc2,ht,ccn_gf,ccn_m,dx,frhm,frhd, &
-!$acc                outt,outq,outqc,phh,subm,cupclw,cupclws, &
-!$acc                dhdt,zu,zus,zd,phf,zum,zdm,outum,outvm,   &
-!$acc                outts,outqs,outqcs,outu,outv,outus,outvs, &
-!$acc                outtm,outqm,outqcm,submm,cupclwm,         &
-!$acc                cnvwt,cnvwts,cnvwtm,hco,hcdo,zdo,zdd,hcom,hcdom,zdom, &
-!$acc                tau_ecmwf,edt,edtm,edtd,ter11,aa0,xlandi, &
-!$acc                pret,prets,pretm,hexec,forcing,forcing2,  &
-!$acc                kbcon, ktop,ierr,ierrs,ierrm,kpbli, &
-!$acc                k22s,kbcons,ktops,k22,jmin,jminm,kbconm,ktopm,k22m)
-!$acc exit data delete(rho_dryar)
-!$acc exit data delete(qcheck,zo,t2d,q2d,po,p2d,rhoi,clw_ten,tn,qo,tshall,qshall,dz8w,omeg, &
-!$acc                z1,psur,cuten,cutens,cutenm,umean,vmean,pmean,           &
-!$acc                xmbs,xmbs2,xmb,xmbm,xmb_dumm,mconv)
-!$acc exit data delete(flux_tun,tun_rad_mid,tun_rad_shall,tun_rad_deep)
-!$acc exit data delete(hfx,qfx)
-!$acc exit data delete(cap_suppress_j)
-   !-----allocate on heap ------
+     !--- Write output state for this time step
+     call cu_gf_io_write_state(trim(state_output_file),        &
+         ntracer,                 &
+         garea,                   &
+         dt,                      &
+         flag_init,               &
+         flag_restart,            &
+         cactiv,                  &
+         cactiv_m,                &
+         g,                       &
+         cp,                      &
+         xlv,                     &
+         r_v,                     &
+         forcet,                  &
+         forceqv_spechum,         &
+         phil,                    &
+         raincv,                  &
+         qv_spechum,              &
+         t,                       &
+         cld1d,                   &
+         us,                      &
+         vs,                      &
+         t2di,                    &
+         w,                       &
+         qv2di_spechum,           &
+         p2di,                    &
+         psuri,                   &
+         hbot,                    &
+         htop,                    &
+         kcnv,                    &
+         xland,                   &
+         hfx2,                    &
+         qfx2,                    &
+         aod_gf,                  &
+         cliw,                    &
+         clcw,                    &
+         pbl,                     &
+         ud_mf,                   &
+         dd_mf,                   &
+         dt_mf,                   &
+         cnvw_moist,              &
+         cnvc,                    &
+         imfshalcnv,              &
+         flag_for_scnv_generic_tend, &
+         flag_for_dcnv_generic_tend, &
+         dtend,                   &
+         dtidx,                   &
+         ntqv,                    &
+         ntiw,                    &
+         ntcw,                    &
+         index_of_temperature,    &
+         index_of_x_wind,         &
+         index_of_y_wind,         &
+         index_of_process_scnv,   &
+         index_of_process_dcnv,   &
+         fhour,                   &
+         fh_dfi_radar,            &
+         ix_dfi_radar,            &
+         cap_suppress,            &
+         dfi_radar_max_intervals, &
+         ldiag3d,                 &
+         qci_conv,                &
+         do_cap_suppress,         &
+         maxupmf,                 &
+         maxMF,                   &
+         do_mynnedmf,             &
+         ichoice_in,              &
+         ichoicem_in,             &
+         ichoice_s_in,            &
+         spp_cu_deep,             &
+         spp_wts_cu_deep,         &
+         nchem,                   &
+         chem3d,                  &
+         fscav,                   &
+         wetdpc_deep,             &
+         do_smoke_transport,      &
+         kdt                      &
+     )
 
    end subroutine cu_gf_driver_run
-!> @}
+!>@}
 end module cu_gf_driver

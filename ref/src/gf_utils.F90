@@ -52,7 +52,13 @@ CONTAINS
        qci_conv,                &
        ix_dfi_radar,            &
        fh_dfi_radar,            &
-       cap_suppress             &
+       cap_suppress,            &
+       maxupmf,                 &
+       maxMF,                   &
+       spp_wts_cu_deep,         &
+       chem3d,                  &
+       fscav,                   &
+       wetdpc_deep              &
        )
 
     CHARACTER(LEN=*) :: msg
@@ -94,6 +100,12 @@ CONTAINS
     INTEGER, INTENT(IN) :: ix_dfi_radar(:)
     REAL(kind_phys), INTENT(IN) :: fh_dfi_radar(:)
     REAL(kind_phys), INTENT(IN) :: cap_suppress(:, :)
+    REAL(kind_phys), INTENT(IN) :: maxupmf(:)
+    REAL(kind_phys), INTENT(IN) :: maxMF(:)
+    REAL(kind_phys), INTENT(IN) :: spp_wts_cu_deep(:,:)
+    REAL(kind_phys), INTENT(IN) :: chem3d(:,:,:)
+    REAL(kind_phys), INTENT(IN) :: fscav(:)
+    REAL(kind_phys), INTENT(IN) :: wetdpc_deep(:,:)
 
     WRITE(*,'(A4)') "TEST"
     WRITE(*,'(A5,A137)') "TEST ", REPEAT("=",137)
@@ -140,6 +152,12 @@ CONTAINS
     CALL print_1d_variable_int("ix_dfi_radar", ix_dfi_radar)
     CALL print_1d_variable("fh_dfi_radar", fh_dfi_radar)
     CALL print_2d_variable("cap_suppress", cap_suppress)
+    CALL print_1d_variable("maxupmf", maxupmf)
+    CALL print_1d_variable("maxMF", maxMF)
+    CALL print_2d_variable("spp_wts_cu_deep", spp_wts_cu_deep)
+    CALL print_3d_variable("chem3d", chem3d)
+    CALL print_1d_variable("fscav", fscav)
+    !CALL print_2d_variable("wetdpc_deep", wetdpc_deep)
 
     WRITE(*,'(A5,A137)') "TEST ", REPEAT("-",137)
     WRITE(*,'(A4)') "TEST"
