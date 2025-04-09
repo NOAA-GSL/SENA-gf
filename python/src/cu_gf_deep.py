@@ -42,6 +42,8 @@ XLF = 0.333e6  # Latent heat of freezing (J / kg)
 
 QRC_CRIT = 2.0e-4  # Critical value for cloud water / ice detrainment (kg / kg)
 
+
+
 def my_maxloc1d(A, N):
     """
     Find the index of the maximum value in a 1D array.
@@ -96,6 +98,39 @@ def satvap(temp2):
     return satvap
 
 def cu_gf_deep_run(
+    itf, ktf, its, ite, kts, kte,  # Dimensions
+    dicycle,                      # Diurnal cycle flag
+    ichoice,                      # Choice of closure, use "0" for ensemble average
+    ipr,                          # Debugging flag
+    ccn,                          # Cloud condensation nuclei (not well tested yet)
+    ccnclean,                     # Clean CCN
+    dtime,                        # Time step over which forcing is applied
+    imid,                         # Flag to turn on mid-level convection
+    kpbl,                         # Level of boundary layer height
+    dhdt,                         # Boundary layer forcing (one closure for shallow)
+    xland,                        # Land mask
+    zo,                           # Heights above surface
+    forcing,                      # Diagnostic forcing
+    t,                            # Temperature before forcing
+    q,                            # Mixing ratio before forcing
+    z1,                           # Terrain height
+    tn,                           # Temperature including forcing
+    qo,                           # Mixing ratio including forcing
+    po,                           # Pressure (mb)
+    psur,                         # Surface pressure (mb)
+    us,                           # U-component of wind on mass points
+    vs,                           # V-component of wind on mass points
+    rho,                          # Density
+    hfx,                          # Surface heat flux (W/m^2, positive upward)
+    qfx,                          # Surface moisture flux (W/m^2, positive upward)
+    dx,                           # Grid spacing (dependent on grid point)
+    mconv,                        # Integrated vertical advection of moisture
+    omeg,                         # Omega (Pa/s)
+    csum,                         # Memory implementation (set to zero if not available)
+    cnvwt,                        # GFS-required variable
+    zuo,                           # Normalized updraft mass flux
+    zdo,                           # Normalized downdraft mass flux
+    zdm,                           # Normalized downdraft mass flux from mid-level scheme
     edto,                         # Downdraft entrainment/detrainment rate
     edtm,                         # Mid-level downdraft entrainment/detrainment rate
     xmb_out,                      # Base mass flux (output)
@@ -115,7 +150,7 @@ def cu_gf_deep_run(
     ierrc,                        # Error descriptions (array)
     nchem,                        # Number of chemical species
     fscav,                        # Scavenging factor
-    chem3d,                       # 3D chemical tracer array (array)
+    chem3d,                       # 3D chemical tracer array
     wetdpc_deep,                  # Wet deposition for deep convection
     do_smoke_transport,           # Flag for smoke transport
     rand_mom,                     # Random perturbations for momentum transport
@@ -129,61 +164,6 @@ def cu_gf_deep_run(
     kdt,                          # Time step index
     tropics                       # Tropics flag
 ):
-    """
-    Grell-Freitas deep convection scheme.
-
-    Parameters:
-        itf, ktf, its, ite, kts, kte: Dimensions (integers)
-        dicycle: Diurnal cycle flag (integer)
-        ichoice: Choice of closure (integer)
-        ipr: Debugging flag (integer)
-        ccn: Cloud condensation nuclei (array)
-        ccnclean: Clean CCN (array)
-        dtime: Time step (float)
-        imid: Mid-level convection flag (integer)
-        kpbl: Boundary layer height level (array)
-        dhdt: Boundary layer forcing (array)
-        xland: Land mask (array)
-        zo: Heights above surface (array)
-        forcing: Diagnostic forcing (array)
-        t, tn: Temperature before and after forcing (arrays)
-        q, qo: Mixing ratio before and after forcing (arrays)
-        po: Pressure (array)
-        psur: Surface pressure (float)
-        us, vs: Wind components (arrays)
-        rho: Density (array)
-        hfx, qfx: Surface fluxes (arrays)
-        dx: Grid spacing (array)
-        mconv: Moisture convergence (array)
-        omeg: Omega (array)
-        csum: Memory implementation (array)
-        cnvwt: GFS-required variable (array)
-        zuo, zdo, zdm: Normalized mass fluxes (arrays)
-        edto, edtm: Entrainment/detrainment rates (arrays)
-        xmb_out, xmbm_in, xmbs_in: Mass fluxes (arrays)
-        pre: Precipitation rate (array)
-        outu, outv: Momentum tendencies (arrays)
-        outt, outq, outqc: Tendencies (arrays)
-        kbcon: Convective cloud base level (array)
-        ktop: Cloud top level (array)
-        cupclw: Cloud water/ice mixing ratio (array)
-        frh_out: Fractional coverage (array)
-        ierr: Error flags (array)
-        ierrc: Error descriptions (array)
-        nchem: Number of chemical species (integer)
-        fscav: Scavenging factor (array)
-        chem3d: 3D chemical tracer array (array)
-        wetdpc_deep: Wet deposition (array)
-        do_smoke_transport: Smoke transport flag (boolean)
-        rand_mom, rand_vmas, rand_clos: Random perturbations (arrays)
-        nranflag: Perturbation type flag (integer)
-        do_capsuppress: CAPE suppression flag (boolean)
-        cap_suppress_j: CAPE suppression array (array)
-        k22: Updraft originating level (array)
-        jmin: Minimum downdraft level (array)
-        kdt: Time step index (integer)
-        tropics: Tropics flag (integer)
-    """
 
     # Integer variables
     iloop = 0
@@ -3547,3 +3527,703 @@ def rates_up_pdf(rand_vmas, ipr, name, ktop, ierr, p_cup, entr_rate_2d, hkbo, he
                     k22[i], ktopdby[i] + 1, zuo[i, kts:kte + 1], kts, kte, ktf, beta_u, kbcon[i], csum[i], pmin_lev[i]
                 )
 
+def get_zu_zd_pdf_fim(kklev, p, rand_vmas, zubeg, ipr, xland, zuh2, draft, ierr, kb, kt, zu, kts, kte, ktf, max_mass, kpbli, csum, pmin_lev):
+    """
+    Calculates a normalized mass-flux profile for updrafts and downdrafts using the beta function.
+
+    Parameters:
+        kklev (int): Level of maximum buoyancy.
+        p (array): Pressure profile.
+        rand_vmas (float): Random variable for mass flux.
+        zubeg (float): Initial updraft mass flux.
+        ipr (int): Print control flag.
+        xland (int): Land-sea mask.
+        zuh2 (array): Placeholder array for updraft mass flux.
+        draft (int): Type of draft (e.g., updraft, downdraft).
+        ierr (int): Error flag.
+        kb (int): Cloud base level.
+        kt (int): Cloud top level.
+        zu (array): Updraft mass flux profile.
+        kts (int): Start of vertical levels.
+        kte (int): End of vertical levels.
+        ktf (int): Full vertical levels.
+        max_mass (float): Maximum mass flux.
+        kpbli (int): Planetary boundary layer index.
+        csum (int): Cumulative sum of some property.
+        pmin_lev (int): Minimum pressure level.
+
+    Returns:
+        None: Updates `zu` and other variables in place.
+    """
+    import numpy as np
+
+    # Constants
+    BETA_SH = 2.2
+    G_BETA_SH = 0.8974707
+    BETA_MID = 1.3
+    G_BETA_MID = 0.8974707
+    BETA_DD = 4.0
+    G_BETA_DD = 6.0
+
+    # Local variables
+    trash = 0.0
+    beta_deep = 0.0
+    zuh = np.zeros(kte - kts + 1)  # Array of size (kts:kte)
+    zuh2 = np.zeros(40)            # Array of size (1:40)
+
+    k1 = 0
+    kk = 0
+    k = 0
+    kb_adj = 0
+    kpbli_adj = 0
+    kmax = 0
+
+    maxlim = 0.0
+    krmax = 0.0
+    kratio = 0.0
+    tunning = 0.0
+    fzu = 0.0
+    rand_vmas = 0.0
+    lev_start = 0.0
+
+    a = 0.0
+    b = 0.0
+    x1 = 0.0
+    y1 = 0.0
+    g_a = 0.0
+    g_b = 0.0
+    alpha2 = 0.0
+    g_alpha2 = 0.0
+
+    # Lookup tables
+    alpha = np.array([
+        3.699999, 3.699999, 3.699999, 3.699999, 3.024999, 2.559999, 2.249999, 2.028571, 1.862500,
+        1.733333, 1.630000, 1.545454, 1.475000, 1.415385, 1.364286, 1.320000, 1.281250, 1.247059,
+        1.216667, 1.189474, 1.165000, 1.142857, 1.122727, 1.104348, 1.087500, 1.075000, 1.075000,
+        1.075000, 1.075000, 1.075000
+    ])
+    g_alpha = np.array([
+        4.170645, 4.170645, 4.170645, 4.170645, 2.046925, 1.387837, 1.133003, 1.012418, 0.9494680,
+        0.9153771, 0.8972442, 0.8885444, 0.8856795, 0.8865333, 0.8897996, 0.8946404, 0.9005030,
+        0.9070138, 0.9139161, 0.9210315, 0.9282347, 0.9354376, 0.9425780, 0.9496124, 0.9565111,
+        0.9619183, 0.9619183, 0.9619183, 0.9619183, 0.9619183
+    ])
+
+    # Initialize arrays and variables
+    zu[:] = 0.0
+    kb_adj = max(kb, 2)
+
+    if draft == 1:
+        lev_start = min(0.9, 0.1 + csum * 0.013)
+        kb_adj = max(kb, 2)
+        trash = -p[kt] + p[kb_adj]
+        tunning = p[kklev]
+        if rand_vmas != 0.0:
+            tunning = p[kklev - 1] + 0.1 * rand_vmas * trash
+        beta_deep = 1.3 + (1.0 - trash / 1200.0)
+        tunning = min(0.95, (tunning - p[kb_adj]) / (p[kt] - p[kb_adj]))
+        tunning = max(0.02, tunning)
+        alpha2 = (tunning * (beta_deep - 2.0) + 1.0) / (1.0 - tunning)
+
+        for k in range(27, 2, -1):
+            if alpha[k] >= alpha2:
+                break
+        k1 = k + 1
+
+        if alpha[k1] != alpha[k1 - 1]:
+            a = alpha[k1] - alpha[k1 - 1]
+            b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
+            x1 = (alpha2 - b) / a
+            y1 = a * x1 + b
+            g_a = g_alpha[k1] - g_alpha[k1 - 1]
+            g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
+            g_alpha2 = g_a * x1 + g_b
+        else:
+            g_alpha2 = g_alpha[k1]
+
+        fzu = math.gamma(alpha2 + beta_deep) / (math.gamma(alpha2) * math.gamma(beta_deep))
+        zu[kb_adj] = zubeg
+
+        for k in range(kb_adj + 1, min(kte, kt - 1) + 1):
+            kratio = (p[k] - p[kb_adj]) / (p[kt] - p[kb_adj])
+            zu[k] = zubeg + fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(beta_deep - 1.0)
+
+        if zu[kpbli] > 0.0:
+            zu[kts:min(ktf, kt - 1) + 1] = zu[kts:min(ktf, kt - 1) + 1] / zu[kpbli]
+
+        for k in range(np.argmax(zu[:kte][::-1]), 0, -1):
+            if zu[k] < 1e-6:
+                kb_adj = k + 1
+                break
+
+        kb_adj = max(2, kb_adj)
+
+        for k in range(kts, kb_adj):
+            zu[k] = 0.0
+
+        maxlim = 1.2
+        a = np.max(zu) - zu[kb_adj]
+
+        for k in range(kb_adj, kt + 1):
+            trash = zu[k]
+            if a > maxlim:
+                zu[k] = (zu[k] - zu[kb_adj]) * maxlim / a + zu[kb_adj]
+
+    elif draft == 2:
+        k = kklev
+        if kpbli > 5:
+            k = kpbli
+        tunning = p[kklev]
+        tunning = min(0.95, (tunning - p[kb_adj]) / (p[kt] - p[kb_adj]))
+        tunning = max(0.02, tunning)
+        alpha2 = (tunning * (BETA_SH - 2.0) + 1.0) / (1.0 - tunning)
+
+        for k in range(27, 2, -1):
+            if alpha[k] >= alpha2:
+                break
+        k1 = k + 1
+
+        if alpha[k1] != alpha[k1 - 1]:
+            a = alpha[k1] - alpha[k1 - 1]
+            b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
+            x1 = (alpha2 - b) / a
+            y1 = a * x1 + b
+            g_a = g_alpha[k1] - g_alpha[k1 - 1]
+            g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
+            g_alpha2 = g_a * x1 + g_b
+        else:
+            g_alpha2 = g_alpha[k1]
+
+        fzu = math.gamma(alpha2 + BETA_SH) / (g_alpha2 * G_BETA_SH)
+        zu[kb_adj] = zubeg
+
+        for k in range(kb_adj + 1, min(kte, kt - 1) + 1):
+            kratio = (p[k] - p[kb_adj]) / (p[kt] - p[kb_adj])
+            zu[k] = zubeg + fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(BETA_SH - 1.0)
+
+        if zu[kpbli] > 0.0:
+            zu[kts:min(ktf, kt - 1) + 1] = zu[kts:min(ktf, kt - 1) + 1] / zu[kpbli]
+
+        for k in range(np.argmax(zu[:kte][::-1]), 0, -1):
+            if zu[k] < 1e-6:
+                kb_adj = k + 1
+                break
+
+        maxlim = 1.0
+        a = np.max(zu) - zu[kb_adj]
+
+        for k in range(kts, kt + 1):
+            if a > maxlim:
+                zu[k] = (zu[k] - zu[kb_adj]) * maxlim / a + zu[kb_adj]
+
+    elif draft == 3:
+        kb_adj = max(kb, 2)
+        tunning = 0.5 * (p[kt] + p[kpbli])
+        tunning = min(0.95, (tunning - p[kb_adj]) / (p[kt] - p[kb_adj]))
+        tunning = max(0.02, tunning)
+        alpha2 = (tunning * (BETA_MID - 2.0) + 1.0) / (1.0 - tunning)
+
+        for k in range(27, 2, -1):
+            if alpha[k] >= alpha2:
+                break
+        k1 = k + 1
+
+        if alpha[k1] != alpha[k1 - 1]:
+            a = alpha[k1] - alpha[k1 - 1]
+            b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
+            x1 = (alpha2 - b) / a
+            y1 = a * x1 + b
+            g_a = g_alpha[k1] - g_alpha[k1 - 1]
+            g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
+            g_alpha2 = g_a * x1 + g_b
+        else:
+            g_alpha2 = g_alpha[k1]
+
+        fzu = math.gamma(alpha2 + BETA_MID) / (math.gamma(alpha2) * math.gamma(BETA_MID))
+        zu[kb_adj] = zubeg
+
+        for k in range(kb_adj + 1, min(kte, kt - 1) + 1):
+            kratio = (p[k] - p[kb_adj]) / (p[kt] - p[kb_adj])
+            zu[k] = zubeg + fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(BETA_MID - 1.0)
+
+        if zu[kpbli] > 0.0:
+            zu[kts:min(ktf, kt - 1) + 1] = zu[kts:min(ktf, kt - 1) + 1] / zu[kpbli]
+
+        for k in range(np.argmax(zu[:kte][::-1]), 0, -1):
+            if zu[k] < 1e-6:
+                kb_adj = k + 1
+                break
+
+        kb_adj = max(2, kb_adj)
+
+        for k in range(kts, kb_adj):
+            zu[k] = 0.0
+
+        maxlim = 1.5
+        a = np.max(zu) - zu[kb_adj]
+
+        for k in range(kts, kt + 1):
+            if a > maxlim:
+                zu[k] = (zu[k] - zu[kb_adj]) * maxlim / a + zu[kb_adj]
+
+    elif draft == 4 or draft == 5:
+        tunning = p[kb]
+        tunning = min(0.95, (tunning - p[0]) / (p[kt] - p[0]))
+        tunning = max(0.02, tunning)
+        alpha2 = (tunning * (BETA_DD - 2.0) + 1.0) / (1.0 - tunning)
+
+        for k in range(27, 2, -1):
+            if alpha[k] >= alpha2:
+                break
+        k1 = k + 1
+
+        if alpha[k1] != alpha[k1 - 1]:
+            a = alpha[k1] - alpha[k1 - 1]
+            b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
+            x1 = (alpha2 - b) / a
+            y1 = a * x1 + b
+            g_a = g_alpha[k1] - g_alpha[k1 - 1]
+            g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
+            g_alpha2 = g_a * x1 + g_b
+        else:
+            g_alpha2 = g_alpha[k1]
+
+        fzu = math.gamma(alpha2 + BETA_DD) / (g_alpha2 * G_BETA_DD)
+        zu[:] = 0.0
+
+        for k in range(1, min(kte, kt - 1)):
+            kratio = (p[k] - p[0]) / (p[kt] - p[0])
+            zu[k] = fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(BETA_DD - 1.0)
+
+        fzu = np.max(zu[kts:min(ktf, kt - 1) + 1])
+        if fzu > 0.0:
+            zu[kts:min(ktf, kt - 1) + 1] = zu[kts:min(ktf, kt - 1) + 1] / fzu
+
+        zu[0] = 0.0
+        for k in range(1, kb - 1):
+            zu[kb - k] = zu[kb - k + 1] - zu[kb] * (p[kb - k] - p[kb - k + 1]) / (p[0] - p[kb])
+
+        zu[0] = 0.0
+
+def cup_up_aa1bl(aa0, t, tn, q, qo, dtime, z_cup, zu, dby, gamma_cup, t_cup, kbcon, ktop, ierr, 
+                 itf, ktf, its, ite, kts, kte):
+    """
+    Calculates the cloud work function based on boundary layer forcing.
+
+    Parameters:
+        aa0 (array): Cloud work function (output).
+        t (array): Environmental temperature.
+        tn (array): Temperature with forcing effects.
+        q (array): Environmental mixing ratio.
+        qo (array): Mixing ratio with forcing effects.
+        dtime (float): Time step.
+        z_cup (array): Heights of model levels.
+        zu (array): Normalized updraft mass flux.
+        dby (array): Buoyancy term.
+        gamma_cup (array): Gamma on model cloud levels.
+        t_cup (array): Temperature on model cloud levels.
+        kbcon (array): Cloud base level.
+        ktop (array): Cloud top level.
+        ierr (array): Error flag.
+        itf, ktf, its, ite, kts, kte (int): Loop bounds.
+
+    Returns:
+        None: Updates `aa0` in place.
+    """
+    # Initialize aa0
+    for i in range(itf - its + 1):
+        aa0[i] = 0.0
+
+    # Calculate cloud work function
+    for i in range(itf - its + 1):
+        for k in range(kts, kbcon[i] + 1):  # Match Fortran loop range
+            if ierr[i] != 0:
+                continue
+            dz = (z_cup[i, k + 1] - z_cup[i, k]) * 9.81  # Gravitational acceleration
+            da = dz * (tn[i, k] * (1.0 + 0.608 * qo[i, k]) - 
+                       t[i, k] * (1.0 + 0.608 * q[i, k])) / dtime
+            aa0[i] += da
+
+import numpy as np
+
+def get_inversion_layers(ierr, p_cup, t_cup, z_cup, qo_cup, qeso_cup, k_inv_layers, 
+                         kstart, kend, dtempdz, itf, ktf, its, ite, kts, kte):
+    """
+    Finds temperature inversions using the first and second derivatives of temperature.
+
+    Parameters:
+        ierr (array): Error flags for each column.
+        p_cup, t_cup, z_cup (2D arrays): Pressure, temperature, and height profiles.
+        qo_cup, qeso_cup (2D arrays): Mixing ratios.
+        k_inv_layers (2D array): Output array for inversion layers.
+        kstart, kend (1D arrays): Start and end levels for each column.
+        dtempdz (2D array): Output array for temperature gradient.
+        itf, ktf, its, ite, kts, kte (int): Loop bounds.
+
+    Returns:
+        None: Updates `k_inv_layers` and `dtempdz` in place.
+    """
+    l_mid = 300.0
+    l_shal = 100.0
+
+    # Initialize k_inv_layers
+    k_inv_layers[:, :] = 1
+
+    for i in range(itf - its + 1):
+        if ierr[i] == 0:
+            sec_deriv = np.zeros(kte - kts + 1)
+            kend_p3 = kend[i] + 3
+
+            # Calculate first derivative
+            for k in range(kts + 1, kend_p3 + 5):
+                dtempdz[i, k] = (t_cup[i, k + 1] - t_cup[i, k - 1]) / (z_cup[i, k + 1] - z_cup[i, k - 1])
+
+            # Calculate second derivative
+            for k in range(kts + 2, kend_p3 + 4):
+                sec_deriv[k] = abs((dtempdz[i, k + 1] - dtempdz[i, k - 1]) / (z_cup[i, k + 1] - z_cup[i, k - 1]))
+
+            # Find inversion layers
+            ilev = max(kts + 3, kstart[i] + 1)
+            ix = 0
+            k = ilev
+            while ilev < kend_p3:
+                for kk in range(k, kend_p3 + 3):
+                    if sec_deriv[kk] < sec_deriv[kk + 1] and sec_deriv[kk] < sec_deriv[kk - 1]:
+                        k_inv_layers[i, ix] = kk
+                        ix = min(5, ix + 1)
+                        ilev = kk + 1
+                        break
+                    ilev = kk + 1
+                k = ilev
+
+            # Second criteria
+            kadd = 0
+            ken = np.argmax(k_inv_layers[i, :]) + 1
+            for k in range(ken):
+                kk = k_inv_layers[i, k + kadd]
+                if kk == 1:
+                    break
+                if dtempdz[i, kk] < dtempdz[i, kk - 1] and dtempdz[i, kk] < dtempdz[i, kk + 1]:
+                    kadd += 1
+                    for kj in range(k, ken):
+                        if k_inv_layers[i, kj + kadd] > 1:
+                            k_inv_layers[i, kj] = k_inv_layers[i, kj + kadd]
+                        if k_inv_layers[i, kj + kadd] == 1:
+                            k_inv_layers[i, kj] = 1
+
+    # Find locations of inversions around 800 and 550 hPa
+    for i in range(itf - its + 1):
+        if ierr[i] != 0:
+            continue
+
+        sec_deriv = np.full(kte - kts + 1, 1e9)
+        for k in range(np.argmax(k_inv_layers[i, :]) + 1):
+            dp = p_cup[i, k_inv_layers[i, k]] - p_cup[i, kstart[i]]
+            sec_deriv[k] = abs(dp) - l_shal
+        k800 = np.argmin(np.abs(sec_deriv))
+
+        sec_deriv = np.full(kte - kts + 1, 1e9)
+        for k in range(np.argmax(k_inv_layers[i, :]) + 1):
+            dp = p_cup[i, k_inv_layers[i, k]] - p_cup[i, kstart[i]]
+            sec_deriv[k] = abs(dp) - l_mid
+        k550 = np.argmin(np.abs(sec_deriv))
+
+        # Save k800 and k550 in k_inv_layers array
+        shal = 0
+        mid = 1
+        k_inv_layers[i, shal] = k_inv_layers[i, k800]
+        k_inv_layers[i, mid] = k_inv_layers[i, k550]
+        k_inv_layers[i, mid + 1:] = -1
+
+import numpy as np
+
+def get_lateral_massflux(itf, ktf, its, ite, kts, kte, ierr, ktop, zo_cup, zuo, cd, entr_rate_2d, 
+                         up_massentro, up_massdetro, up_massentr, up_massdetr, draft, kbcon, k22, 
+                         up_massentru=None, up_massdetru=None, lambau=None):
+    """
+    Calculates mass entrainment and detrainment rates.
+
+    Parameters:
+        itf, ktf, its, ite, kts, kte (int): Loop bounds.
+        ierr (array): Error flags for each column.
+        ktop, kbcon, k22 (array): Cloud top, cloud base, and originating levels.
+        zo_cup, zuo (2D arrays): Heights and updraft mass flux.
+        cd, entr_rate_2d (2D arrays): Detrainment coefficient and entrainment rate.
+        up_massentro, up_massdetro, up_massentr, up_massdetr (2D arrays): Output arrays for mass fluxes.
+        draft (int): Type of draft (e.g., deep, shallow, mid).
+        up_massentru, up_massdetru (optional, 2D arrays): Optional arrays for modified mass fluxes.
+        lambau (optional, array): Optional array for lambda values.
+
+    Returns:
+        None: Updates the provided arrays in place.
+    """
+    # Initialize mass flux arrays
+    up_massentro[:, :] = 0.0
+    up_massdetro[:, :] = 0.0
+    up_massentr[:, :] = 0.0
+    up_massdetr[:, :] = 0.0
+
+    if up_massentru is not None and up_massdetru is not None:
+        up_massentru[:, :] = 0.0
+        up_massdetru[:, :] = 0.0
+
+    for i in range(itf - its + 1):
+        if ierr[i] == 0:
+            # Below maximum value of zuo
+            for k in range(max(2, k22[i] + 1), np.argmax(zuo[i, :]) + 1):
+                dz = zo_cup[i, k] - zo_cup[i, k - 1]
+                up_massdetro[i, k - 1] = cd[i, k - 1] * dz * zuo[i, k - 1]
+                up_massentro[i, k - 1] = zuo[i, k] - zuo[i, k - 1] + up_massdetro[i, k - 1]
+                if up_massentro[i, k - 1] < 0.0:
+                    up_massentro[i, k - 1] = 0.0
+                    up_massdetro[i, k - 1] = zuo[i, k - 1] - zuo[i, k]
+                    if zuo[i, k - 1] > 0.0:
+                        cd[i, k - 1] = up_massdetro[i, k - 1] / (dz * zuo[i, k - 1])
+                if zuo[i, k - 1] > 0.0:
+                    entr_rate_2d[i, k - 1] = up_massentro[i, k - 1] / (dz * zuo[i, k - 1])
+
+            # Above maximum value of zuo
+            for k in range(np.argmax(zuo[i, :]) + 1, ktop[i] + 1):
+                dz = zo_cup[i, k] - zo_cup[i, k - 1]
+                up_massentro[i, k - 1] = entr_rate_2d[i, k - 1] * dz * zuo[i, k - 1]
+                up_massdetro[i, k - 1] = zuo[i, k - 1] + up_massentro[i, k - 1] - zuo[i, k]
+                if up_massdetro[i, k - 1] < 0.0:
+                    up_massdetro[i, k - 1] = 0.0
+                    up_massentro[i, k - 1] = zuo[i, k] - zuo[i, k - 1]
+                    if zuo[i, k - 1] > 0.0:
+                        entr_rate_2d[i, k - 1] = up_massentro[i, k - 1] / (dz * zuo[i, k - 1])
+                if zuo[i, k - 1] > 0.0:
+                    cd[i, k - 1] = up_massdetro[i, k - 1] / (dz * zuo[i, k - 1])
+
+            # Set values at cloud top
+            up_massdetro[i, ktop[i]] = zuo[i, ktop[i]]
+            up_massentro[i, ktop[i]] = 0.0
+
+            # Set values above cloud top
+            for k in range(ktop[i] + 1, ktf):
+                cd[i, k] = 0.0
+                entr_rate_2d[i, k] = 0.0
+                up_massentro[i, k] = 0.0
+                up_massdetro[i, k] = 0.0
+
+            # Copy values to up_massentr and up_massdetr
+            for k in range(2, ktf):
+                up_massentr[i, k - 1] = up_massentro[i, k - 1]
+                up_massdetr[i, k - 1] = up_massdetro[i, k - 1]
+
+            if up_massentru is not None and up_massdetru is not None and draft == 1:
+                for k in range(2, ktf):
+                    up_massentru[i, k - 1] = up_massentro[i, k - 1] + lambau[i] * up_massdetro[i, k - 1]
+                    up_massdetru[i, k - 1] = up_massdetro[i, k - 1] + lambau[i] * up_massdetro[i, k - 1]
+            elif up_massentru is not None and up_massdetru is not None and draft == 2:
+                for k in range(2, ktf):
+                    up_massentru[i, k - 1] = up_massentro[i, k - 1] + lambau[i] * up_massdetro[i, k - 1]
+                    up_massdetru[i, k - 1] = up_massdetro[i, k - 1] + lambau[i] * up_massdetro[i, k - 1]
+            elif up_massentru is not None and up_massdetru is not None and draft == 3:
+                lambau[i] = 0.0
+                for k in range(2, ktf):
+                    up_massentru[i, k - 1] = up_massentro[i, k - 1] + lambau[i] * up_massdetro[i, k - 1]
+                    up_massdetru[i, k - 1] = up_massdetro[i, k - 1] + lambau[i] * up_massdetro[i, k - 1]
+
+            # Calculate entrainment rates for diagnostics
+            trash = 0.0
+            trash2 = 0.0
+            for k in range(k22[i] + 1, ktop[i] + 1):
+                trash2 += entr_rate_2d[i, k]
+            for k in range(k22[i] + 1, kbcon[i] + 1):
+                trash += entr_rate_2d[i, k]
+
+# End of parallel loop
+
+import numpy as np
+
+def get_partition_liq_ice(ierr, tn, po_cup, p_liq_ice, melting_layer, 
+                          itf, ktf, its, ite, kts, kte, cumulus, melt_glac, t_ice, t_0, g):
+    """
+    Calculates the partition between cloud water and cloud ice.
+
+    Parameters:
+        ierr (array): Error flags for each column.
+        tn (2D array): Temperature profile (K).
+        po_cup (2D array): Pressure profile (Pa).
+        p_liq_ice (2D array): Output array for liquid-ice partition.
+        melting_layer (2D array): Output array for melting layer.
+        itf, ktf, its, ite, kts, kte (int): Loop bounds.
+        cumulus (str): Type of cumulus (e.g., 'deep').
+        melt_glac (bool): Flag for enabling melting calculations.
+        t_ice (float): Ice temperature threshold (K).
+        t_0 (float): Freezing temperature threshold (K).
+        g (float): Gravitational acceleration (m/s^2).
+
+    Returns:
+        None: Updates `p_liq_ice` and `melting_layer` in place.
+    """
+    t1 = 276.16  # Upper temperature threshold for melting layer (K)
+
+    # Initialize p_liq_ice and melting_layer
+    p_liq_ice[:, :] = 1.0
+    melting_layer[:, :] = 0.0
+
+    # Partition total condensate into liquid and ice phases
+    if melt_glac and cumulus == 'deep':
+        for i in range(itf - its + 1):
+            if ierr[i] == 0:
+                for k in range(kts, ktf + 1):
+                    if tn[i, k] <= t_ice:
+                        p_liq_ice[i, k] = 0.0
+                    elif t_ice < tn[i, k] < t_0:
+                        p_liq_ice[i, k] = ((tn[i, k] - t_ice) / (t_0 - t_ice))**2
+                    else:
+                        p_liq_ice[i, k] = 1.0
+
+        # Define the melting layer
+        for i in range(itf - its + 1):
+            if ierr[i] == 0:
+                for k in range(kts, ktf + 1):
+                    if tn[i, k] <= t_0 + 1:
+                        melting_layer[i, k] = 0.0
+                    elif t_0 + 1 < tn[i, k] < t1:
+                        melting_layer[i, k] = ((tn[i, k] - (t_0 + 1)) / (t1 - (t_0 + 1)))**2
+                    else:
+                        melting_layer[i, k] = 1.0
+                    melting_layer[i, k] *= (1 - melting_layer[i, k])
+
+        # Normalize vertical integral of melting_layer to 1
+        norm = np.zeros(itf - its + 1)  # Initialize norm array with NumPy
+        for i in range(itf - its + 1):
+            if ierr[i] == 0:
+                for k in range(kts, ktf):
+                    dp = 100.0 * (po_cup[i, k] - po_cup[i, k + 1])
+                    norm[i] += melting_layer[i, k] * dp / g
+
+        for i in range(itf - its + 1):
+            if ierr[i] == 0:
+                melting_layer[i, :] = melting_layer[i, :] / (norm[i] + 1e-6) * (
+                    100 * (po_cup[i, kts] - po_cup[i, ktf]) / g
+                )
+    else:
+        p_liq_ice[:, :] = 1.0
+        melting_layer[:, :] = 0.0
+
+import numpy as np
+
+def get_melting_profile(ierr, tn_cup, po_cup, p_liq_ice, melting_layer, qrco, 
+                        pwo, edto, pwdo, melting, itf, ktf, its, ite, kts, kte, 
+                        cumulus, melt_glac, g):
+    """
+    Calculates the melting profile.
+
+    Parameters:
+        ierr (array): Error flags for each column.
+        tn_cup, po_cup (2D arrays): Temperature and pressure profiles.
+        p_liq_ice (2D array): Liquid-ice partition.
+        melting_layer (2D array): Melting layer profile.
+        qrco, pwo, edto, pwdo (2D arrays): Precipitation and evaporation terms.
+        melting (2D array): Output array for melting profile.
+        itf, ktf, its, ite, kts, kte (int): Loop bounds.
+        cumulus (str): Type of cumulus (e.g., 'deep').
+        melt_glac (bool): Flag for enabling melting calculations.
+        g (float): Gravitational acceleration (m/s^2).
+
+    Returns:
+        None: Updates `melting` in place.
+    """
+    # Initialize local arrays
+    norm = np.zeros(itf - its + 1)
+    total_pwo_solid_phase = np.zeros(itf - its + 1)
+    pwo_solid_phase = np.zeros((itf - its + 1, kte - kts + 1))
+    pwo_eff = np.zeros((itf - its + 1, kte - kts + 1))
+
+    if melt_glac and cumulus == 'deep':
+        # Set melting to zero for columns without deep convection
+        for i in range(itf - its + 1):
+            if ierr[i] > 0:
+                melting[i, :] = 0.0
+
+        # Calculate for columns with deep convection
+        for k in range(kts, ktf):
+            for i in range(itf - its + 1):
+                if ierr[i] != 0:
+                    continue
+                dp = 100.0 * (po_cup[i, k] - po_cup[i, k + 1])
+
+                # Effective precipitation (after evaporation by downdraft)
+                pwo_eff[i, k] = 0.5 * (pwo[i, k] + pwo[i, k + 1] + edto[i] * (pwdo[i, k] + pwdo[i, k + 1]))
+
+                # Precipitation at solid phase (ice/snow)
+                pwo_solid_phase[i, k] = (1.0 - p_liq_ice[i, k]) * pwo_eff[i, k]
+
+                # Integrated precipitation at solid phase (ice/snow)
+                total_pwo_solid_phase[i] += pwo_solid_phase[i, k] * dp / g
+
+        # Calculate melting profile
+        for k in range(kts, ktf + 1):
+            for i in range(itf - its + 1):
+                if ierr[i] != 0:
+                    continue
+                melting[i, k] = melting_layer[i, k] * (
+                    total_pwo_solid_phase[i] / (100 * (po_cup[i, kts] - po_cup[i, ktf]) / g)
+                )
+    else:
+        # No melting allowed in this run
+        melting[:, :] = 0.0
+
+import numpy as np
+
+def get_cloud_top(name, ktop, ierr, p_cup, entr_rate_2d, hkbo, heo, heso_cup, z_cup, 
+                  kstabi, k22, kbcon, its, ite, itf, kts, kte, ktf, zuo, kpbl, klcl, hcot):
+    """
+    Calculates the cloud top height.
+
+    Parameters:
+
+        name (str): Type of convection (e.g., 'shallow', 'mid', 'deep').
+        ktop (array): Output array for cloud top levels.
+        ierr (array): Error flags for each column.
+        p_cup, entr_rate_2d, hkbo, heo, heso_cup, z_cup (2D arrays): Profiles for pressure, entrainment rates, etc.
+        kstabi, k22, kbcon, kpbl, klcl (1D arrays): Indices for various levels.
+        its, ite, itf, kts, kte, ktf (int): Loop bounds.
+        zuo (2D array): Updraft mass flux.
+        hcot (2D array): Output array for cloud top heights.
+
+    Returns:
+        None: Updates `ktop` and `hcot` in place.
+    """
+    dbythresh = 0.8  # Threshold for determining cloud top
+    if name in ['shallow', 'mid']:
+        dbythresh = 1.0
+
+    for i in range(itf - its + 1):
+        kfinalzu = ktf - 2
+        ktop[i] = kfinalzu
+        if ierr[i] == 0:
+            dby = np.zeros(kte - kts + 1)
+
+            start_level = kbcon[i]
+            hcot[i, kts:start_level + 1] = hkbo[i]
+
+            dz = z_cup[i, start_level] - z_cup[i, start_level - 1]
+            dby[start_level] = (hcot[i, start_level] - heso_cup[i, start_level]) * dz
+
+            for k in range(start_level + 1, ktf - 1):
+                dz = z_cup[i, k] - z_cup[i, k - 1]
+                hcot[i, k] = ((1.0 - 0.5 * entr_rate_2d[i, k - 1] * dz) * hcot[i, k - 1] +
+                              entr_rate_2d[i, k - 1] * dz * heo[i, k - 1]) / \
+                             (1.0 + 0.5 * entr_rate_2d[i, k - 1] * dz)
+                dby[k] = dby[k - 1] + (hcot[i, k] - heso_cup[i, k]) * dz
+
+            if find_ktop_option == 0:
+                for k in range(np.argmax(dby), ktf - 1):
+                    if dby[k] < dbythresh * np.max(dby):
+                        kfinalzu = k - 1
+                        ktop[i] = kfinalzu
+                        break
+            else:
+                for k in range(start_level + 1, ktf - 1):
+                    if hcot[i, k] < heso_cup[i, k]:
+                        kfinalzu = k - 1
+                        ktop[i] = kfinalzu
+                        break
+
+            if kfinalzu <= kbcon[i] + 1:
+                ierr[i] = 41
