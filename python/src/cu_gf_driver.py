@@ -1,6 +1,236 @@
 import numpy as np
 
-def cu_gf_driver_run(forcet, t, t2di, dt, xlv, forceqv, qv, qv2di, cp, p2d, us, vs, clcw, cliw, forcing, forcing2, w, mconv, dx, do_mynnedmf, maxMF, ierr, its, itf, kts, ktf, g, rhoi, psuri, hfx2, qfx2, garea, xland, cutens, cutenm, cuten, outts, outtm, outt, outqs, outqm, outq, outus, outum, outu, outvs, outvm, outv, cnvw, cnvwt, cnvwts, cnvwtm, zu, zus, zum, zd, zdm, edt, edtm, cupclw, cupclws, cupclwm, tun_rad_shall, tun_rad_mid, tun_rad_deep, prets, pretm, pret, kpbli, ktop, kbcon, ktopm, kbconm, clw_ten, qci_conv, maxupmf, ud_mf, dd_mf):
+from cu_gf_sh import cu_gf_sh_run
+from cu_gf_deep import cu_gf_deep_run, neg_check, fct1d3
+
+def cu_gf_driver_run(
+    ntracer, garea, im, km, dt, flag_init, flag_restart,
+    cactiv, cactiv_m, g, cp, xlv, r_v, forcet, forceqv_spechum, phil, raincv,
+    qv_spechum, t, cld1d, us, vs, t2di, w, qv2di_spechum, p2di, psuri,
+    hbot, htop, kcnv, xland, hfx2, qfx2, aod_gf, cliw, clcw,
+    pbl, ud_mf, dd_mf, dt_mf, cnvw_moist, cnvc, imfshalcnv,
+    flag_for_scnv_generic_tend, flag_for_dcnv_generic_tend,
+    dtend, dtidx, ntqv, ntiw, ntcw, index_of_temperature, index_of_x_wind,
+    index_of_y_wind, index_of_process_scnv, index_of_process_dcnv,
+    fhour, fh_dfi_radar, ix_dfi_radar, num_dfi_radar, cap_suppress,
+    dfi_radar_max_intervals, ldiag3d, qci_conv, do_cap_suppress,
+    maxupmf, maxMF, do_mynnedmf, ichoice_in, ichoicem_in, ichoice_s_in,
+    spp_cu_deep, spp_wts_cu_deep, nchem, chem3d, fscav, wetdpc_deep,
+    do_smoke_transport, kdt, errmsg, errflg
+):
+    
+    aodc0 = 0.14  # Default value for aerosol optical depth
+    aodreturn = 30.0  # Default value for AOD return time (minutes)
+
+    tf = 258.16
+    tcr = 273.16  # Critical temperature for cloud water/ice conversion
+    tcrf = 1.0 / (tcr-tf)  # Scaling factor for temperature conversion
+
+    dicycle = 0  # Diurnal cycle flag for deep convection
+    dicycle_m = 0  # Diurnal cycle flag for middle convection
+
+    ipn = 0  # Process index for negative checks
+    ideep=1
+
+    cap_suppress_j = np.zeros(im)  # 1D array with size equal to the horizontal grid dimension
+
+    rand_mom = np.zeros(im)  # 1D array with size equal to the horizontal grid dimension
+    rand_vmas = np.zeros(im)
+    rand_clos = np.zeros((im, km))  # 2D array with horizontal and vertical dimensions
+
+    tropics = np.zeros(im, dtype=int)  # Integer array for tropics flag
+
+    tun_rad_shall = np.zeros(im)  # Tuning constants for radiation coupling
+    tun_rad_mid = np.zeros(im)
+    tun_rad_deep = np.zeros(im)
+
+    edt = np.zeros(im)  # Eddy diffusivity arrays
+    edtm = np.zeros(im)
+    edtd = np.zeros(im)
+
+    zdd = np.zeros((im, km))  # 2D array for downdraft mass flux
+    flux_tun = np.zeros(im)  # Flux tuning array
+
+    ht = np.zeros(im)  # Height array
+    dz8w = np.zeros((im, km))  # Vertical layer thickness
+    zh = np.zeros(km)  # Vertical height levels
+
+    forcing = np.zeros((im, 10))  # Forcing arrays
+    forcing2 = np.zeros((im, 10))
+
+    ccn_gf = np.zeros(im)  # Cloud condensation nuclei (CCN)
+    ccn_m = np.zeros(im)
+
+    dx = np.zeros(im)  # Grid spacing
+
+    mconv = np.zeros(im)  # Moisture convergence
+    omeg = np.zeros((im, km))  # Vertical velocity
+
+    ter11 = np.zeros(im)  # Terrain height
+
+    cnvw = np.zeros((im, km))  # Convective tendencies
+    cnvc = np.zeros((im, km))
+
+    gdc = np.zeros((im, km, 10))  # Diagnostic tendencies
+    gdc2 = np.zeros((im, km, 10))
+
+    qci_conv = np.zeros((im, km))  # Cloud ice mixing ratio
+
+    ierr = np.zeros(im, dtype=int)  # Error flags for deep convection
+    ierrm = np.zeros(im, dtype=int)  # Error flags
+    ierrs = np.zeros(im, dtype=int)
+    ierrc = np.full(im, " ", dtype="<U50")  # Error messages (strings)
+
+    cuten = np.zeros(im)  # Convective tendencies
+    cutenm = np.zeros(im)
+    cutens = np.zeros(im)
+
+    kbcon = np.zeros(im, dtype=int)  # Convective base indices (deep convection)
+    kbcons = np.zeros(im, dtype=int)  # Convective base indices
+    kbconm = np.zeros(im, dtype=int)
+    ktop = np.zeros(im, dtype=int)  # Convective cloud top indices (deep convection))
+    ktops = np.zeros(im, dtype=int)
+    ktopm = np.zeros(im, dtype=int)
+
+    xmb = np.zeros(im)  # Mass flux arrays
+    xmbm = np.zeros(im)
+    xmbs = np.zeros(im)
+    xmb_dumm = np.zeros(im)
+
+    pret = np.zeros(im)  # Precipitation arrays
+    pretm = np.zeros(im)
+    prets = np.zeros(im)
+
+    clcw_save = np.zeros((im, km))  # Cloud liquid water save arrays
+    cliw_save = np.zeros((im, km))
+
+    clw_ten = np.zeros((im, km))  # Cloud water tendencies
+
+    po_cup = np.zeros(km)  # Pressure at cloud levels
+
+    massflx = np.zeros(km)  # Mass flux
+    trcflx_in1 = np.zeros(km)  # Tracer flux
+    clw_in1 = np.zeros(km)  # Cloud water input
+
+    kpbli = np.zeros(im, dtype=int)  # Convective boundary layer index
+
+    dx = np.zeros(im)  # Grid spacing
+
+    zu = np.zeros((im, km))  # Updraft mass flux
+    zum = np.zeros((im, km))  # Middle updraft mass flux
+    zus = np.zeros((im, km))  # Shallow updraft mass flux
+    zd = np.zeros((im, km))  # Downdraft mass flux
+    zdm = np.zeros((im, km))  # Middle downdraft mass flux
+
+    psur = np.zeros(im)  # Surface pressure
+
+    clcw = np.zeros((im, km))  # Cloud liquid water
+    cliw = np.zeros((im, km))  # Cloud ice water
+
+    forcing2 = np.zeros((im, 10))  # Forcing array
+
+    dt_mf = np.zeros((im, km))  # Mass flux tendencies
+
+    tau_ecmwf = np.zeros(im)  # ECMWF tau array
+
+    qcheck = np.zeros((im, km))  # Specific humidity check array
+
+    massflx = np.zeros(km)  # Mass flux array
+    trcflx_in1 = np.zeros(km)  # Tracer flux array
+    clw_in1 = np.zeros(km)  # Cloud water input array
+
+    zo = np.zeros((im, km))  # Height at model levels
+    t2d = np.zeros((im, km))  # Temperature at model levels
+    q2d = np.zeros((im, km))  # Specific humidity at model levels
+    tn = np.zeros((im, km))  # Temperature tendency
+    qo = np.zeros((im, km))  # Specific humidity tendency
+
+    outts = np.zeros((im, km))  # Temperature tendencies (shallow convection)
+    outqs = np.zeros((im, km))  # Specific humidity tendencies (shallow convection)
+    outqcs = np.zeros((im, km))  # Cloud water tendencies (shallow convection)
+    outus = np.zeros((im, km))  # U-wind tendencies (shallow convection)
+    outvs = np.zeros((im, km))  # V-wind tendencies (shallow convection)
+
+    outtm = np.zeros((im, km))  # Temperature tendencies (middle convection)
+    outqm = np.zeros((im, km))  # Specific humidity tendencies (middle convection)
+    outqcm = np.zeros((im, km))  # Cloud water tendencies (middle convection)
+    outum = np.zeros((im, km))  # U-wind tendencies (middle convection)
+    outvm = np.zeros((im, km))  # V-wind tendencies (middle convection)
+
+    outt = np.zeros((im, km))  # Temperature tendencies (deep convection)
+    outq = np.zeros((im, km))  # Specific humidity tendencies (deep convection)
+    outqc = np.zeros((im, km))  # Cloud water tendencies (deep convection)
+    outu = np.zeros((im, km))  # U-wind tendencies (deep convection)
+    outv = np.zeros((im, km))  # V-wind tendencies (deep convection)
+
+    k22 = np.zeros(im, dtype=int)  # Updraft originating level (deep convection)
+    k22s = np.zeros(im, dtype=int)  # Updraft originating level (shallow convection)
+    k22m = np.zeros(im, dtype=int)  # Updraft originating level (middle convection)
+
+    jmin = np.zeros(im, dtype=int)  # Minimum convection level
+    jminm = np.zeros(im, dtype=int)  # Minimum convection level (middle convection)
+
+    pret = np.zeros(im)  # Precipitation rate (deep convection)
+    prets = np.zeros(im)  # Precipitation rate (shallow convection)
+    pretm = np.zeros(im)  # Precipitation rate (middle convection)
+
+    cupclw = np.zeros((im, km))  # Cloud water (deep convection)
+    cupclws = np.zeros((im, km))  # Cloud water (shallow convection)
+    cupclwm = np.zeros((im, km))  # Cloud water (middle convection)
+
+    cnvwt = np.zeros((im, km))  # Convective tendencies (deep convection)
+    cnvwts = np.zeros((im, km))  # Convective tendencies (shallow convection)
+    cnvwtm = np.zeros((im, km))  # Convective tendencies (middle convection)
+
+    hco = np.zeros((im, km))  # Convective heating (deep convection)
+    hcom = np.zeros((im, km))  # Convective heating (middle convection)
+    hcdo = np.zeros((im, km))  # Convective cooling (deep convection)
+    hcdom = np.zeros((im, km))  # Convective cooling (middle convection)
+
+    subm = np.zeros((im, km))  # Subsidence tendencies
+    dhdt = np.zeros((im, km))  # Heating rate tendencies
+
+    frhm = np.zeros(im)  # Moisture flux (middle convection)
+    frhd = np.zeros(im)  # Moisture flux (deep convection)
+
+    p2d = np.zeros((im, km))  # Pressure at model levels
+    qcheck = np.zeros((im, km))  # Specific humidity check
+
+    tshall = np.zeros((im, km))  # Shallow convection temperature
+    qshall = np.zeros((im, km))  # Shallow convection specific humidity
+
+    hfx = np.zeros(im)  # Surface heat flux
+    qfx = np.zeros(im)  # Surface moisture flux
+
+    massflx = np.zeros(km)  # Mass flux
+    trcflx_in1 = np.zeros(km)  # Tracer flux
+    clw_in1 = np.zeros(km)  # Cloud water input
+
+    clw_ten = np.zeros((im, km))  # Cloud water tendencies
+    po_cup = np.zeros(km)  # Pressure at cloud levels
+
+    xlandi = np.zeros(im)  # Land mask as a float array
+
+    ierrcs = np.full(im, " ", dtype="<U50")  # Error messages for shallow convection
+    ierrcm = np.full(im, " ", dtype="<U50")  # Error messages for middle convection
+
+    wetdpc_mid = np.zeros(im)  # Wet deposition for middle convection
+
+    xmbs2 = np.zeros(im)  # Additional mass flux array for shallow convection
+
+    po = np.zeros((im, km))  # Pressure at model levels
+    rhoi = np.zeros((im, km))  # Air density at model levels
+
+    forcing2 = np.zeros((im, 10))  # Forcing array for convection calculations
+
+    po_cup = np.zeros(km)  # Pressure at cloud levels
+
+    massflx = np.zeros(km)  # Mass flux array
+    trcflx_in1 = np.zeros(km)  # Tracer flux array
+    clw_in1 = np.zeros(km)  # Cloud water input array
+    cliw_idx = 0
+
+
     # Initialize variables
     dhdt = np.zeros_like(t)
     umean = np.zeros(t.shape[0])
