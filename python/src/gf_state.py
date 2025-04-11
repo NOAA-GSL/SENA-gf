@@ -908,23 +908,14 @@ class GFState:
             _do_mynnedmfVar[:] = 0
 
         # Fill the ichoice_in variable
-        if self.ichoice_in:
-            _ichoice_inVar[:] = 1
-        else:
-            _ichoice_inVar[:] = 0
+        _ichoice_inVar[:] = np.transpose(self.ichoice_in)
 
         # Fill the ichoicem_in variable
-        if self.ichoicem_in:
-            _ichoicem_inVar[:] = 1
-        else:
-            _ichoicem_inVar[:] = 0
-
+        _ichoicem_inVar[:] = np.transpose(self.ichoicem_in)
+        
         # Fill the ichoice_s_in variable
-        if self.ichoice_s_in:
-            _ichoice_s_inVar[:] = 1 
-        else:  
-            _ichoice_s_inVar[:] = 0
-
+        _ichoice_s_inVar[:] = np.transpose(self.ichoice_s_in)
+    
         # Fill the spp_cu_deep variable
         _spp_cu_deepVar[:] = np.transpose(self.spp_cu_deep)
 
@@ -1241,22 +1232,13 @@ class GFState:
             self.do_mynnedmf = False
 
         # Get ichoice_in
-        if _dataset.variables["ichoice_in"][:] == 1:
-            self.ichoice_in = True
-        else:
-            self.ichoice_in = False
+        self.ichoice_in = _dataset.variables["ichoice_in"][:]
 
         # Get ichoicem_in
-        if _dataset.variables["ichoicem_in"][:] == 1:
-            self.ichoicem_in = True
-        else:
-            self.ichoicem_in = False
+        self.ichoicem_in = _dataset.variables["ichoicem_in"][:]
 
         # Get ichoice_s_in
-        if _dataset.variables["ichoice_s_in"][:] == 1:  
-            self.ichoice_s_in = True
-        else:
-            self.ichoice_s_in = False
+        self.ichoice_s_in = _dataset.variables["ichoice_s_in"][:]
 
         # Get spp_cu_deep
         self.spp_cu_deep = _dataset.variables["spp_cu_deep"][:]
