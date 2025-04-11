@@ -790,7 +790,7 @@ contains
      ! Define index_of_y_wind variable
      call nc_check(nf90_def_var(ncid=ncFileID, name="index_of_y_wind", xtype=nf90_int, &
                    varid=index_of_y_windVarID))
-     call nc_check(nf90_put_att(ncFileID, index_of_y_windVarID, "long_name", "index of x-wind in first dimension of array cumulative change index"))
+     call nc_check(nf90_put_att(ncFileID, index_of_y_windVarID, "long_name", "index of y-wind in first dimension of array cumulative change index"))
      call nc_check(nf90_put_att(ncFileID, index_of_y_windVarID, "units",     "index"))
 
      ! Define index_of_process_scnv variable
@@ -928,7 +928,7 @@ contains
      ! Define the fscav field
      call nc_check(nf90_def_var(ncid=ncFileID, name="fscav", xtype=nf90_double, &
                    dimids=(/fscavDimID/), varid=fscavVarID))
-     call nc_check(nf90_put_att(ncFileID, fscavVarID, "long_name", "smoke dust convetive wet scavanging coefficents"))
+     call nc_check(nf90_put_att(ncFileID, fscavVarID, "long_name", "smoke dust convective wet scavanging coefficents"))
      call nc_check(nf90_put_att(ncFileID, fscavVarID, "units",     "none"))
 
      ! Define the wetdpc_deep field
@@ -950,7 +950,6 @@ contains
                    varid=kdtVarID))
      call nc_check(nf90_put_att(ncFileID, kdtVarID, "long_name", "current forecast iteration"))
      call nc_check(nf90_put_att(ncFileID, kdtVarID, "units",     "index"))
-     call nc_check(nf90_put_att(ncFileID, NF90_GLOBAL, "kdt", kdt))
 
      ! Leave define mode so we can fill
      call nc_check(nf90_enddef(ncfileID))

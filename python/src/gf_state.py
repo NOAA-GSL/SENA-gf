@@ -1,109 +1,135 @@
 import numpy as np
-from mt19937 import MT19937
 import math
 
 class GFState:
-    def __init__(self, ncol=512, nlev=64, rkind=np.float64):
+    def __init__(self, rkind=np.float64, ikind=np.int32):
         self.rkind=rkind
-        self.ncol = ncol
-        self.nlev = nlev
-        self.im = ncol
-        self.km = nlev
-        self.ix = self.im
+        self.ikind=ikind
+        
+        self.ntracer = None
+        self.garea = None
+        self.im = None
+        self.km = None
+        self.dt = None
+        self.flag_init = None
+        self.flag_restart = None
+        self.cactiv = None
+        self.cactiv_m = None
+        self.g = None
+        self.cp = None
+        self.xlv = None
+        self.r_v = None
+        self.forcet = None
+        self.forceqv_spechum = None
+        self.phil = None
+        self.raincv = None
+        self.qv_spechum = None
+        self.t = None
+        self.cld1d = None
+        self.us = None
+        self.vs = None
+        self.t2di = None
+        self.w = None
+        self.qv2di_spechum = None
+        self.p2di = None
+        self.psuri = None
+        self.hbot = None
+        self.htop = None
+        self.kcnv = None
+        self.xland = None
+        self.hfx2 = None
+        self.qfx2 = None
+        self.aod_gf = None
+        self.cliw = None
+        self.clcw = None
+        self.pbl = None
+        self.ud_mf = None
+        self.dd_mf = None
+        self.dt_mf = None
+        self.cnvw_moist = None
+        self.cnvc = None
+        self.imfshalcnv = None
+        self.flag_for_scnv_generic_tend = None
+        self.flag_for_dcnv_generic_tend = None
+        self.dtend = None
+        self.dtidx = None
+        self.ntqv = None
+        self.ntcw = None
+        self.ntiw = None
+        self.index_of_temperature= None
+        self.index_of_x_wind = None
+        self.index_of_y_wind = None
+        self.index_of_process_scnv = None
+        self.index_of_process_dcnv = None
+        self.dfi_radar_max_intervals= None
+        self.ldiag3d = None
+        self.qci_conv = None
+        self.fhour = None
+        self.do_cap_suppress = None
+        self.fh_dfi_radar = None
+        self.ix_dfi_radar = None
+        self.num_dfi_radar = None
+        self.cap_suppress = None
+        self.maxupmf = None
+        self.maxMF = None
+        self.do_mynnedmf = None
+        self.ichoice_in = None
+        self.ichoicem_in = None
+        self.ichoice_s_in = None
+        self.spp_wts_cu_deep = None
+        self.spp_cu_deep = None
+        self.nchem = None
+        self.chem3d = None
+        self.fscav = None
+        self.do_smoke_transport = None
+        self.wetdpc_deep = None
+        self.kdt = None
 
-        self.DTEND_DIM = 12
-        self.num_dfi_radar = 10
+        self.dtend_dim3 = None
+        self.ntracers_p100 = None
+        self.dtidx_dim2 = None
+        self.num_dfi_radar_p1 = None
+        self.fscav_dim = None
 
         # Allocate state data
-        self.garea = np.zeros(self.im, dtype=self.rkind)
-        self.cactiv = np.ones(self.im, dtype=np.int32)
-        self.cactiv_m = np.ones(self.im, dtype=np.int32)
-        self.forcet = np.zeros((self.ix, self.km), dtype=self.rkind)
-        self.forceqv_spechum = np.zeros((self.ix, self.km), dtype=self.rkind)
-        self.phil = np.zeros((self.ix, self.km), dtype=self.rkind)
-        self.raincv = np.zeros(self.im, dtype=self.rkind)
-        self.qv_spechum = np.zeros((self.ix, self.km), dtype=self.rkind)
-        self.t = np.zeros((self.ix, self.km), dtype=self.rkind)
-        self.cld1d = np.zeros(self.im, dtype=self.rkind)
-        self.us = np.zeros((self.ix, self.km), dtype=self.rkind)
-        self.vs = np.zeros((self.ix, self.km), dtype=self.rkind)
-        self.t2di = np.zeros((self.ix, self.km), dtype=self.rkind)
-        self.w = np.zeros((self.ix, self.km), dtype=self.rkind)
-        self.qv2di_spechum = np.zeros((self.ix, self.km), dtype=self.rkind)
-        self.p2di = np.zeros((self.ix, self.km), dtype=self.rkind)
-        self.psuri = np.zeros(self.im, dtype=self.rkind)
-        self.hbot = np.ones(self.im, dtype=np.int32)
-        self.htop = np.ones(self.im, dtype=np.int32)
-        self.kcnv = np.ones(self.im, dtype=np.int32)
-        self.xland = np.ones(self.im, dtype=np.int32)
-        self.hfx2 = np.zeros(self.im, dtype=self.rkind)
-        self.qfx2 = np.zeros(self.im, dtype=self.rkind)
-        self.aod_gf = np.zeros(self.im, dtype=self.rkind)
-        self.cliw = np.zeros((self.ix, self.km), dtype=self.rkind)
-        self.clcw = np.zeros((self.ix, self.km), dtype=self.rkind)
-        self.pbl = np.zeros(self.im, dtype=self.rkind)
-        self.ud_mf = np.zeros((self.im, self.km), dtype=self.rkind)
-        self.dd_mf = np.zeros((self.im, self.km), dtype=self.rkind)
-        self.dt_mf = np.zeros((self.im, self.km), dtype=self.rkind)
-        self.cnvw_moist = np.zeros((self.ix, self.km), dtype=self.rkind)
-        self.cnvc = np.zeros((self.ix, self.km), dtype=self.rkind)
-        self.dtend = np.zeros((self.im, self.km, self.DTEND_DIM), dtype=self.rkind)
-        self.dtidx = np.ones((113, 18), dtype=np.int32)
-        self.qci_conv = np.zeros((self.im, self.km), dtype=self.rkind)
-        self.ix_dfi_radar = np.ones(self.num_dfi_radar, dtype=np.int32)
-        self.fh_dfi_radar = np.zeros(self.num_dfi_radar+1, dtype=self.rkind)
-        self.cap_suppress = np.zeros((self.im, self.num_dfi_radar), dtype=self.rkind)
-
-        # Initialize state
-        self.read_state("../../test/test_input/input_state.nc")
-
-        # Initialize state
-        #mt = MT19937()
-        #mt.mt19937_real1d(self.garea)
-        #for i in range(self.cactiv.size):
-        #    self.cactiv[i] = 1 + (i + 1) % 2
-        #    self.cactiv_m[i] = 1 + (1 + i) % 3
-        #mt.mt19937_real2d(self.forcet)
-        #self.forcet *= 0.001
-        #mt.mt19937_real2d(self.forceqv_spechum)
-        #mt.mt19937_real2d(self.phil)
-        #mt.mt19937_real1d(self.raincv)
-        #mt.mt19937_real2d(self.qv_spechum)
-        #mt.mt19937_real2d(self.t)
-        #self.t += 510.0
-        #mt.mt19937_real1d(self.cld1d)
-        #mt.mt19937_real2d(self.us)
-        #mt.mt19937_real2d(self.vs)
-        #mt.mt19937_real2d(self.t2di)
-        #self.t2di += 500.0
-        #mt.mt19937_real2d(self.w)
-        #mt.mt19937_real2d(self.qv2di_spechum)
-        #mt.mt19937_real2d(self.p2di)
-        #mt.mt19937_real1d(self.psuri)
-        #self.htop = self.htop * 4
-        #for i in range(self.kcnv.size):
-        #    self.kcnv[i] = 1 + (i + 1) % 2
-        #    self.xland[i] = 1 + (i + 1) % 3
-        #mt.mt19937_real1d(self.hfx2)
-        #mt.mt19937_real1d(self.qfx2)
-        #mt.mt19937_real2d(self.cliw)
-        #mt.mt19937_real2d(self.clcw)
-        #mt.mt19937_real1d(self.pbl)
-        #mt.mt19937_real2d(self.ud_mf)
-        #mt.mt19937_real2d(self.dd_mf)
-        #mt.mt19937_real2d(self.dt_mf)
-        #mt.mt19937_real2d(self.cnvw_moist)
-        #mt.mt19937_real2d(self.cnvc)
-        #mt.mt19937_real3d(self.dtend)
-        #mt.mt19937_real2d(self.qci_conv)
-        #mt.mt19937_real1d(self.aod_gf)
-        #for i in range(113):
-        #    for j in range(18):
-        #        self.dtidx[i,j] = 1 + ((j + 1) % 4) + ((i + 1) % 4)
-        #for i in range(self.num_dfi_radar):
-        #    self.ix_dfi_radar[i] = 1 + (i + 1) % 3
-        #mt.mt19937_real1d(self.fh_dfi_radar)
-        #mt.mt19937_real2d(self.cap_suppress)
+        # self.garea = np.zeros(self.im, dtype=self.rkind)
+        # self.cactiv = np.ones(self.im, dtype=np.int32)
+        # self.cactiv_m = np.ones(self.im, dtype=np.int32)
+        # self.forcet = np.zeros((self.ix, self.km), dtype=self.rkind)
+        # self.forceqv_spechum = np.zeros((self.ix, self.km), dtype=self.rkind)
+        # self.phil = np.zeros((self.ix, self.km), dtype=self.rkind)
+        # self.raincv = np.zeros(self.im, dtype=self.rkind)
+        # self.qv_spechum = np.zeros((self.ix, self.km), dtype=self.rkind)
+        # self.t = np.zeros((self.ix, self.km), dtype=self.rkind)
+        # self.cld1d = np.zeros(self.im, dtype=self.rkind)
+        # self.us = np.zeros((self.ix, self.km), dtype=self.rkind)
+        # self.vs = np.zeros((self.ix, self.km), dtype=self.rkind)
+        # self.t2di = np.zeros((self.ix, self.km), dtype=self.rkind)
+        # self.w = np.zeros((self.ix, self.km), dtype=self.rkind)
+        # self.qv2di_spechum = np.zeros((self.ix, self.km), dtype=self.rkind)
+        # self.p2di = np.zeros((self.ix, self.km), dtype=self.rkind)
+        # self.psuri = np.zeros(self.im, dtype=self.rkind)
+        # self.hbot = np.ones(self.im, dtype=np.int32)
+        # self.htop = np.ones(self.im, dtype=np.int32)
+        # self.kcnv = np.ones(self.im, dtype=np.int32)
+        # self.xland = np.ones(self.im, dtype=np.int32)
+        # self.hfx2 = np.zeros(self.im, dtype=self.rkind)
+        # self.qfx2 = np.zeros(self.im, dtype=self.rkind)
+        # self.aod_gf = np.zeros(self.im, dtype=self.rkind)
+        # self.cliw = np.zeros((self.ix, self.km), dtype=self.rkind)
+        # self.clcw = np.zeros((self.ix, self.km), dtype=self.rkind)
+        # self.pbl = np.zeros(self.im, dtype=self.rkind)
+        # self.ud_mf = np.zeros((self.im, self.km), dtype=self.rkind)
+        # self.dd_mf = np.zeros((self.im, self.km), dtype=self.rkind)
+        # self.dt_mf = np.zeros((self.im, self.km), dtype=self.rkind)
+        # self.cnvw_moist = np.zeros((self.ix, self.km), dtype=self.rkind)
+        # self.cnvc = np.zeros((self.ix, self.km), dtype=self.rkind)
+        # self.dtend = np.zeros((self.im, self.km, self.DTEND_DIM), dtype=self.rkind)
+        # self.dtidx = np.ones((113, 18), dtype=np.int32)
+        # self.qci_conv = np.zeros((self.im, self.km), dtype=self.rkind)
+        # self.ix_dfi_radar = np.ones(self.num_dfi_radar, dtype=np.int32)
+        # self.fh_dfi_radar = np.zeros(self.num_dfi_radar+1, dtype=self.rkind)
+        # self.cap_suppress = np.zeros((self.im, self.num_dfi_radar), dtype=self.rkind)
 
 
     def print_state(self, msg):
@@ -242,232 +268,469 @@ class GFState:
     def write_state(self, filename):
         from netCDF4 import Dataset
 
-        _ix = self.forcet.shape[0]
-        _km = self.forcet.shape[1]
-        _im = self.garea.shape[0]
-        _dtend_dim = self.dtend.shape[2]
-        _num_dfi_radar = self.ix_dfi_radar.shape[0]
-        _num_dfi_radar_p1 = _num_dfi_radar + 1
-        _dtidx_dim1 = self.dtidx.shape[0]
-        _dtidx_dim2 = self.dtidx.shape[1]
+        # _ix = self.forcet.shape[0]
+        # _km = self.forcet.shape[1]
+        # _im = self.garea.shape[0]
+        # _dtend_dim = self.dtend.shape[2]
+        # _num_dfi_radar = self.ix_dfi_radar.shape[0]
+        # _num_dfi_radar_p1 = _num_dfi_radar + 1
+        # _dtidx_dim1 = self.dtidx.shape[0]
+        # _dtidx_dim2 = self.dtidx.shape[1]
 
         # Open new file, overwriting previous contents
         _dataset = Dataset(filename, "w")
 
         # Define the dimensions
-        _ixDim = _dataset.createDimension("ix", _ix)
-        _kmDim = _dataset.createDimension("km", _km)
-        _imDim = _dataset.createDimension("im", _im)
-        _dtend_dimDim = _dataset.createDimension("dtend_dim", _dtend_dim)
-        _num_dfi_radarDim = _dataset.createDimension("num_dfi_radar", _num_dfi_radar)
-        _num_dfi_radar_p1Dim = _dataset.createDimension("num_dfi_radar_p1", _num_dfi_radar_p1)
-        _dtidx_dim1Dim = _dataset.createDimension("dtidx_dim1", _dtidx_dim1)
+        _dtend_dim3 = self.dtend.shape[2]
+        _num_dfi_radar_dim = self.ix_dfi_radar.shape[0]
+        _dtidx_dim2 = self.dtidx.shape[1]
+        _imDim = _dataset.createDimension("im", self.im)
+        _kmDim = _dataset.createDimension("km", self.km)
+        _dtend_dim3Dim = _dataset.createDimension("dtend_dim3", _dtend_dim3)
+        _ntracers_p100Dim = _dataset.createDimension("ntracers_p100", self.ntracer + 100)
         _dtidx_dim2Dim = _dataset.createDimension("dtidx_dim2", _dtidx_dim2)
+        _num_dfi_radarDim = _dataset.createDimension("num_dfi_radar", _num_dfi_radar_dim)
+        _num_dfi_radar_p1Dim = _dataset.createDimension("num_dfi_radar_p1", _num_dfi_radar_dim + 1)
+        _nchemDim = _dataset.createDimension("nchem", self.nchem)
+        _fscav_dimDim = _dataset.createDimension("fscav_dim", 3)
+
+        # Define the ntracer variable
+        _ntracerVar = _dataset.createVariable("ntracer", self.ikind, ())
+        _ntracerVar.long_name = "number of tracers"
+        _ntracerVar.units = "count"
 
         # Define the garea field
-        _gareaVar = _dataset.createVariable("garea", "f8", (_imDim,))
-        _gareaVar.long_name = "garea"
-        _gareaVar.units = "Nondimensional"
+        _gareaVar = _dataset.createVariable("garea", self.rkind, (_imDim,))
+        _gareaVar.long_name = "grid cell area"
+        _gareaVar.units = "m2"
+
+        # Define the dt variable
+        _dtVar = _dataset.createVariable("dt", self.rkind, ())
+        _dtVar.long_name = "physics time step"
+        _dtVar.units = "s"
+
+        # Define the flag_init field
+        _flag_initVar = _dataset.createVariable("flag_init", self.ikind, ())
+        _flag_initVar.long_name = "flag signaling first time step for time integration loop"
+        _flag_initVar.units = "flag"
+
+        # Define the flag_restart field
+        _flag_restartVar = _dataset.createVariable("flag_restart", self.ikind, ())
+        _flag_restartVar.long_name = "flag for restart (warmstart) or coldstart"
+        _flag_restartVar.units = "flag"
 
         # Define the cactiv field
-        _cactivVar = _dataset.createVariable("cactiv", "i4", (_imDim,))
-        _cactivVar.long_name = "cactiv"
-        _cactivVar.units = "Nondimensional"
+        if self.cactiv is not None:
+            _cactivVar = _dataset.createVariable("cactiv", self.ikind, (_imDim,))
+            _cactivVar.long_name = "convective activity memory"
+            _cactivVar.units = "Nondimensional"
 
         # Define the cactiv_m field
-        _cactiv_mVar = _dataset.createVariable("cactiv_m", "i4", (_imDim,))
-        _cactiv_mVar.long_name = "cactiv_m"
-        _cactiv_mVar.units = "Nondimensional"
+        if self.cactiv_m is not None:
+            _cactiv_mVar = _dataset.createVariable("cactiv_m", self.ikind, (_imDim,))
+            _cactiv_mVar.long_name = "mid-level cloud convective activity memory"
+            _cactiv_mVar.units = "Nondimensional"
+
+        # Define the g variable
+        _gVar = _dataset.createVariable("g", self.rkind, ())
+        _gVar.long_name = "gravitational acceleration"
+        _gVar.units = "m s-2"
+
+        # Define the cp field
+        _cpVar = _dataset.createVariable("cp", self.rkind, ())
+        _cpVar.long_name = "specific heat of dry air at constant pressure"
+        _cpVar.units = "J kg-1 K-1"
+
+        # Define the xlv field
+        _xlvVar = _dataset.createVariable("xlv", self.rkind, ())
+        _xlvVar.long_name = "latent heat of evaporation/sublimation"
+        _xlvVar.units = "J kg-1"
+
+        # Define the r_v field
+        _r_vVar = _dataset.createVariable("r_v", self.rkind, ())
+        _r_vVar.long_name = "ideal gas constant for water vapor"
+        _r_vVar.units = "J kg-1 K-1"
 
         # Define the forcet field
-        _forcetVar = _dataset.createVariable("forcet", "f8", (_kmDim, _ixDim,))
-        _forcetVar.long_name = "forcet"
-        _forcetVar.units = "Nondimensional"
+        if self.forcet is not None:
+            _forcetVar = _dataset.createVariable("forcet", self.rkind, (_kmDim, _imDim,))
+            _forcetVar.long_name = "temperature tendency due to dynamics only"
+            _forcetVar.units = "K s-1"
 
         # Define the forceqv_spechum field
-        _forceqv_spechumVar = _dataset.createVariable("forceqv_spechum", "f8", (_kmDim, _ixDim,))
-        _forceqv_spechumVar.long_name = "forceqv_spechum"
-        _forceqv_spechumVar.units = "Nondimensional"
+        if self.forceqv_spechum is not None:
+            _forceqv_spechumVar = _dataset.createVariable("forceqv_spechum", self.rkind, (_kmDim, _imDim,))
+            _forceqv_spechumVar.long_name = "moisture tendency due to dynamics only"
+            _forceqv_spechumVar.units = "kg kg-1 s-1"
 
         # Define the phil field
-        _philVar = _dataset.createVariable("phil", "f8", (_kmDim, _ixDim,))
-        _philVar.long_name = "phil"
-        _philVar.units = "Nondimensional"
+        _philVar = _dataset.createVariable("phil", self.rkind, (_kmDim, _imDim,))
+        _philVar.long_name = "layer geopotential"
+        _philVar.units = "m2 s-2"
 
         # Define the raincv field
-        _raincvVar = _dataset.createVariable("raincv", "f8", (_imDim,))
-        _raincvVar.long_name = "raincv"
-        _raincvVar.units = "Nondimensional"
+        _raincvVar = _dataset.createVariable("raincv", self.rkind, (_imDim,))
+        _raincvVar.long_name = "deep convective rainfall amount on physics timestep"
+        _raincvVar.units = "m"
 
         # Define the qv_spechum field
-        _qv_spechumVar = _dataset.createVariable("qv_spechum", "f8", (_kmDim, _ixDim,))
-        _qv_spechumVar.long_name = "qv_spechum"
-        _qv_spechumVar.units = "Nondimensional"
+        _qv_spechumVar = _dataset.createVariable("qv_spechum", self.rkind, (_kmDim, _imDim,))
+        _qv_spechumVar.long_name = "water vapor specific humidity updated by physics"
+        _qv_spechumVar.units = "kg kg-1"
 
         # Define the t field
-        _tVar = _dataset.createVariable("t", "f8", (_kmDim, _ixDim,))
-        _tVar.long_name = "t"
-        _tVar.units = "Nondimensional"
+        _tVar = _dataset.createVariable("t", self.rkind, (_kmDim, _imDim,))
+        _tVar.long_name = "updated temperature"
+        _tVar.units = "K"
 
         # Define the cld1d field
-        _cld1dVar = _dataset.createVariable("cld1d", "f8", (_imDim,))
-        _cld1dVar.long_name = "cld1d"
-        _cld1dVar.units = "Nondimensional"
+        _cld1dVar = _dataset.createVariable("cld1d", self.rkind, (_imDim,))
+        _cld1dVar.long_name = "cloud work function"
+        _cld1dVar.units = "m2 s-2"
 
         # Define the us field
-        _usVar = _dataset.createVariable("us", "f8", (_kmDim, _ixDim))
-        _usVar.long_name = "us"
-        _usVar.units = "Nondimensional"
+        _usVar = _dataset.createVariable("us", self.rkind, (_kmDim, _imDim))
+        _usVar.long_name = "updated x-direction wind"
+        _usVar.units = "m s-1"
 
         # Define the vs field
-        _vsVar = _dataset.createVariable("vs", "f8", (_kmDim, _ixDim))
-        _vsVar.long_name = "vs"
-        _vsVar.units = "Nondimensional"
+        _vsVar = _dataset.createVariable("vs", self.rkind, (_kmDim, _imDim))
+        _vsVar.long_name = "updated y-direction wind"
+        _vsVar.units = "m s-1"
 
         # Define the t2di field
-        _t2diVar = _dataset.createVariable("t2di", "f8", (_kmDim, _ixDim))
-        _t2diVar.long_name = "t2di"
-        _t2diVar.units = "Nondimensional"
+        _t2diVar = _dataset.createVariable("t2di", self.rkind, (_kmDim, _imDim))
+        _t2diVar.long_name = "mid-layer temperature"
+        _t2diVar.units = "K"
 
         # Define the w field
-        _wVar = _dataset.createVariable("w", "f8", (_kmDim, _ixDim))
-        _wVar.long_name = "w"
-        _wVar.units = "Nondimensional"
+        _wVar = _dataset.createVariable("w", self.rkind, (_kmDim, _imDim))
+        _wVar.long_name = "layer mean vertical velocity"
+        _wVar.units = "Pa s-1"
 
         # Define the qv2di_spechum field
-        _qv2di_spechumVar = _dataset.createVariable("qv2di_spechum", "f8", (_kmDim, _ixDim))
-        _qv2di_spechumVar.long_name = "qv2di_spechum"
-        _qv2di_spechumVar.units = "Nondimensional"
+        _qv2di_spechumVar = _dataset.createVariable("qv2di_spechum", self.rkind, (_kmDim, _imDim))
+        _qv2di_spechumVar.long_name = "water vapor specific humidity"
+        _qv2di_spechumVar.units = "kg kg-1"
 
         # Define the p2di field
-        _p2diVar = _dataset.createVariable("p2di", "f8", (_kmDim, _ixDim))
-        _p2diVar.long_name = "p2di"
-        _p2diVar.units = "Nondimensional"
+        _p2diVar = _dataset.createVariable("p2di", self.rkind, (_kmDim, _imDim))
+        _p2diVar.long_name = "mean layer pressure"
+        _p2diVar.units = "Pa"
 
         # Define the psuri field
-        _psuriVar = _dataset.createVariable("psuri", "f8", (_imDim,))
-        _psuriVar.long_name = "psuri"
-        _psuriVar.units = "Nondimensional"
+        _psuriVar = _dataset.createVariable("psuri", self.rkind, (_imDim,))
+        _psuriVar.long_name = "surface pressure"
+        _psuriVar.units = "Pa"
 
         # Define the hbot field
-        _hbotVar = _dataset.createVariable("hbot", "i4", (_imDim,))
-        _hbotVar.long_name = "hbot"
-        _hbotVar.units = "Nondimensional"
+        _hbotVar = _dataset.createVariable("hbot", self.ikind, (_imDim,))
+        _hbotVar.long_name = "index for cloud base"
+        _hbotVar.units = "index"
 
         # Define the htop field
-        _htopVar = _dataset.createVariable("htop", "i4", (_imDim,))
-        _htopVar.long_name = "htop"
-        _htopVar.units = "Nondimensional"
+        _htopVar = _dataset.createVariable("htop", self.ikind, (_imDim,))
+        _htopVar.long_name = "index for cloud top"
+        _htopVar.units = "index"
 
         # Define the kcnv field
-        _kcnvVar = _dataset.createVariable("kcnv", "i4", (_imDim,))
-        _kcnvVar.long_name = "kcnv"
-        _kcnvVar.units = "Nondimensional"
+        _kcnvVar = _dataset.createVariable("kcnv", self.ikind, (_imDim,))
+        _kcnvVar.long_name = "deep convection: 0=no, 1=yes"
+        _kcnvVar.units = "flag"
 
         # Define the xland field
-        _xlandVar = _dataset.createVariable("xland", "i4", (_imDim,))
-        _xlandVar.long_name = "xland"
-        _xlandVar.units = "Nondimensional"
+        _xlandVar = _dataset.createVariable("xland", self.ikind, (_imDim,))
+        _xlandVar.long_name = "landmask: sea/land/ice=0/1/2"
+        _xlandVar.units = "flag"
 
         # Define the hfx2 field
-        _hfx2Var = _dataset.createVariable("hfx2", "f8", (_imDim,))
-        _hfx2Var.long_name = "hfx2"
-        _hfx2Var.units = "Nondimensional"
+        _hfx2Var = _dataset.createVariable("hfx2", self.rkind, (_imDim,))
+        _hfx2Var.long_name = "kinematic surface upward sensible heat flux reduced by surface roughness and vegetation"
+        _hfx2Var.units = "K m s-1"
 
         # Define the qfx2 field
-        _qfx2Var = _dataset.createVariable("qfx2", "f8", (_imDim,))
-        _qfx2Var.long_name = "qfx2"
-        _qfx2Var.units = "Nondimensional"
+        _qfx2Var = _dataset.createVariable("qfx2", self.rkind, (_imDim,))
+        _qfx2Var.long_name = "kinematic surface upward latent heat flux"
+        _qfx2Var.units = "kg kg-1 m s-1"
 
         # Define the aod_gf field
-        _aod_gfVar = _dataset.createVariable("aod_gf", "f8", (_imDim,))
-        _aod_gfVar.long_name = "aod_gf"
-        _aod_gfVar.units = "Nondimensional"
+        if self.aod_gf is not None:
+            _aod_gfVar = _dataset.createVariable("aod_gf", self.rkind, (_imDim,))
+            _aod_gfVar.long_name = "aerosol optical depth used in Grell-Freitas Convective Parameterization"
+            _aod_gfVar.units = "none"
 
         # Define the cliw field
-        _cliwVar = _dataset.createVariable("cliw", "f8", (_kmDim, _ixDim))
-        _cliwVar.long_name = "cliw"
-        _cliwVar.units = "Nondimensional"
+        _cliwVar = _dataset.createVariable("cliw", self.rkind, (_kmDim, _imDim))
+        _cliwVar.long_name = "ratio of mass of ice water to mass of dry air plus vapor (without condensates) in the convectively transported tracer array"
+        _cliwVar.units = "kg kg-1"
 
         # Define the clcw field
-        _clcwVar = _dataset.createVariable("clcw", "f8", (_kmDim, _ixDim))
-        _clcwVar.long_name = "clcw"
-        _clcwVar.units = "Nondimensional"
+        _clcwVar = _dataset.createVariable("clcw", self.rkind, (_kmDim, _imDim))
+        _clcwVar.long_name = "ratio of mass of cloud water to mass of dry air plus vapor (without condensates) in the convectively transported tracer array"
+        _clcwVar.units = "kg kg-1"
 
         # Define the pbl field
-        _pblVar = _dataset.createVariable("pbl", "f8", (_imDim,))
-        _pblVar.long_name = "pbl"
-        _pblVar.units = "Nondimensional"
+        _pblVar = _dataset.createVariable("pbl", self.rkind, (_imDim,))
+        _pblVar.long_name = "PBL thickness"
+        _pblVar.units = "m"
 
         # Define the ud_mf field
-        _ud_mfVar = _dataset.createVariable("ud_mf", "f8", (_kmDim, _imDim,))
-        _ud_mfVar.long_name = "ud_mf"
-        _ud_mfVar.units = "Nondimensional"
-
+        if self.ud_mf is not None:
+            _ud_mfVar = _dataset.createVariable("ud_mf",self.rkind, (_kmDim, _imDim,))
+            _ud_mfVar.long_name = "(updraft mass flux) * delt"
+            _ud_mfVar.units = "kg m-2"
+        
         # Define the dd_mf field
-        _dd_mfVar = _dataset.createVariable("dd_mf", "f8", (_kmDim, _imDim,))
-        _dd_mfVar.long_name = "dd_mf"
-        _dd_mfVar.units = "Nondimensional"
+        _dd_mfVar = _dataset.createVariable("dd_mf", self.rkind, (_kmDim, _imDim,))
+        _dd_mfVar.long_name = "(downdraft mass flux) * delt"
+        _dd_mfVar.units = "kg m-2"
 
         # Define the dt_mf field
-        _dt_mfVar = _dataset.createVariable("dt_mf", "f8", (_kmDim, _imDim,))
-        _dt_mfVar.long_name = "dt_mf"
-        _dt_mfVar.units = "Nondimensional"
+        _dt_mfVar = _dataset.createVariable("dt_mf", self.rkind, (_kmDim, _imDim,))
+        _dt_mfVar.long_name = "(detrainment mass flux) * delt"
+        _dt_mfVar.units = "kg m-2"
 
         # Define the cnvw_moist field
-        _cnvw_moistVar = _dataset.createVariable("cnvw_moist", "f8", (_kmDim, _ixDim,))
-        _cnvw_moistVar.long_name = "cnvw_moist"
-        _cnvw_moistVar.units = "Nondimensional"
+        _cnvw_moistVar = _dataset.createVariable("cnvw_moist", self.rkind, (_kmDim, _imDim,))
+        _cnvw_moistVar.long_name = "moist convective cloud water mixing ratio"
+        _cnvw_moistVar.units = "kg kg-1"
 
         # Define the cnvc field
-        _cnvcVar = _dataset.createVariable("cnvc", "f8", (_kmDim, _ixDim,))
-        _cnvcVar.long_name = "cnvc"
-        _cnvcVar.units = "Nondimensional"
+        _cnvcVar = _dataset.createVariable("cnvc", self.rkind, (_kmDim, _imDim,))
+        _cnvcVar.long_name = "convective cloud cover"
+        _cnvcVar.units = "frac"
+
+        # Define the imfshalcnv variable
+        _imfshalcnvVar = _dataset.createVariable("imfshalcnv", self.ikind, ())
+        _imfshalcnvVar.long_name = "flag for mass-flux shallow convection scheme"
+        _imfshalcnvVar.units = "flag"
+
+        # Define the flag_for_scnv_generic_tend field
+        _flag_for_scnv_generic_tendVar = _dataset.createVariable("flag_for_scnv_generic_tend", self.ikind, ())
+        _flag_for_scnv_generic_tendVar.long_name = "true if GFS_SCNV_generic should calculate tendencies"
+        _flag_for_scnv_generic_tendVar.units = "flag"
+
+        # Define the flag_for_dcnv_generic_tend field
+        _flag_for_dcnv_generic_tendVar = _dataset.createVariable("flag_for_dcnv_generic_tend", self.ikind, ())
+        _flag_for_dcnv_generic_tendVar.long_name = "true if GFS_DCNV_generic should calculate tendencies"
+        _flag_for_dcnv_generic_tendVar.units = "flag"
 
         # Define the dtend field
-        _dtendVar = _dataset.createVariable("dtend", "f8", (_dtend_dimDim, _kmDim, _imDim,))
-        _dtendVar.long_name = "dtend"
-        _dtendVar.units = "Nondimensional"
+        if self.dtend is not None:
+            _dtendVar = _dataset.createVariable("dtend", self.rkind, (_dtend_dim3Dim, _kmDim, _imDim,))
+            _dtendVar.long_name = "diagnostic tendencies for state variables"
+            _dtendVar.units = "mixed"
 
         # Define the dtidx field
-        _dtidxVar = _dataset.createVariable("dtidx", "i4", (_dtidx_dim2Dim, _dtidx_dim1Dim))
-        _dtidxVar.long_name = "dtidx"
-        _dtidxVar.units = "Nondimensional"
+        _dtidxVar = _dataset.createVariable("dtidx", self.ikind, (_dtidx_dim2Dim, _ntracers_p100Dim))
+        _dtidxVar.long_name = "index of state-variable and process in last dimension of diagnostic tendencies array AKA cumulative_change_index"
+        _dtidxVar.units = "index"
 
-        # Define the qci_conv field
-        _qci_convVar = _dataset.createVariable("qci_conv", "f8", (_kmDim, _imDim,))
-        _qci_convVar.long_name = "qci_conv"
-        _qci_convVar.units = "Nondimensional"
+        # Define the ntqv variable
+        _ntqvVar = _dataset.createVariable("ntqv", self.ikind, ())
+        _ntqvVar.long_name = "tracer index for water vapor (specific humidity)"
+        _ntqvVar.units = "index"
 
-        # Define the ix_dfi_radar field
-        _ix_dfi_radarVar = _dataset.createVariable("ix_dfi_radar", "f8", (_num_dfi_radarDim,))
-        _ix_dfi_radarVar.long_name = "ix_dfi_radar"
-        _ix_dfi_radarVar.units = "Nondimensional"
+        # Define the ntiw variable
+        _ntiwVar = _dataset.createVariable("ntiw", self.ikind, ())
+        _ntiwVar.long_name = "tracer index for ice water"
+        _ntiwVar.units = "index"
+
+        # Define the ntcw variable
+        _ntcwVar = _dataset.createVariable("ntcw", self.ikind, ())
+        _ntcwVar.long_name = "tracer index for cloud condensate (or liquid water)"
+        _ntcwVar.units = "index"
+
+        # Define the index_of_temperature variable
+        _index_of_temperatureVar = _dataset.createVariable("index_of_temperature", self.ikind, ())
+        _index_of_temperatureVar.long_name = "index of temperature in first dimension of array cumulative change index"
+        _index_of_temperatureVar.units = "index"
+
+        # Define the index_of_x_wind variable
+        _index_of_x_windVar = _dataset.createVariable("index_of_x_wind", self.ikind, ())
+        _index_of_x_windVar.long_name = "index of x-wind in first dimension of array cumulative change index"
+        _index_of_x_windVar.units = "index"
+
+        # Define the index_of_y_wind variable
+        _index_of_y_windVar = _dataset.createVariable("index_of_y_wind", self.ikind, ())
+        _index_of_y_windVar.long_name = "index of y-wind in first dimension of array cumulative change index"
+        _index_of_y_windVar.units = "index"
+
+        # Define the index_of_process_scnv variable
+        _index_of_process_scnvVar = _dataset.createVariable("index_of_process_scnv", self.ikind, ())
+        _index_of_process_scnvVar.long_name = "index of shallow convection process in second dimension of array cumulative change index"
+        _index_of_process_scnvVar.units = "index"
+
+        # Define the index_of_process_dcnv variable
+        _index_of_process_dcnvVar = _dataset.createVariable("index_of_process_dcnv", self.ikind, ())
+        _index_of_process_dcnvVar.long_name = "index of deep convection process in second dimension of array cumulative change index"
+        _index_of_process_dcnvVar.units = "index"
+
+        # Define the fhour variable
+        _fhourVar = _dataset.createVariable("fhour", self.rkind, ())
+        _fhourVar.long_name = "current forecast time"
+        _fhourVar.units = "h"
 
         # Define the fh_dfi_radar field
-        _fh_dfi_radarVar = _dataset.createVariable("fh_dfi_radar", "f8", (_num_dfi_radar_p1Dim,))
-        _fh_dfi_radarVar.long_name = "fh_dfi_radar"
-        _fh_dfi_radarVar.units = "Nondimensional"
+        _fh_dfi_radarVar = _dataset.createVariable("fh_dfi_radar", self.rkind, (_num_dfi_radar_p1Dim,))
+        _fh_dfi_radarVar.long_name = "forecast lead times bounding radar derived temperature or convection suppression intervals"
+        _fh_dfi_radarVar.units = "h"
+
+        # Define the ix_dfi_radar field
+        _ix_dfi_radarVar = _dataset.createVariable("ix_dfi_radar", self.ikind, (_num_dfi_radarDim,))
+        _ix_dfi_radarVar.long_name = "indices with radar derived temperature or convection suppression data"
+        _ix_dfi_radarVar.units = "index"
+
+        # Define the num_dfi_radar variable
+        _num_dfi_radarVar = _dataset.createVariable("num_dfi_radar", self.ikind, ())
+        _num_dfi_radarVar.long_name = "number of time ranges with radar-derived microphysics temperature tendencies or radar-derived convection suppression"
+        _num_dfi_radarVar.units = "count"
 
         # Define the cap_suppress field
-        _cap_suppressVar = _dataset.createVariable("cap_suppress", "f8", (_num_dfi_radarDim, _imDim,))
-        _cap_suppressVar.long_name = "cap_suppress"
-        _cap_suppressVar.units = "Nondimensional"
+        if self.cap_suppress is not None:
+            _cap_suppressVar = _dataset.createVariable("cap_suppress", self.rkind, (_num_dfi_radarDim, _imDim,))
+            _cap_suppressVar.long_name = "radar-derived convection suppression"
+            _cap_suppressVar.units = "unitless"
+
+        # Define the dfi_radar_max_intervals variable
+        _dfi_radar_max_intervalsVar = _dataset.createVariable("dfi_radar_max_intervals", self.ikind,())
+        _dfi_radar_max_intervalsVar.long_name = "maximum allowed number of time ranges with radar-derived microphysics temperature tendencies or radar-derived convection suppression"
+        _dfi_radar_max_intervalsVar.units = "count"
+
+        # Define the ldiag3d variable
+        _ldiag3dVar = _dataset.createVariable("ldiag3d", self.ikind, ())
+        _ldiag3dVar.long_name = "flag for 3d diagnostic fields"
+        _ldiag3dVar.units = "flag"
+
+        # Define the qci_conv field
+        if self.qci_conv is not None:
+            _qci_convVar = _dataset.createVariable("qci_conv", self.rkind, (_kmDim, _imDim,))
+            _qci_convVar.long_name = "convective cloud condesate after rainout"
+            _qci_convVar.units = "kg kg-1"
+
+        # Define the do_cap_suppress variable
+        _do_cap_suppressVar = _dataset.createVariable("do_cap_suppress", self.ikind, ())
+        _do_cap_suppressVar.long_name = "flag for radar-derived convection suppression"
+        _do_cap_suppressVar.units = "flag"
+
+        # Define the maxupmf variable
+        if self.maxupmf is not None:
+            _maxupmfVar = _dataset.createVariable("maxupmf", self.rkind, (_imDim))
+            _maxupmfVar.long_name = "maximum convective updraft mass flux within a column"
+            _maxupmfVar.units = "m s-1"
+
+        # Defie the maxMF field
+        if self.maxMF is not None:
+            _maxMFVar = _dataset.createVariable("maxMF", self.rkind, (_imDim))
+            _maxMFVar.long_name = "maximum mass flux within a column"
+            _maxMFVar.units = "m s-1"
+
+        # Define the do_mynnedmf variable
+        _do_mynnedmfVar = _dataset.createVariable("do_mynnedmf", self.ikind, ())
+        _do_mynnedmfVar.long_name = "flag to activate MYNN-EDMF"
+        _do_mynnedmfVar.units = "flag"
+
+        # define the ichoice_in variable
+        _ichoice_inVar = _dataset.createVariable("ichoice_in", self.ikind, ())
+        _ichoice_inVar.long_name = "flag for C3 or GF deep convection closure"
+        _ichoice_inVar.units = "flag"
+
+        # Define the ichoicem_in variable
+        _ichoicem_inVar = _dataset.createVariable("ichoicem_in", self.ikind, ())
+        _ichoicem_inVar.long_name = "flag for C3 or GF mid convection closure"
+        _ichoicem_inVar.units = "flag"
+
+        # Define the ichoice_s_in variable
+        _ichoice_s_inVar = _dataset.createVariable("ichoice_s_in", self.ikind, ())
+        _ichoice_s_inVar.long_name = "flag for C3 or GF shallow convection closure"
+        _ichoice_s_inVar.units = "flag"
+
+        # Define the spp_cu_deep variable
+        _spp_cu_deepVar = _dataset.createVariable("spp_cu_deep", self.ikind, ())
+        _spp_cu_deepVar.long_name = "control for deep convection spp perturbations"
+        _spp_cu_deepVar.units = "count"
+
+        # Define the spp_wts_cu_deep field
+        if self.spp_wts_cu_deep is not None:
+            _spp_wts_cu_deepVar = _dataset.createVariable("spp_wts_cu_deep", self.rkind, (_kmDim,_imDim))
+            _spp_wts_cu_deepVar.long_name = "spp weights for cu deep scheme"
+            _spp_wts_cu_deepVar.units = "1"
+
+        # Define the chem3d field
+        if self.chem3d is not None:
+            _chem3dVar = _dataset.createVariable("chem3d", self.rkind, (_nchemDim, _kmDim, _imDim))
+            _chem3dVar.long_name = "mynn pbl transport of smoke and dust"
+            _chem3dVar.units = "various"
+
+        # Define the fscav field
+        _fscavVar = _dataset.createVariable("fscav", self.rkind, (_fscav_dimDim))
+        _fscavVar.long_name = "smoke dust convective wet scavanging coefficents"
+        _fscavVar.units = "none"
+
+        # Define the wetdpc_deep field
+        if self.wetdpc_deep is not None:
+            _wetdpc_deepVar = _dataset.createVariable("wetdpc_deep", self.rkind, (_nchemDim, _imDim))
+            _wetdpc_deepVar.long_name = "convective wet removal of smoke and dust"
+            _wetdpc_deepVar.units = "kg kg-1"
+
+        # Define do_smoke_transport variable
+        _do_smoke_transportVar = _dataset.createVariable("do_smoke_transport", self.ikind, ())
+        _do_smoke_transportVar.long_name = "flag for rrfs smoke convective transport"
+        _do_smoke_transportVar.units = "flag"
+
+        # Define kdt variable
+        _kdtVar = _dataset.createVariable("kdt", self.ikind, ())
+        _kdtVar.long_name = "current forecast iteration"
+        _kdtVar.units = "index"
+
+        # Fill the ntracer variable
+        _ntracerVar[:] = np.transpose(self.ntracer)
 
         # Fill the garea variable
         _gareaVar[:] = np.transpose(self.garea)
 
+        # Fill the dt variable
+        _dtVar[:] = np.transpose(self.dt)
+
+        # Fill the flag_init variable
+        if self.flag_init:
+            _flag_initVar[:] = 1
+        else:
+            _flag_initVar[:] = 0
+
+        # Fill the flag_restart variable
+        if self.flag_restart:
+            _flag_restartVar[:] = 1
+        else:
+            _flag_restartVar[:] = 0
+
         # Fill the cactiv variable
-        _cactivVar[:] = np.transpose(self.cactiv)
+        if self.cactiv is not None:
+         _cactivVar[:] = np.transpose(self.cactiv)
 
         # Fill the cactiv_m variable
-        _cactiv_mVar[:] = np.transpose(self.cactiv_m)
+        if self.cactiv_m is not None:
+            _cactiv_mVar[:] = np.transpose(self.cactiv_m)
+
+        # Fill the g variable
+        _gVar[:] = np.transpose(self.g)
+
+        # Fill the cp variable
+        _cpVar[:] = np.transpose(self.cp)
+
+        # Fill the xlv variable
+        _xlvVar[:] = np.transpose(self.xlv)
+
+        # Fill the r_v variable
+        _r_vVar[:] = np.transpose(self.r_v)
 
         # Fill the forcet variable
-        _forcetVar[:,:] = np.transpose(self.forcet)
+        if self.forcet is not None:
+            _forcetVar[:,:] = np.transpose(self.forcet)
 
         # Fill the forceqv_spechum variable
-        _forceqv_spechumVar[:,:] = np.transpose(self.forceqv_spechum)
+        if self.forceqv_spechum is not None:
+            _forceqv_spechumVar[:,:] = np.transpose(self.forceqv_spechum)
 
         # Fill the phil variable
         _philVar[:,:] = np.transpose(self.phil)
@@ -524,7 +787,8 @@ class GFState:
         _qfx2Var[:] = np.transpose(self.qfx2)
 
         # Fill the aod_gf variable
-        _aod_gfVar[:] = np.transpose(self.aod_gf)
+        if self.aod_gf is not None:
+            _aod_gfVar[:] = np.transpose(self.aod_gf)
 
         # Fill the cliw variable
         _cliwVar[:,:] = np.transpose(self.cliw)
@@ -536,7 +800,8 @@ class GFState:
         _pblVar[:] = np.transpose(self.pbl)
 
         # Fill the ud_mf variable
-        _ud_mfVar[:,:] = np.transpose(self.ud_mf)
+        if self.ud_mf is not None:
+            _ud_mfVar[:,:] = np.transpose(self.ud_mf)
 
         # Fill the dd_mf variable
         _dd_mfVar[:,:] = np.transpose(self.dd_mf)
@@ -550,23 +815,142 @@ class GFState:
         # Fill the cnvc variable
         _cnvcVar[:,:] = np.transpose(self.cnvc)
 
+        # Fill the imfshalcnv variable
+        _imfshalcnvVar[:] = np.transpose(self.imfshalcnv)
+
+        # Fill the flag_for_scnv_generic_tend variable
+        if self.flag_for_scnv_generic_tend:
+            _flag_for_scnv_generic_tendVar[:] = 1
+        else:
+            _flag_for_scnv_generic_tendVar[:] = 0
+
+        # Fill the flag_for_dcnv_generic_tend variable
+        if self.flag_for_dcnv_generic_tend:
+            _flag_for_dcnv_generic_tendVar[:] = 1
+        else:
+            _flag_for_dcnv_generic_tendVar[:] = 0
+
         # Fill the dtend variable
-        _dtendVar[:,:,:] = np.transpose(self.dtend)
+        if self.dtend is not None:
+            _dtendVar[:,:,:] = np.transpose(self.dtend)
 
         # Fill the dtidx variable
         _dtidxVar[:,:] = np.transpose(self.dtidx)
 
-        # Fill the qci_conv variable
-        _qci_convVar[:,:] = np.transpose(self.qci_conv)
+        # Fill the ntqv variable
+        _ntqvVar[:] = np.transpose(self.ntqv)
 
-        # Fill the ix_dfi_radar variable
-        _ix_dfi_radarVar[:] = np.transpose(self.ix_dfi_radar)
+        # Fill the ntiw variable
+        _ntiwVar[:] = np.transpose(self.ntiw)
+
+        # Fill the ntcw variable
+        _ntcwVar[:] = np.transpose(self.ntcw)
+
+        # Fill the index_of_temperature variable
+        _index_of_temperatureVar[:] = np.transpose(self.index_of_temperature)
+
+        # Fill the index_of_x_wind variable
+        _index_of_x_windVar[:] = np.transpose(self.index_of_x_wind)
+
+        # Fill the index_of_y_wind variable
+        _index_of_y_windVar[:] = np.transpose(self.index_of_y_wind)
+
+        # Fill the index_of_process_scnv variable
+        _index_of_process_scnvVar[:] = np.transpose(self.index_of_process_scnv)
+
+        # Fill the index_of_process_dcnv variable
+        _index_of_process_dcnvVar[:] = np.transpose(self.index_of_process_dcnv)
+
+        # Fill the fhour variable
+        _fhourVar[:] = np.transpose(self.fhour)
 
         # Fill the fh_dfi_radar variable
         _fh_dfi_radarVar[:] = np.transpose(self.fh_dfi_radar)
 
+        # Fill the ix_dfi_radar variable
+        _ix_dfi_radarVar[:] = np.transpose(self.ix_dfi_radar)
+
+        # Fill the num_dfi_radar variable
+        _num_dfi_radarVar[:] = np.transpose(self.num_dfi_radar)
+
         # Fill the cap_suppress variable
-        _cap_suppressVar[:,:] = np.transpose(self.cap_suppress)
+        if self.cap_suppress is not None:
+            _cap_suppressVar[:,:] = np.transpose(self.cap_suppress)
+
+        # Fill the dfi_radar_max_intervals variable
+        _dfi_radar_max_intervalsVar[:] = np.transpose(self.dfi_radar_max_intervals)
+
+        # Fill the ldiag3d variable
+        _ldiag3dVar[:] = np.transpose(self.ldiag3d)
+
+        # Fill the qci_conv variable
+        if self.qci_conv is not None:
+            _qci_convVar[:,:] = np.transpose(self.qci_conv)
+
+        # Fill the do_cap_suppress variable
+        if self.do_cap_suppress:
+            _do_cap_suppressVar[:] = 1
+        else:
+            _do_cap_suppressVar[:] = 0
+
+        # Fill the maxupmf variable
+        if self.maxupmf is not None:
+            _maxupmfVar[:] = np.transpose(self.maxupmf)
+
+        # Fill the maxMF variable
+        if self.maxMF is not None:
+            _maxMFVar[:] = np.transpose(self.maxMF)
+
+        # Fill the do_mynnedmf variable
+        if self.do_mynnedmf:
+            _do_mynnedmfVar[:] = 1
+        else:
+            _do_mynnedmfVar[:] = 0
+
+        # Fill the ichoice_in variable
+        if self.ichoice_in:
+            _ichoice_inVar[:] = 1
+        else:
+            _ichoice_inVar[:] = 0
+
+        # Fill the ichoicem_in variable
+        if self.ichoicem_in:
+            _ichoicem_inVar[:] = 1
+        else:
+            _ichoicem_inVar[:] = 0
+
+        # Fill the ichoice_s_in variable
+        if self.ichoice_s_in:
+            _ichoice_s_inVar[:] = 1 
+        else:  
+            _ichoice_s_inVar[:] = 0
+
+        # Fill the spp_cu_deep variable
+        _spp_cu_deepVar[:] = np.transpose(self.spp_cu_deep)
+
+        # Fill the spp_wts_cu_deep variable
+        if self.spp_wts_cu_deep is not None:
+            _spp_wts_cu_deepVar[:,:] = np.transpose(self.spp_wts_cu_deep)
+
+        # Fill the chem3d variable
+        if self.chem3d is not None:
+            _chem3dVar[:,:,:] = np.transpose(self.chem3d)
+
+        # Fill the fscav variable
+        _fscavVar[:] = np.transpose(self.fscav)
+
+        # Fill the wetdpc_deep variable
+        if self.wetdpc_deep is not None:
+            _wetdpc_deepVar[:,:] = np.transpose(self.wetdpc_deep)
+
+        # Fill the do_smoke_transport variable
+        if self.do_smoke_transport:
+            _do_smoke_transportVar[:] = 1
+        else:
+            _do_smoke_transportVar[:] = 0
+
+        # Fill the kdt variable
+        _kdtVar[:] = np.transpose(self.kdt)
 
         # Close the NetCDF file
         _dataset.close()
@@ -583,119 +967,330 @@ class GFState:
         # Open new file for reading
         _dataset = Dataset(filename, "r")
 
+        # Get model dimensions
+        self.im = len(_dataset.dimensions['im'])
+        self.km = len(_dataset.dimensions['km'])
+        self.dtend_dim3 = len(_dataset.dimensions['dtend_dim3'])
+        self.dtidx_dim2 = len(_dataset.dimensions['dtidx_dim2'])
+        self.num_dfi_radar_dim = len(_dataset.dimensions['num_dfi_radar'])
+        self.nchem = len(_dataset.dimensions['nchem'])
+        self.fscav_dim = len(_dataset.dimensions['fscav_dim'])
+
+        # Get ntracer
+        self.ntracer = _dataset.variables["ntracer"][:]
+
         # Get garea
+        self.garea = np.zeros(self.im, dtype=self.rkind)
         self.garea[:] = np.transpose(_dataset.variables["garea"][:])
 
+        # Get dt
+        self.dt = _dataset.variables["dt"][:]
+
+        # Get flag_init
+        if _dataset.variables["flag_init"][:] == 1:
+            self.flag_init = True
+        else:
+            self.flag_init = False
+
+        # # Get flag_restart
+        if _dataset.variables["flag_restart"][:] == 1:
+            self.flag_restart = True
+        else:
+            self.flag_restart = False
+
         # Get cactiv
-        self.cactiv[:] = np.transpose(_dataset.variables["cactiv"][:])
+        if _dataset.variables.get("cactiv"):
+            self.cactiv = np.zeros(self.im, dtype=self.ikind)
+            self.cactiv[:] = np.transpose(_dataset.variables["cactiv"][:])
 
         # Get cactiv_m
-        self.cactiv_m[:] = np.transpose(_dataset.variables["cactiv_m"][:])
+        if _dataset.variables.get("cactiv_m"):
+            self.cactiv_m = np.zeros(self.im, dtype=self.ikind) 
+            self.cactiv_m[:] = np.transpose(_dataset.variables["cactiv_m"][:])
+
+        # Get g
+        self.g = _dataset.variables["g"][:]
+
+        # Get cp
+        self.cp = _dataset.variables["cp"][:]
+
+        # Get xlv
+        self.xlv = _dataset.variables["xlv"][:]
+
+        # Get r_v
+        self.r_v = _dataset.variables["r_v"][:]
 
         # Get forcet
-        self.forcet[:,:] = np.transpose(_dataset.variables["forcet"][:,:])
-
+        if _dataset.variables.get("forcet"):
+            self.forcet = np.zeros((self.im, self.km), dtype=self.rkind)
+            self.forcet[:,:] = np.transpose(_dataset.variables["forcet"][:,:])
+        
         # Get forceqv_spechum
-        self.forceqv_spechum[:,:] = np.transpose(_dataset.variables["forceqv_spechum"][:,:])
+        if _dataset.variables.get("forceqv_spechum"):
+            self.forceqv_spechum = np.zeros((self.im, self.km), dtype=self.rkind)
+            self.forceqv_spechum[:,:] = np.transpose(_dataset.variables["forceqv_spechum"][:,:])
 
         # Get phil
+        self.phil = np.zeros((self.im, self.km), dtype=self.rkind)
         self.phil[:,:] = np.transpose(_dataset.variables["phil"][:,:])
 
         # Get raincv
+        self.raincv = np.zeros(self.im, dtype=self.rkind)
         self.raincv[:] = np.transpose(_dataset.variables["raincv"][:])
 
         # Get qv_spechum
+        self.qv_spechum = np.zeros((self.im, self.km), dtype=self.rkind)
         self.qv_spechum[:,:] = np.transpose(_dataset.variables["qv_spechum"][:,:])
 
         # Get t
+        self.t = np.zeros((self.im, self.km), dtype=self.rkind)
         self.t[:,:] = np.transpose(_dataset.variables["t"][:,:])
 
         # Get cld1d
+        self.cld1d = np.zeros(self.im, dtype=self.rkind)
         self.cld1d[:] = np.transpose(_dataset.variables["cld1d"][:])
 
         # Get us
+        self.us = np.zeros((self.im, self.km), dtype=self.rkind)
         self.us[:,:] = np.transpose(_dataset.variables["us"][:,:])
 
         # Get vs
+        self.vs = np.zeros((self.im, self.km), dtype=self.rkind)
         self.vs[:,:] = np.transpose(_dataset.variables["vs"][:,:])
 
         # Get t2di
+        self.t2di = np.zeros((self.im, self.km), dtype=self.rkind)
         self.t2di[:,:] = np.transpose(_dataset.variables["t2di"][:,:])
 
         # Get w
+        self.w = np.zeros((self.im, self.km), dtype=self.rkind)
         self.w[:,:] = np.transpose(_dataset.variables["w"][:,:])
 
         # Get qv2di_spechum
+        self.qv2di_spechum = np.zeros((self.im, self.km), dtype=self.rkind)
         self.qv2di_spechum[:,:] = np.transpose(_dataset.variables["qv2di_spechum"][:,:])
 
         # Get p2di
+        self.p2di = np.zeros((self.im, self.km), dtype=self.rkind)
         self.p2di[:,:] = np.transpose(_dataset.variables["p2di"][:,:])
 
         # Get psuri
+        self.psuri = np.zeros(self.im, dtype=self.rkind)
         self.psuri[:] = np.transpose(_dataset.variables["psuri"][:])
 
         # Get hbot
+        self.hbot = np.zeros(self.im, dtype=self.ikind)
         self.hbot[:] = np.transpose(_dataset.variables["hbot"][:])
 
         # Get htop
+        self.htop = np.zeros(self.im, dtype=self.ikind)
         self.htop[:] = np.transpose(_dataset.variables["htop"][:])
 
         # Get kcnv
+        self.kcnv = np.zeros(self.im, dtype=self.ikind)
         self.kcnv[:] = np.transpose(_dataset.variables["kcnv"][:])
 
         # Get xland
+        self.xland = np.zeros(self.im, dtype=self.ikind)
         self.xland[:] = np.transpose(_dataset.variables["xland"][:])
 
         # Get hfx2
+        self.hfx2 = np.zeros(self.im, dtype=self.rkind)
         self.hfx2[:] = np.transpose(_dataset.variables["hfx2"][:])
 
         # Get qfx2
+        self.qfx2 = np.zeros(self.im, dtype=self.rkind)
         self.qfx2[:] = np.transpose(_dataset.variables["qfx2"][:])
 
         # Get aod_gf
-        self.aod_gf[:] = np.transpose(_dataset.variables["aod_gf"][:])
+        if _dataset.variables.get("aod_gf"):
+            self.aod_gf = np.zeros(self.im, dtype=self.rkind)
+            self.aod_gf[:] = np.transpose(_dataset.variables["aod_gf"][:])
 
         # Get cliw
+        self.cliw = np.zeros((self.im, self.km), dtype=self.rkind)
         self.cliw[:,:] = np.transpose(_dataset.variables["cliw"][:,:])
 
         # Get clcw
+        self.clcw = np.zeros((self.im, self.km), dtype=self.rkind)
         self.clcw[:,:] = np.transpose(_dataset.variables["clcw"][:,:])
 
         # Get pbl
+        self.pbl = np.zeros(self.im, dtype=self.rkind)
         self.pbl[:] = np.transpose(_dataset.variables["pbl"][:])
 
         # Get ud_mf
-        self.ud_mf[:,:] = np.transpose(_dataset.variables["ud_mf"][:,:])
+        if _dataset.variables.get("ud_mf"):
+            self.ud_mf = np.zeros((self.im, self.km), dtype=self.rkind)
+            self.ud_mf[:,:] = np.transpose(_dataset.variables["ud_mf"][:,:])
 
         # Get dd_mf
+        self.dd_mf = np.zeros((self.im, self.km), dtype=self.rkind)
         self.dd_mf[:,:] = np.transpose(_dataset.variables["dd_mf"][:,:])
 
         # Get dt_mf
+        self.dt_mf = np.zeros((self.im, self.km), dtype=self.rkind)
         self.dt_mf[:,:] = np.transpose(_dataset.variables["dt_mf"][:,:])
 
         # Get cnvw_moist
+        self.cnvw_moist = np.zeros((self.im, self.km), dtype=self.rkind)
         self.cnvw_moist[:,:] = np.transpose(_dataset.variables["cnvw_moist"][:,:])
 
         # Get cnvc
+        self.cnvc = np.zeros((self.im, self.km), dtype=self.rkind)
         self.cnvc[:,:] = np.transpose(_dataset.variables["cnvc"][:,:])
 
+        # Get imfshalcnv
+        self.imfshalcnv = _dataset.variables["imfshalcnv"][:]
+
+        # Get flag_for_scnv_generic_tend
+        if _dataset.variables["flag_for_scnv_generic_tend"][:] == 1:
+            self.flag_for_scnv_generic_tend = True
+        else:   
+            self.flag_for_scnv_generic_tend = False
+        
+        # Get flag_for_dcnv_generic_tend
+        if _dataset.variables["flag_for_dcnv_generic_tend"][:] == 1:
+            self.flag_for_dcnv_generic_tend = True
+        else:
+            self.flag_for_dcnv_generic_tend = False
+
         # Get dtend
-        self.dtend[:,:,:] = np.transpose(_dataset.variables["dtend"][:,:,:])
+        if _dataset.variables.get("dtend"):
+            self.dtend = np.zeros((self.im, self.km, self.dtend_dim3), dtype=self.rkind)
+            self.dtend[:,:,:] = np.transpose(_dataset.variables["dtend"][:,:,:])
 
         # Get dtidx
+        self.dtidx = np.zeros((self.ntracer + 100, self.dtidx_dim2), dtype=self.ikind)
         self.dtidx[:,:] = np.transpose(_dataset.variables["dtidx"][:,:])
 
-        # Get qci_conv
-        self.qci_conv[:,:] = np.transpose(_dataset.variables["qci_conv"][:,:])
+        # Get ntqv
+        self.ntqv = _dataset.variables["ntqv"][:]
 
-        # Get ix_dfi_radar
-        self.ix_dfi_radar[:] = np.transpose(_dataset.variables["ix_dfi_radar"][:])
+        # Get ntiw
+        self.ntiw = _dataset.variables["ntiw"][:]
+
+        # Get ntcw
+        self.ntcw = _dataset.variables["ntcw"][:]
+
+        # Get index_of_temperature
+        self.index_of_temperature = _dataset.variables["index_of_temperature"][:]
+
+        # Get index_of_x_wind
+        self.index_of_x_wind = _dataset.variables["index_of_x_wind"][:]
+
+        # Get index_of_y_wind
+        self.index_of_y_wind = _dataset.variables["index_of_y_wind"][:]
+
+        # Get index_of_process_scnv
+        self.index_of_process_scnv = _dataset.variables["index_of_process_scnv"][:]
+
+        # Get index_of_process_dcnv
+        self.index_of_process_dcnv = _dataset.variables["index_of_process_dcnv"][:]
+
+        # Get fhour
+        self.fhour = _dataset.variables["fhour"][:]
 
         # Get fh_dfi_radar
+        self.fh_dfi_radar = np.zeros(self.num_dfi_radar_dim + 1, dtype=self.rkind)
         self.fh_dfi_radar[:] = np.transpose(_dataset.variables["fh_dfi_radar"][:])
 
+        # Get ix_dfi_radar
+        self.ix_dfi_radar = np.zeros(self.num_dfi_radar_dim, dtype=self.ikind)
+        self.ix_dfi_radar[:] = np.transpose(_dataset.variables["ix_dfi_radar"][:])
+
+        # Get num_dfi_radar
+        self.num_dfi_radar = _dataset.variables["num_dfi_radar"][:]
+
         # Get cap_suppress
-        self.cap_suppress[:,:] = np.transpose(_dataset.variables["cap_suppress"][:,:])
+        if _dataset.variables.get("cap_suppress"):
+            self.cap_suppress = np.zeros((self.im, self.num_dfi_radar_dim), dtype=self.rkind)
+            self.cap_suppress[:,:] = np.transpose(_dataset.variables["cap_suppress"][:,:])
+
+        # Get dfi_radar_max_intervals
+        self.dfi_radar_max_intervals = _dataset.variables["dfi_radar_max_intervals"][:]
+
+        # Get ldiag3d
+        self.ldiag3d = _dataset.variables["ldiag3d"][:]
+
+        # Get qci_conv
+        if _dataset.variables.get("qci_conv"):
+            self.qci_conv = np.zeros((self.im, self.km), dtype=self.rkind)
+            self.qci_conv[:,:] = np.transpose(_dataset.variables["qci_conv"][:,:])
+
+        # Get do_cap_suppress
+        if _dataset.variables["do_cap_suppress"][:] == 1:
+            self.do_cap_suppress = True
+        else:
+            self.do_cap_suppress = False
+
+        # Get maxupmf
+        if _dataset.variables.get("maxupmf"):
+            self.maxupmf = np.zeros(self.im, dtype=self.rkind)
+            self.maxupmf[:] = np.transpose(_dataset.variables["maxupmf"][:])
+
+        # Get maxMF
+        if _dataset.variables.get("maxMF"):
+            self.maxMF = np.zeros(self.im, dtype=self.rkind)
+            self.maxMF[:] = np.transpose(_dataset.variables["maxMF"][:])
+
+        # Get do_mynnedmf
+        if _dataset.variables["do_mynnedmf"][:] == 1:
+            self.do_mynnedmf = True
+        else:
+            self.do_mynnedmf = False
+
+        # Get ichoice_in
+        if _dataset.variables["ichoice_in"][:] == 1:
+            self.ichoice_in = True
+        else:
+            self.ichoice_in = False
+
+        # Get ichoicem_in
+        if _dataset.variables["ichoicem_in"][:] == 1:
+            self.ichoicem_in = True
+        else:
+            self.ichoicem_in = False
+
+        # Get ichoice_s_in
+        if _dataset.variables["ichoice_s_in"][:] == 1:  
+            self.ichoice_s_in = True
+        else:
+            self.ichoice_s_in = False
+
+        # Get spp_cu_deep
+        self.spp_cu_deep = _dataset.variables["spp_cu_deep"][:]
+
+        # Get spp_wts_cu_deep
+        if _dataset.variables.get("spp_wts_cu_deep"):
+            self.spp_wts_cu_deep = np.zeros((self.im, self.km), dtype=self.rkind)
+            self.spp_wts_cu_deep[:,:] = np.transpose(_dataset.variables["spp_wts_cu_deep"][:,:])
+
+        # Get chem3d
+        if _dataset.variables.get("chem3d"):
+            self.chem3d = np.zeros((self.im, self.km, self.nchem), dtype=self.rkind)
+            self.chem3d[:,:,:] = np.transpose(_dataset.variables["chem3d"][:,:,:])
+
+        # Get fscav
+        self.fscav = np.zeros(self.fscav_dim, dtype=self.rkind)
+        self.fscav[:] = np.transpose(_dataset.variables["fscav"][:])
+
+        # Get wetdpc_deep
+        if _dataset.variables.get("wetdpc_deep"):
+            self.wetdpc_deep = np.zeros((self.im, self.nchem), dtype=self.rkind)
+            self.wetdpc_deep[:,:] = np.transpose(_dataset.variables["wetdpc_deep"][:,:])
+
+        # Get do_smoke_transport
+        if _dataset.variables["do_smoke_transport"][:] == 1:
+            self.do_smoke_transport = True
+        else:
+            self.do_smoke_transport = False
+
+        # Get kdt
+        self.kdt = _dataset.variables["kdt"][:]
+
+        # Close the NetCDF file
+        _dataset.close()
 
 
     #SUBROUTINE print_2d_variable_int(name, data)
