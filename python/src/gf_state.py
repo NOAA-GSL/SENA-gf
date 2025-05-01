@@ -268,15 +268,6 @@ class GFState:
     def write_state(self, filename):
         from netCDF4 import Dataset
 
-        # _ix = self.forcet.shape[0]
-        # _km = self.forcet.shape[1]
-        # _im = self.garea.shape[0]
-        # _dtend_dim = self.dtend.shape[2]
-        # _num_dfi_radar = self.ix_dfi_radar.shape[0]
-        # _num_dfi_radar_p1 = _num_dfi_radar + 1
-        # _dtidx_dim1 = self.dtidx.shape[0]
-        # _dtidx_dim2 = self.dtidx.shape[1]
-
         # Open new file, overwriting previous contents
         _dataset = Dataset(filename, "w")
 
@@ -706,11 +697,11 @@ class GFState:
 
         # Fill the cactiv variable
         if self.cactiv is not None:
-         _cactivVar[:] = np.transpose(self.cactiv)
+         _cactivVar[:] = np.transpose(self.cactiv)[:]
 
         # Fill the cactiv_m variable
         if self.cactiv_m is not None:
-            _cactiv_mVar[:] = np.transpose(self.cactiv_m)
+            _cactiv_mVar[:] = np.transpose(self.cactiv_m)[:]
 
         # Fill the g variable
         _gVar[:] = np.transpose(self.g)
@@ -769,10 +760,10 @@ class GFState:
         _psuriVar[:] = np.transpose(self.psuri)
 
         # Fill the hbot variable
-        _hbotVar[:] = np.transpose(self.hbot)
+        _hbotVar[:] = np.transpose(self.hbot)[:] + 1
 
         # Fill the htop variable
-        _htopVar[:] = np.transpose(self.htop)
+        _htopVar[:] = np.transpose(self.htop)[:] + 1
 
         # Fill the kcnv variable
         _kcnvVar[:] = np.transpose(self.kcnv)
@@ -835,31 +826,31 @@ class GFState:
             _dtendVar[:,:,:] = np.transpose(self.dtend)
 
         # Fill the dtidx variable
-        _dtidxVar[:,:] = np.transpose(self.dtidx)
+        _dtidxVar[:,:] = np.transpose(self.dtidx) + 1
 
         # Fill the ntqv variable
-        _ntqvVar[:] = np.transpose(self.ntqv)
+        _ntqvVar[:] = np.transpose(self.ntqv) + 1
 
         # Fill the ntiw variable
-        _ntiwVar[:] = np.transpose(self.ntiw)
+        _ntiwVar[:] = np.transpose(self.ntiw) + 1
 
         # Fill the ntcw variable
-        _ntcwVar[:] = np.transpose(self.ntcw)
+        _ntcwVar[:] = np.transpose(self.ntcw) + 1
 
         # Fill the index_of_temperature variable
-        _index_of_temperatureVar[:] = np.transpose(self.index_of_temperature)
+        _index_of_temperatureVar[:] = np.transpose(self.index_of_temperature) + 1
 
         # Fill the index_of_x_wind variable
-        _index_of_x_windVar[:] = np.transpose(self.index_of_x_wind)
+        _index_of_x_windVar[:] = np.transpose(self.index_of_x_wind) + 1
 
         # Fill the index_of_y_wind variable
-        _index_of_y_windVar[:] = np.transpose(self.index_of_y_wind)
+        _index_of_y_windVar[:] = np.transpose(self.index_of_y_wind) +1
 
         # Fill the index_of_process_scnv variable
-        _index_of_process_scnvVar[:] = np.transpose(self.index_of_process_scnv)
+        _index_of_process_scnvVar[:] = np.transpose(self.index_of_process_scnv) + 1
 
         # Fill the index_of_process_dcnv variable
-        _index_of_process_dcnvVar[:] = np.transpose(self.index_of_process_dcnv)
+        _index_of_process_dcnvVar[:] = np.transpose(self.index_of_process_dcnv) + 1
 
         # Fill the fhour variable
         _fhourVar[:] = np.transpose(self.fhour)
@@ -868,7 +859,7 @@ class GFState:
         _fh_dfi_radarVar[:] = np.transpose(self.fh_dfi_radar)
 
         # Fill the ix_dfi_radar variable
-        _ix_dfi_radarVar[:] = np.transpose(self.ix_dfi_radar)
+        _ix_dfi_radarVar[:] = np.transpose(self.ix_dfi_radar) + 1
 
         # Fill the num_dfi_radar variable
         _num_dfi_radarVar[:] = np.transpose(self.num_dfi_radar)
@@ -1072,10 +1063,12 @@ class GFState:
         # Get hbot
         self.hbot = np.zeros(self.im, dtype=self.ikind)
         self.hbot[:] = np.transpose(_dataset.variables["hbot"][:])
+        self.hbot[:] -= 1
 
         # Get htop
         self.htop = np.zeros(self.im, dtype=self.ikind)
         self.htop[:] = np.transpose(_dataset.variables["htop"][:])
+        self.htop[:] -= 1
 
         # Get kcnv
         self.kcnv = np.zeros(self.im, dtype=self.ikind)
@@ -1103,7 +1096,8 @@ class GFState:
         self.cliw[:,:] = np.transpose(_dataset.variables["cliw"][:,:])
 
         # Get clcw
-        self.clcw = np.zeros((self.im, self.km), dtype=self.rkind)
+        # self.clcw = np.zeros((self.im, self.km), dtype=self.rkind)
+        self.clcw = np.zeros((self.im, self.km), dtype=np.float64)
         self.clcw[:,:] = np.transpose(_dataset.variables["clcw"][:,:])
 
         # Get pbl
@@ -1154,30 +1148,39 @@ class GFState:
         # Get dtidx
         self.dtidx = np.zeros((self.ntracer + 100, self.dtidx_dim2), dtype=self.ikind)
         self.dtidx[:,:] = np.transpose(_dataset.variables["dtidx"][:,:])
+        self.dtidx -= 1
 
         # Get ntqv
         self.ntqv = _dataset.variables["ntqv"][:]
+        self.ntqv -= 1
 
         # Get ntiw
         self.ntiw = _dataset.variables["ntiw"][:]
+        self.ntiw -= 1
 
         # Get ntcw
         self.ntcw = _dataset.variables["ntcw"][:]
+        self.ntcw -= 1
 
         # Get index_of_temperature
         self.index_of_temperature = _dataset.variables["index_of_temperature"][:]
+        self.index_of_temperature -= 1
 
         # Get index_of_x_wind
         self.index_of_x_wind = _dataset.variables["index_of_x_wind"][:]
+        self.index_of_x_wind -= 1
 
         # Get index_of_y_wind
         self.index_of_y_wind = _dataset.variables["index_of_y_wind"][:]
+        self.index_of_y_wind -= 1
 
         # Get index_of_process_scnv
         self.index_of_process_scnv = _dataset.variables["index_of_process_scnv"][:]
+        self.index_of_process_scnv -= 1
 
         # Get index_of_process_dcnv
         self.index_of_process_dcnv = _dataset.variables["index_of_process_dcnv"][:]
+        self.index_of_process_dcnv -= 1
 
         # Get fhour
         self.fhour = _dataset.variables["fhour"][:]
@@ -1189,6 +1192,7 @@ class GFState:
         # Get ix_dfi_radar
         self.ix_dfi_radar = np.zeros(self.num_dfi_radar_dim, dtype=self.ikind)
         self.ix_dfi_radar[:] = np.transpose(_dataset.variables["ix_dfi_radar"][:])
+        self.ix_dfi_radar -= 1
 
         # Get num_dfi_radar
         self.num_dfi_radar = _dataset.variables["num_dfi_radar"][:]

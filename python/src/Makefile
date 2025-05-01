@@ -1,9 +1,16 @@
 FC=ifort
+FC=gfortran
 
 # Use same flags as SCM uses in non-debug mode
-FFLAGS=-g -traceback -fpp -fno-alias -auto -safe-cray-ptr -ftz -assume byterecl -nowarn -sox -align array64byte -qno-opt-dynamic-align -real-size 64 -O2 -debug minimal -fp-model source -qoverride-limits -qopt-prefetch=3 -no-prec-div -no-prec-sqrt -march=core-avx2 -O2 -fPIC
+#FFLAGS=-g -traceback -fpp -fno-alias -auto -safe-cray-ptr -ftz -assume byterecl -nowarn -sox -align array64byte -qno-opt-dynamic-align -real-size 64 -O2 -debug minimal -fp-model source -qoverride-limits -qopt-prefetch=3 -no-prec-div -no-prec-sqrt -march=core-avx2 -O2 -fPIC
+FFLAGS=-ggdb -fbacktrace -fno-unsafe-math-optimizations -frounding-math -fsignaling-nans -cpp -fcray-pointer -ffree-line-length-none -fno-range-check -fallow-argument-mismatch -fallow-invalid-boz -fdefault-real-8 -fdefault-double-8 -O2 -O2 -fPIC -I/usr/local/include
 
-LDFLAGS=-L$(netcdf_c_ROOT)/lib -lnetcdf -L$(netcdf_fortran_ROOT)/lib -lnetcdff
+
+netcdf_c_ROOT=/usr/local
+netcdf_fortran_ROOT=/usr/local
+
+#LDFLAGS=-L$(netcdf_c_ROOT)/lib -lnetcdf -L$(netcdf_fortran_ROOT)/lib -lnetcdff
+LDFLAGS=-L/usr/local/lib -lnetcdf -L/usr/local/lib -lnetcdff
 OBJS=physcons.o machine.o cu_gf_driver.o cu_gf_deep.o cu_gf_sh.o cu_gf_io.o
 
 all: gf_test.exe

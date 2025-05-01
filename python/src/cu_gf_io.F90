@@ -171,7 +171,7 @@ module cu_gf_io
         'smoke dust convetive wet scavanging coefficents                                                                                     ', &
         'flag for rrfs smoke convective transport                                                                                            ', &
         'convective wet removal of smoke and dust                                                                                            ', &
-        'current forecast iteration                                                                                                           ' &
+        'current forecast iteration                                                                                                          ' &
         /)
 
    character(len=13), dimension(nargs) :: units = &
@@ -253,7 +253,7 @@ module cu_gf_io
         'none         ', &
         'flag         ', &
         'kg kg-1      ', &
-        'index         ' &
+        'index        ' &
         /)
 
 contains
@@ -1904,4 +1904,3 @@ contains
    end subroutine nc_check
 
 end module cu_gf_io
- 

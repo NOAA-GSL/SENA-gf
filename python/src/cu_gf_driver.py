@@ -3,21 +3,92 @@ import numpy as np
 from cu_gf_sh import cu_gf_sh_run
 from cu_gf_deep import cu_gf_deep_run, neg_check, fct1d3
 
-def cu_gf_driver_run(
-    ntracer, garea, im, km, dt, flag_init, flag_restart,
-    cactiv, cactiv_m, g, cp, xlv, r_v, forcet, forceqv_spechum, phil, raincv,
-    qv_spechum, t, cld1d, us, vs, t2di, w, qv2di_spechum, p2di, psuri,
-    hbot, htop, kcnv, xland, hfx2, qfx2, aod_gf, cliw, clcw,
-    pbl, ud_mf, dd_mf, dt_mf, cnvw_moist, cnvc, imfshalcnv,
-    flag_for_scnv_generic_tend, flag_for_dcnv_generic_tend,
-    dtend, dtidx, ntqv, ntiw, ntcw, index_of_temperature, index_of_x_wind,
-    index_of_y_wind, index_of_process_scnv, index_of_process_dcnv,
-    fhour, fh_dfi_radar, ix_dfi_radar, num_dfi_radar, cap_suppress,
-    dfi_radar_max_intervals, ldiag3d, qci_conv, do_cap_suppress,
-    maxupmf, maxMF, do_mynnedmf, ichoice_in, ichoicem_in, ichoice_s_in,
-    spp_cu_deep, spp_wts_cu_deep, nchem, chem3d, fscav, wetdpc_deep,
-    do_smoke_transport, kdt, errmsg, errflg
-):
+def cu_gf_driver_run(state, errmsg, errflg):
+    ntracer = state.ntracer  # Number of tracers
+    garea = state.garea  # Grid area
+    im = state.im  # Number of horizontal grid points
+    km = state.km  # Number of vertical levels
+    dt = state.dt  # Time step
+    flag_init = state.flag_init  # Initialization flag
+    flag_restart = state.flag_restart  # Restart flag
+    cactiv = state.cactiv  # Cloud activation flag
+    cactiv_m = state.cactiv_m  # Cloud activation flag for middle convection
+    g = state.g  # Gravitational acceleration
+    cp = state.cp  # Specific heat capacity at constant pressure
+    xlv = state.xlv  # Latent heat of vaporization
+    r_v = state.r_v  # Gas constant for water vapor
+    forcet = state.forcet  # Temperature forcing
+    forceqv_spechum = state.forceqv_spechum  # Specific humidity forcing
+    phil = state.phil  # Geopotential height
+    raincv = state.raincv  # Rainfall rate
+    qv_spechum = state.qv_spechum  # Specific humidity
+    t = state.t  # Temperature
+    cld1d = state.cld1d  # Cloud fraction
+    us = state.us  # Zonal wind
+    vs = state.vs  # Meridional wind
+    # t2di = state.t2di  # Temperature at model levels
+    t2di = state.t  # Temperature at model levels
+    w = state.w  # Vertical velocity
+    # qv2di_spechum = state.qv2di_spechum  # Specific humidity at model levels
+    qv2di_spechum = state.qv_spechum  # Specific humidity at model levels
+    p2di = state.p2di  # Pressure at model levels
+    psuri = state.psuri  # Surface pressure
+    hbot = state.hbot  # Height of the bottom of the cloud
+    htop = state.htop  # Height of the top of the cloud
+    kcnv = state.kcnv  # Convection flag
+    xland = state.xland  # Land-sea mask
+    hfx2 = state.hfx2  # Surface heat flux
+    qfx2 = state.qfx2  # Surface moisture flux
+    aod_gf = state.aod_gf  # Aerosol optical depth
+    cliw = state.cliw  # Cloud liquid water
+    clcw = state.clcw  # Cloud ice water
+    pbl = state.pbl  # Planetary boundary layer height
+    ud_mf = state.ud_mf  # Updraft mass flux
+    dd_mf = state.dd_mf  # Downdraft mass flux
+    dt_mf = state.dt_mf  # Mass flux tendencies
+    cnvw_moist = state.cnvw_moist  # Moisture convergence
+    cnvc = state.cnvc  # Convective tendencies
+    imfshalcnv = state.imfshalcnv  # Shallow convection flag
+    flag_for_scnv_generic_tend = state.flag_for_scnv_generic_tend  # Flag for shallow convection tendencies
+    flag_for_dcnv_generic_tend = state.flag_for_dcnv_generic_tend  # Flag for deep convection tendencies
+    dtend = state.dtend  # Tendency array
+    dtidx = state.dtidx  # Index array for tendencies
+    ntqv = state.ntqv  # Number of tracers for water vapor
+    ntiw = state.ntiw  # Number of tracers for ice water
+    ntcw = state.ntcw  # Number of tracers for cloud water
+    index_of_temperature = state.index_of_temperature  # Index of temperature in tendency array
+    index_of_x_wind = state.index_of_x_wind  # Index of zonal wind in tendency array
+    index_of_y_wind = state.index_of_y_wind  # Index of meridional wind in tendency array
+    index_of_process_scnv = state.index_of_process_scnv  # Index of shallow convection process
+    index_of_process_dcnv = state.index_of_process_dcnv  # Index of deep convection process
+    fhour = state.fhour  # Forecast hour
+    fh_dfi_radar = state.fh_dfi_radar  # Forecast hour for radar data assimilation
+    ix_dfi_radar = state.ix_dfi_radar  # Index for radar data assimilation
+    num_dfi_radar = state.num_dfi_radar  # Number of radar data assimilation intervals
+    cap_suppress = state.cap_suppress  # CAPE suppression array
+    dfi_radar_max_intervals = state.dfi_radar_max_intervals  # Maximum number of radar data assimilation intervals
+    ldiag3d = state.ldiag3d  # Flag for 3D diagnostics
+    qci_conv = state.qci_conv  # Cloud ice mixing ratio
+    do_cap_suppress = state.do_cap_suppress  # Flag for CAPE suppression
+    maxupmf = state.maxupmf  # Maximum updraft mass flux
+    maxMF = state.maxMF  # Maximum mass flux
+    do_mynnedmf = state.do_mynnedmf  # Flag for MYNN eddy-diffusivity mass flux scheme
+    ichoice_in = state.ichoice_in  # Choice of convection scheme (input)
+    ichoicem_in = state.ichoicem_in  # Choice of middle convection scheme (input)
+    ichoice_s_in = state.ichoice_s_in  # Choice of shallow convection scheme (input)
+    spp_cu_deep = state.spp_cu_deep  # Stochastic perturbation parameter for deep convection
+    spp_wts_cu_deep = state.spp_wts_cu_deep  # Stochastic weights for deep convection
+    nchem = state.nchem  # Number of chemical tracers
+    chem3d = state.chem3d  # 3D chemical tracer array
+    fscav = state.fscav  # Fraction of scavenging
+    wetdpc_deep = state.wetdpc_deep  # Wet deposition for deep convection
+    do_smoke_transport = state.do_smoke_transport  # Flag for smoke transport
+    kdt = state.kdt  # Time step index
+
+    # Write input state for sanity check - Should be identical to input_state_0400.nc.baseline
+    state.write_state('input_state_0400.nc')
+
+    imid_gf = 1
     
     aodc0 = 0.14  # Default value for aerosol optical depth
     aodreturn = 30.0  # Default value for AOD return time (minutes)
@@ -74,7 +145,7 @@ def cu_gf_driver_run(
     gdc = np.zeros((im, km, 10))  # Diagnostic tendencies
     gdc2 = np.zeros((im, km, 10))
 
-    qci_conv = np.zeros((im, km))  # Cloud ice mixing ratio
+    # qci_conv = np.zeros((im, km))  # Cloud ice mixing ratio
 
     ierr = np.zeros(im, dtype=int)  # Error flags for deep convection
     ierrm = np.zeros(im, dtype=int)  # Error flags
@@ -101,8 +172,8 @@ def cu_gf_driver_run(
     pretm = np.zeros(im)
     prets = np.zeros(im)
 
-    clcw_save = np.zeros((im, km))  # Cloud liquid water save arrays
-    cliw_save = np.zeros((im, km))
+    # clcw_save = np.zeros((im, km))  # Cloud liquid water save arrays
+    # cliw_save = np.zeros((im, km))
 
     clw_ten = np.zeros((im, km))  # Cloud water tendencies
 
@@ -124,8 +195,8 @@ def cu_gf_driver_run(
 
     psur = np.zeros(im)  # Surface pressure
 
-    clcw = np.zeros((im, km))  # Cloud liquid water
-    cliw = np.zeros((im, km))  # Cloud ice water
+    # clcw = np.zeros((im, km))  # Cloud liquid water
+    # cliw = np.zeros((im, km))  # Cloud ice water
 
     forcing2 = np.zeros((im, 10))  # Forcing array
 
@@ -244,9 +315,10 @@ def cu_gf_driver_run(
     ichoicem = ichoicem_in
     ichoice_s = ichoice_s_in
 
+    itime = 0 # CWH
     if do_cap_suppress:
         for itime in range(num_dfi_radar):  # Python indices start at 0
-            if ix_dfi_radar[itime] < 1:
+            if ix_dfi_radar[itime] < 0:
                 continue
             if fhour < fh_dfi_radar[itime]:
                 continue
@@ -263,27 +335,40 @@ def cu_gf_driver_run(
     
     if ldiag3d:
         if flag_for_dcnv_generic_tend:
-            cliw_deep_idx = 0
-            clcw_deep_idx = 0
+            cliw_deep_idx = -1
+            clcw_deep_idx = -1
         else:
-            cliw_deep_idx = dtidx[100 + ntiw - 1, index_of_process_dcnv - 1]
-            clcw_deep_idx = dtidx[100 + ntcw - 1, index_of_process_dcnv - 1]
+            cliw_deep_idx = dtidx[100 + ntiw, index_of_process_dcnv]
+            clcw_deep_idx = dtidx[100 + ntcw, index_of_process_dcnv]
 
         if flag_for_scnv_generic_tend:
-            cliw_shal_idx = 0
-            clcw_shal_idx = 0
+            cliw_shal_idx = -1
+            clcw_shal_idx = -1
         else:
-            cliw_shal_idx = dtidx[100 + ntiw - 1, index_of_process_scnv - 1]
-            clcw_shal_idx = dtidx[100 + ntcw - 1, index_of_process_scnv - 1]
+            cliw_shal_idx = dtidx[100 + ntiw, index_of_process_scnv]
+            clcw_shal_idx = dtidx[100 + ntcw, index_of_process_scnv]
 
-        if (cliw_deep_idx >= 1 or clcw_deep_idx >= 1 or
-            cliw_shal_idx >= 1 or clcw_shal_idx >= 1):
+        if (cliw_deep_idx >= 0 or clcw_deep_idx >= 0 or
+            cliw_shal_idx >= 0 or clcw_shal_idx >= 0):
             clcw_save = np.zeros((im, km))
             cliw_save = np.zeros((im, km))
 
             # Copy data into clcw_save and cliw_save
             clcw_save[:, :] = clcw[:, :]
             cliw_save[:, :] = cliw[:, :]
+
+    # print("kdt = ", kdt)
+    # if (kdt == 400):
+    #    print(im, km, kdt)
+    #    print(ichoice, ichoicem, ichoice_s)
+    #    print(itime, do_cap_suppress_here)
+    #    print(cap_suppress_j[0])
+    #    print(cliw_deep_idx, clcw_deep_idx, cliw_shal_idx, clcw_shal_idx)
+    #    print(clcw_save[0,:])
+    #    print(cliw_save[0,:])
+    #    raise
+
+        
 
     # Scale specific humidity to dry mixing ratio
     qv2di = qv2di_spechum / (1.0 - qv2di_spechum)
@@ -336,6 +421,7 @@ def cu_gf_driver_run(
     high_resolution = 0
     subcenter = 0.0
     iens = 1
+    ipr = 0 # CWH
     jpr = 0
     ipr_deep = 0
 
@@ -368,7 +454,7 @@ def cu_gf_driver_run(
         zo[i, :] = phil[i, :] / g
         dz8w[i, 0] = zo[i, 1] - zo[i, 0]
         zh[0] = 0.0
-        kpbli[i] = 2
+        kpbli[i] = 1
 
         for k in range(kts + 1, ktf + 1):  # Loop over vertical levels
             dz8w[i, k] = zo[i, k + 1] - zo[i, k]
@@ -376,8 +462,17 @@ def cu_gf_driver_run(
         for k in range(kts + 1, ktf + 1):
             zh[k] = zh[k - 1] + dz8w[i, k - 1]
             if zh[k] > pbl[i]:
-                kpbli[i] = max(2, k)
+                kpbli[i] = max(1, k)
                 break
+    # if (kdt == 400):
+    #     print(im, km, kdt)
+    #     print(cld1d[:])
+    #     print(kpbli[:])
+    #     print(dz8w[0,:])
+    #     print(zh[:])
+    #     print(zo[0,:])
+    #     raise
+
 
     # Initialize arrays and variables
     for i in range(its, itf + 1):  # Loop over horizontal grid points
@@ -405,6 +500,14 @@ def cu_gf_driver_run(
         htop[i] = kts
         raincv[i] = 0.0
         xlandi[i] = float(xland[i])  # Convert to real (float in Python)
+
+    # if (kdt == 400):
+    #     print(im, km, kdt)
+    #     print(ccn_gf[0], ccn_m[0], aod_gf[0], ccnclean, raincv[0],  xlandi[0])
+    #     print(hbot[0], htop[0])
+    #     print(forcing[0,:])
+    #     print(forcing2[0,:])
+    #     raise
 
     # Initialize `mconv` array
     for i in range(its, itf + 1):  # Loop over horizontal grid points
@@ -454,13 +557,13 @@ def cu_gf_driver_run(
     ierrc[:] = " "
 
     # Initialize arrays
-    kbcon[:] = 0
-    kbcons[:] = 0
-    kbconm[:] = 0
+    kbcon[:] = -1
+    kbcons[:] = -1
+    kbconm[:] = -1
 
-    ktop[:] = 0
-    ktops[:] = 0
-    ktopm[:] = 0
+    ktop[:] = -1
+    ktops[:] = -1
+    ktopm[:] = -1
 
     xmb[:] = 0.0
     xmb_dumm[:] = 0.0
@@ -468,12 +571,12 @@ def cu_gf_driver_run(
     xmbs[:] = 0.0
     xmbs2[:] = 0.0
 
-    k22s[:] = 0
-    k22m[:] = 0
-    k22[:] = 0
+    k22s[:] = -1
+    k22m[:] = -1
+    k22[:] = -1
 
-    jmin[:] = 0
-    jminm[:] = 0
+    jmin[:] = -1
+    jminm[:] = -1
 
     pret[:] = 0.0
     prets[:] = 0.0
@@ -538,6 +641,11 @@ def cu_gf_driver_run(
             tshall[i, k] = t2d[i, k]
             qshall[i, k] = q2d[i, k]
 
+    # if (kdt == 400):
+    #     print(im, km, kdt, its, itf, ite, kts, ktf, kte)
+    #     print(p2d[0,:], po[0,:], rhoi[0,:], qcheck[0,:], tn[0,:], qo[0,:], t2d[0,:], q2d[0,:], tshall[0,:], qshall[0,:])
+    #     raise
+
     # Loop over horizontal grid points and vertical levels
     for i in range(its, itf + 1):  # Loop over horizontal grid points
         for k in range(kts, kpbli[i] + 1):  # Loop over vertical levels up to `kpbli`
@@ -566,9 +674,16 @@ def cu_gf_driver_run(
             dhdt[i, k] = cp * (forcet[i, k] + (t[i, k] - t2di[i, k]) / dt) + \
                          xlv * (forceqv[i, k] + (qv[i, k] - qv2di[i, k]) / dt)
 
+    # if (kdt == 400):
+    #     print(im, km, kdt, its, itf, ite, kts, ktf, kte)
+    #     print(hfx[0], qfx[0], dx[0])
+    #     print(tshall[0,:], qshall[0,:], tn[0,:], qo[0,:], dhdt[0,:])
+    #     raise
+
+
     # Compute umean, vmean, and pmean
-    for k in range(kts + 1, ktf - 1):
-        for i in range(its, itf):
+    for k in range(kts + 1, ktf):
+        for i in range(its, itf + 1):
             if (p2d[i, 1] - p2d[i, k]) > 150 and p2d[i, k] > 300:
                 dp = -0.5 * (p2d[i, k + 1] - p2d[i, k - 1])
                 umean[i] += us[i, k] * dp
@@ -578,7 +693,7 @@ def cu_gf_driver_run(
     # Compute `psum` and update `forcing` arrays
     for i in range(its, itf + 1):  # Loop over horizontal grid points
         psum = 0.0
-        for k in range(kts, ktf - 3):  # Loop over vertical levels
+        for k in range(kts, ktf - 2):  # Loop over vertical levels
             if clcw[i, k] > -999.0 and clcw[i, k + 1] > -999.0:
                 dp = p2d[i, k] - p2d[i, k + 1]
                 psum += dp
@@ -606,6 +721,13 @@ def cu_gf_driver_run(
     if dx[its] < 6500.0:
         imid_gf = 0
 
+    # if (kdt == 400):
+    #     print(im, km, kdt, its, itf, ite, kts, ktf, kte)
+    #     print(imid_gf, ierr[0])
+    #     print(dp, umean[0], vmean[0], pmean[0], psum, clwtot, forcing[0,6], forcing2[0,6], mconv[0])
+    #     print(omeg[0,:])
+    #     raise
+
     # Call cumulus parameterization
     if ishallow_g3 == 1:
         # Initialize `ierrs` and `ierrm`
@@ -613,13 +735,33 @@ def cu_gf_driver_run(
             ierrs[i] = 0
             ierrm[i] = 0
 
-        # Call shallow convection subroutine
+        # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+        # print(f"{kpbli[0]:>4}{ichoice_s:>4}{kbcons[0]:>4}{ktops[0]:>4}{k22s[0]:>4}{ipr:>4}{tropics[0]:>4}")
+        # print(f"{ter11[0]:>20.12E}{psur[0]:>20.12E}{hfx[0]:>20.12E}{qfx[0]:>20.12E}{xlandi[0]:>20.12E}{tcrit:>20.12E}{dt:>20.12E}{xmbs[0]:>20.12E}{prets[0]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{zo[0,k]:>20.12E}{t2d[0,k]:>20.12E}{q2d[0,k]:>20.12E}{tshall[0,k]:>20.12E}{qshall[0,k]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{p2d[0,k]:>20.12E}{dhdt[0,k]:>20.12E}{rhoi[0,k]:>20.12E}{zus[0,k]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{outts[0,k]:>20.12E}{outqs[0,k]:>20.12E}{outqcs[0,k]:>20.12E}{outus[0,k]:>20.12E}{outvs[0,k]:>20.12E}{cnvwt[0,k]:>20.12E}{cupclws[0,k]:>20.12E}")
+
         cu_gf_sh_run(
             us, vs, zo, t2d, q2d, ter11, tshall, qshall, p2d, psur, dhdt, kpbli,
             rhoi, hfx, qfx, xlandi, ichoice_s, tcrit, dt, zus, xmbs, kbcons, ktops,
             k22s, ierrs, ierrcs, outts, outqs, outqcs, outus, outvs, cnvwt, prets,
             cupclws, itf, ktf, its, ite, kts, kte, ipr, tropics
         )
+        
+        # Output variables match
+        # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+        # print(f"{kpbli[0]:>4}{ichoice_s:>4}{kbcons[0]:>4}{ktops[0]:>4}{k22s[0]:>4}{ipr:>4}{tropics[0]:>4}")
+        # print(f"{ter11[0]:>20.12E}{psur[0]:>20.12E}{hfx[0]:>20.12E}{qfx[0]:>20.12E}{xlandi[0]:>20.12E}{tcrit:>20.12E}{dt:>20.12E}{xmbs[0]:>20.12E}{prets[0]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{zo[0,k]:>20.12E}{t2d[0,k]:>20.12E}{q2d[0,k]:>20.12E}{tshall[0,k]:>20.12E}{qshall[0,k]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{p2d[0,k]:>20.12E}{dhdt[0,k]:>20.12E}{rhoi[0,k]:>20.12E}{zus[0,k]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{outts[0,k]:>20.12E}{outqs[0,k]:>20.12E}{outqcs[0,k]:>20.12E}{outus[0,k]:>20.12E}{outvs[0,k]:>20.12E}{cnvwt[0,k]:>20.12E}{cupclws[0,k]:>20.12E}")
 
         # Update `cutens`, `ierrm`, and `ierr` based on `xmbs`
         for i in range(its, itf + 1):
@@ -629,11 +771,24 @@ def cu_gf_driver_run(
                     ierrm[i] = 555
                     ierr[i] = 555
 
+        # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+        # print(f"{ipn:>4}{ktops[0]:>4}")
+        # print(f"{dt:>20.10E}{prets[0]:>20.10E}")
+        # for k in range(km):
+        #     print(f"{qcheck[0,k]:>20.10E}{outqs[0,k]:>20.10E}{outts[0,k]:>20.10E}{outus[0,k]:>20.10E}{outvs[0,k]:>20.10E}{outqcs[0,k]:>20.10E}")
+
         # Call `neg_check` for GF shallow convection
         neg_check(
             "shallow", ipn, dt, qcheck, outqs, outts, outus, outvs, outqcs, prets,
             its, ite, kts, kte, itf, ktf, ktops
         )
+
+        # Output variables match
+        # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+        # print(f"{ipn:>4}{ktops[0]:>4}")
+        # print(f"{dt:>20.10E}{prets[0]:>20.10E}")
+        # for k in range(km):
+        #     print(f"{qcheck[0,k]:>20.10E}{outqs[0,k]:>20.10E}{outts[0,k]:>20.10E}{outus[0,k]:>20.10E}{outvs[0,k]:>20.10E}{outqcs[0,k]:>20.10E}")
 
     ipr = 0
     jpr_deep = 0  # Previously set to 340765 in commentsments
@@ -787,6 +942,9 @@ def cu_gf_driver_run(
             tropics
         )
 
+        jpr = 0
+        ipr = 0
+
         # Update `qcheck` array
         for i in range(its, itf + 1):
             for k in range(kts, ktf + 1):
@@ -805,8 +963,8 @@ def cu_gf_driver_run(
             kcnv[i] = 1  # Previously `jmin(i)` in comments
             cutenm[i] = 1.0
         else:
-            kbconm[i] = 0
-            ktopm[i] = 0
+            kbconm[i] = -1
+            ktopm[i] = -1
             cutenm[i] = 0.0
 
         if pret[i] > 0.0:
@@ -814,11 +972,11 @@ def cu_gf_driver_run(
             cutenm[i] = 0.0
             pretm[i] = 0.0
             kcnv[i] = 1  # Previously `jmin(i)` in comments
-            ktopm[i] = 0
-            kbconm[i] = 0
+            ktopm[i] = -1
+            kbconm[i] = -1
         else:
-            kbcon[i] = 0
-            ktop[i] = 0
+            kbcon[i] = -1
+            ktop[i] = -1
             cuten[i] = 0.0
 
     # Loop over horizontal grid points
@@ -840,9 +998,9 @@ def cu_gf_driver_run(
         if ktops[i] > kts:
             kstop = max(kstop, ktops[i])
 
-        if kstop > 2:
+        if kstop > 1:
             htop[i] = kstop
-            if kbcon[i] > 2 or kbconm[i] > 2:
+            if kbcon[i] > 1 or kbconm[i] > 1:
                 hbot[i] = max(kbconm[i], kbcon[i])
 
             dtime_max = dt
@@ -941,14 +1099,14 @@ def cu_gf_driver_run(
             massflx[0] = 0.0
             trcflx_in1[0] = 0.0
 
-            # Call `fct1d3` subroutine
+            # Call `fct1d3`` subroutine
             fct1d3(
                 kstop, kte, dtime_max, po_cup,
                 clw_in1, massflx, trcflx_in1, clw_ten[i, :], g
             )
 
             # Update cloud ice and water tendencies
-            for k in range(kstop):  # Python's 0-based indexing
+            for k in range(kstop + 1):  # Python's 0-based indexing
                 tem = dt * (
                     outqcs[i, k] * cutens[i] +
                     outqc[i, k] * cuten[i] +
@@ -982,14 +1140,14 @@ def cu_gf_driver_run(
             # Calculate maximum upward mass flux
             maxupmf[i] = 0.0
             if forcing2[i, 5] > 0.0:
-                maxupmf[i] = max(xmb[i] * zu[i, kts:ktf] / forcing2[i, 5])
+                maxupmf[i] = max(xmb[i] * zu[i, kts:ktf + 1] / forcing2[i, 5])
 
             # Update `dt_mf` for deep convection
-            if ktop[i] > 2 and pret[i] > 0.0:
+            if ktop[i] > 1 and pret[i] > 0.0:
                 dt_mf[i, ktop[i] - 1] = ud_mf[i, ktop[i]]
 
     # Loop over horizontal grid points
-    for i in range(its - 1, itf):  # Python's 0-based indexing
+    for i in range(its, itf + 1):  # Python's 0-based indexing
         if pret[i] > 0.0:
             cactiv[i] = 1
             raincv[i] = 0.001 * (
@@ -1035,25 +1193,25 @@ def cu_gf_driver_run(
             tidx = dtidx[index_of_temperature, index_of_process_scnv]
             qidx = dtidx[100 + ntqv, index_of_process_scnv]
 
-            if uidx >= 1:
+            if uidx >= 0:
                 # Update tendencies for x-wind
-                for k in range(kts - 1, ktf):  # Python's 0-based indexing
+                for k in range(kts, ktf + 1):  # Python's 0-based indexing
                     dtend[:, k, uidx] += cutens[:] * outus[:, k] * dt
 
-            if vidx >= 1:
+            if vidx >= 0:
                 # Update tendencies for y-wind
-                for k in range(kts - 1, ktf):
-                    dtend[:, k, vidx] += cutens[:] * outvs[:] * dt
+                for k in range(kts, ktf + 1):
+                    dtend[:, k, vidx] += cutens[:] * outvs[:, k] * dt
 
-            if tidx >= 1:
+            if tidx >= 0:
                 # Update tendencies for temperature
-                for k in range(kts - 1, ktf):
+                for k in range(kts, ktf + 1):
                     dtend[:, k, tidx] += cutens[:] * outts[:, k] * dt
 
-            if qidx >= 1:
+            if qidx >= 0:
                 # Update tendencies for specific humidity
-                for k in range(kts - 1, ktf):
-                    for i in range(its - 1, itf):
+                for k in range(kts, ktf + 1):
+                    for i in range(its, itf + 1):
                         tem = cutens[i] * outqs[i, k] * dt
                         tem = tem / (1.0 + tem)
                         dtend[i, k, qidx] += tem
@@ -1063,26 +1221,26 @@ def cu_gf_driver_run(
             vidx = dtidx[index_of_y_wind, index_of_process_dcnv]
             tidx = dtidx[index_of_temperature, index_of_process_dcnv]
 
-            if uidx >= 1:
+            if uidx >= 0:
                 # Update tendencies for x-wind
-                for k in range(kts - 1, ktf):
+                for k in range(kts, ktf + 1):
                     dtend[:, k, uidx] += (cuten * outu[:, k] + cutenm * outum[:, k]) * dt
 
-            if vidx >= 1:
+            if vidx >= 0:
                 # Update tendencies for y-wind
-                for k in range(kts - 1, ktf):
+                for k in range(kts, ktf + 1):
                     dtend[:, k, vidx] += (cuten * outv[:, k] + cutenm * outvm[:, k]) * dt
 
-            if tidx >= 1:
+            if tidx >= 0:
                 # Update tendencies for temperature
-                for k in range(kts - 1, ktf):
+                for k in range(kts, ktf + 1):
                     dtend[:, k, tidx] += (cuten * outt[:, k] + cutenm * outtm[:, k]) * dt
 
             qidx = dtidx[100 + ntqv, index_of_process_dcnv]
-            if qidx >= 1:
+            if qidx >= 0:
                 # Update tendencies for specific humidity
-                for k in range(kts - 1, ktf):
-                    for i in range(its - 1, itf):
+                for k in range(kts, ktf + 1):
+                    for i in range(its, itf + 1):
                         tem = (cuten[i] * outq[i, k] + cutenm[i] * outqm[i, k]) * dt
                         tem = tem / (1.0 + tem)
                         dtend[i, k, qidx] += tem
@@ -1090,8 +1248,8 @@ def cu_gf_driver_run(
     # Check if `clcw_save` is allocated
     if clcw_save is not None:
         # Loop over vertical levels and horizontal grid points
-        for k in range(kts - 1, ktf):  # Python's 0-based indexing
-            for i in range(its - 1, itf):
+        for k in range(kts, ktf + 1):  # Python's 0-based indexing
+            for i in range(its, itf + 1):
                 tem_shal = dt * (outqcs[i, k] * cutens[i] + outqcm[i, k] * cutenm[i])
                 tem_deep = dt * (outqc[i, k] * cuten[i] + clw_ten[i, k])
                 tem = tem_shal + tem_deep
@@ -1104,17 +1262,94 @@ def cu_gf_driver_run(
                 if clcw_save[i, k] > -999.0:
                     cliw_both = max(0.0, cliw_save[i, k] + tem * tem1) - cliw_save[i, k]
                     clcw_both = max(0.0, clcw_save[i, k] + tem) - clcw_save[i, k]
-                elif cliw_idx >= 1:
+                elif cliw_idx >= 0:
                     cliw_both = max(0.0, cliw_save[i, k] + tem) - cliw_save[i, k]
                     clcw_both = 0.0
 
-                if cliw_deep_idx >= 1:
+                if cliw_deep_idx >= 0:
                     dtend[i, k, cliw_deep_idx] += abs(tem_deep) / weight_sum * cliw_both
-                if clcw_deep_idx >= 1:
+                if clcw_deep_idx >= 0:
                     dtend[i, k, clcw_deep_idx] += abs(tem_deep) / weight_sum * clcw_both
-                if cliw_shal_idx >= 1:
+                if cliw_shal_idx >= 0:
                     dtend[i, k, cliw_shal_idx] += abs(tem_shal) / weight_sum * cliw_both
-                if clcw_shal_idx >= 1:
+                if clcw_shal_idx >= 0:
                     dtend[i, k, clcw_shal_idx] += abs(tem_shal) / weight_sum * clcw_both
 
-    return dhdt, umean, vmean, pmean, hfx, qfx, cnvw, ud_mf, dd_mf, t, qv, us, vs
+    state.ntracer = ntracer  # Number of tracers
+    state.garea = garea  # Grid area
+    state.im = im  # Number of horizontal grid points
+    state.km = km  # Number of vertical levels
+    state.dt = dt  # Time step
+    state.flag_init = flag_init  # Initialization flag
+    state.flag_restart = flag_restart  # Restart flag
+    state.cactiv = cactiv  # Cloud activation flag
+    state.cactiv_m = cactiv_m  # Cloud activation flag for middle convection
+    state.g = g  # Gravitational acceleration
+    state.cp = cp  # Specific heat capacity at constant pressure
+    state.xlv = xlv  # Latent heat of vaporization
+    state.r_v = r_v  # Gas constant for water vapor
+    state.forcet = forcet  # Temperature forcing
+    state.forceqv_spechum = forceqv_spechum  # Specific humidity forcing
+    state.phil = phil  # Geopotential height
+    state.raincv = raincv  # Rainfall rate
+    state.qv_spechum = qv_spechum  # Specific humidity
+    state.t = t  # Temperature
+    state.cld1d = cld1d  # Cloud fraction
+    state.us = us  # Zonal wind
+    state.vs = vs  # Meridional wind
+    state.t2di = t2di  # Temperature at model levels
+    state.w = w  # Vertical velocity
+    state.qv2di_spechum = qv2di_spechum  # Specific humidity at model levels
+    state.p2di = p2di  # Pressure at model levels
+    state.psuri = psuri  # Surface pressure
+    state.hbot = hbot  # Height of the bottom of the cloud
+    state.htop = htop  # Height of the top of the cloud
+    state.kcnv = kcnv  # Convection flag
+    state.xland = xland  # Land-sea mask
+    state.hfx2 = hfx2  # Surface heat flux
+    state.qfx2 = qfx2  # Surface moisture flux
+    state.aod_gf = aod_gf  # Aerosol optical depth
+    state.cliw = cliw  # Cloud liquid water
+    state.clcw = clcw  # Cloud ice water
+    state.pbl = pbl  # Planetary boundary layer height
+    state.ud_mf = ud_mf  # Updraft mass flux
+    state.dd_mf = dd_mf  # Downdraft mass flux
+    state.dt_mf = dt_mf  # Mass flux tendencies
+    state.cnvw_moist = cnvw_moist  # Moisture convergence
+    state.cnvc = cnvc  # Convective tendencies
+    state.imfshalcnv = imfshalcnv  # Shallow convection flag
+    state.flag_for_scnv_generic_tend = flag_for_scnv_generic_tend  # Flag for shallow convection tendencies
+    state.flag_for_dcnv_generic_tend = flag_for_dcnv_generic_tend  # Flag for deep convection tendencies
+    state.dtend = dtend  # Tendency array
+    state.dtidx = dtidx  # Index array for tendencies
+    state.ntqv = ntqv  # Number of tracers for water vapor
+    state.ntiw = ntiw  # Number of tracers for ice water
+    state.ntcw = ntcw  # Number of tracers for cloud water
+    state.index_of_temperature = index_of_temperature  # Index of temperature in tendency array
+    state.index_of_x_wind = index_of_x_wind  # Index of zonal wind in tendency array
+    state.index_of_y_wind = index_of_y_wind  # Index of meridional wind in tendency array
+    state.index_of_process_scnv = index_of_process_scnv  # Index of shallow convection process
+    state.index_of_process_dcnv = index_of_process_dcnv  # Index of deep convection process
+    state.fhour = fhour  # Forecast hour
+    state.fh_dfi_radar = fh_dfi_radar  # Forecast hour for radar data assimilation
+    state.ix_dfi_radar = ix_dfi_radar  # Index for radar data assimilation
+    state.num_dfi_radar = num_dfi_radar  # Number of radar data assimilation intervals
+    state.cap_suppress = cap_suppress  # CAPE suppression array
+    state.dfi_radar_max_intervals = dfi_radar_max_intervals  # Maximum number of radar data assimilation intervals
+    state.ldiag3d = ldiag3d  # Flag for 3D diagnostics
+    state.qci_conv = qci_conv  # Cloud ice mixing ratio
+    state.do_cap_suppress = do_cap_suppress  # Flag for CAPE suppression
+    state.maxupmf = maxupmf  # Maximum updraft mass flux
+    state.maxMF = maxMF  # Maximum mass flux
+    state.do_mynnedmf = do_mynnedmf  # Flag for MYNN eddy-diffusivity mass flux scheme
+    state.ichoice_in = ichoice_in  # Choice of convection scheme (input)
+    state.ichoicem_in = ichoicem_in  # Choice of middle convection scheme (input)
+    state.ichoice_s_in = ichoice_s_in  # Choice of shallow convection scheme (input)
+    state.spp_cu_deep = spp_cu_deep  # Stochastic perturbation parameter for deep convection
+    state.spp_wts_cu_deep = spp_wts_cu_deep  # Stochastic weights for deep convection
+    state.nchem = nchem  # Number of chemical tracers
+    state.chem3d = chem3d  # 3D chemical tracer array
+    state.fscav = fscav  # Fraction of scavenging
+    state.wetdpc_deep = wetdpc_deep  # Wet deposition for deep convection
+    state.do_smoke_transport = do_smoke_transport  # Flag for smoke transport
+    state.kdt = kdt  # Time step index
