@@ -685,32 +685,137 @@ contains
 !
 !> - Call cup_env() to calculate moist static energy, heights, qes
 !
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)')
+! write(*,'(10ES20.12)') z1(1), psur(1), tcrit
+! do k=kts,kte
+!    write(*,'(10ES20.12)') z(1,k), qes(1,k), he(1,k), hes(1,k), t(1,k), q(1,k), po(1,k)
+! end do
+
       call cup_env(z,qes,he,hes,t,q,po,z1,                         &
            psur,ierr,tcrit,-1,                                     &
            itf,ktf,                                                &
            its,ite, kts,kte)
+
+! Output variables match
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)')
+! write(*,'(10ES20.12)') z1(1), psur(1), tcrit
+! do k=kts,kte
+!    write(*,'(10ES20.12)') z(1,k), qes(1,k), he(1,k), hes(1,k), t(1,k), q(1,k), po(1,k)
+! end do
+
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)')
+! write(*,'(10ES20.12)') z1(1), psur(1), tcrit
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo(1,k), qeso(1,k), heo(1,k), heso(1,k), tn(1,k), qo(1,k), po(1,k)
+! end do
+
       call cup_env(zo,qeso,heo,heso,tn,qo,po,z1,                   &
            psur,ierr,tcrit,-1,                                     &
            itf,ktf,                                                &
            its,ite, kts,kte)
 
+! Output variables match
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)')
+! write(*,'(10ES20.12)') z1(1), psur(1), tcrit
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo(1,k), qeso(1,k), heo(1,k), heso(1,k), tn(1,k), qo(1,k), po(1,k)
+! end do
+
 !
 !> - Call cup_env_clev() to calculate environmental values on cloud levels
 !
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)')
+   ! write(*,'(10ES20.12)') z1(1), psur(1), tcrit
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') t(1,k), qes(1,k), q(1,k), he(1,k), hes(1,k), z(1,k), po(1,k)
+   ! end do
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') qes_cup(1,k), q_cup(1,k), he_cup(1,k), hes_cup(1,k), z_cup(1,k), p_cup(1,k), gamma_cup(1,k)
+   ! end do
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') t_cup(1,k)
+   ! end do
+
       call cup_env_clev(t,qes,q,he,hes,z,po,qes_cup,q_cup,he_cup,  &
            hes_cup,z_cup,p_cup,gamma_cup,t_cup,psur,               &
            ierr,z1,                                                &
            itf,ktf,                                                &
            its,ite, kts,kte)
+
+   ! Output variables match
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)')
+   ! write(*,'(10ES20.12)') z1(1), psur(1), tcrit
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') t(1,k), qes(1,k), q(1,k), he(1,k), hes(1,k), z(1,k), po(1,k)
+   ! end do
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') qes_cup(1,k), q_cup(1,k), he_cup(1,k), hes_cup(1,k), z_cup(1,k), p_cup(1,k), gamma_cup(1,k)
+   ! end do
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') t_cup(1,k)
+   ! end do
+   
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)')
+   ! write(*,'(10ES20.12)') z1(1), psur(1), tcrit
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') tn(1,k), qeso(1,k), qo(1,k), heo(1,k), heso(1,k), zo(1,k), po(1,k)
+   ! end do
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') qeso_cup(1,k), qo_cup(1,k), heo_cup(1,k), heso_cup(1,k), zo_cup(1,k), po_cup(1,k), gammao_cup(1,k)
+   ! end do
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') tn_cup(1,k)
+   ! end do
+
       call cup_env_clev(tn,qeso,qo,heo,heso,zo,po,qeso_cup,qo_cup, &
            heo_cup,heso_cup,zo_cup,po_cup,gammao_cup,tn_cup,psur,  &
            ierr,z1,                                                &
            itf,ktf,                                                &
            its,ite, kts,kte)
+
+   ! Output variables match
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)')
+   ! write(*,'(10ES20.12)') z1(1), psur(1), tcrit
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') tn(1,k), qeso(1,k), qo(1,k), heo(1,k), heso(1,k), zo(1,k), po(1,k)
+   ! end do
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') qeso_cup(1,k), qo_cup(1,k), heo_cup(1,k), heso_cup(1,k), zo_cup(1,k), po_cup(1,k), gammao_cup(1,k)
+   ! end do
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') tn_cup(1,k)
+   ! end do
+
 !---meltglac-------------------------------------------------
 !> - Call get_partition_liq_ice() to calculate partition between liq/ice cloud contents
-      call get_partition_liq_ice(ierr,tn,po_cup,p_liq_ice,melting_layer,&
+
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)')
+! write(*,'(10ES20.12)')
+! do k=kts,kte
+!    write(*,'(10ES20.12)') tn(1,k), po_cup(1,k), p_liq_ice(1,k), melting_layer(1,k)
+! end do
+
+
+           call get_partition_liq_ice(ierr,tn,po_cup,p_liq_ice,melting_layer,&
                                  itf,ktf,its,ite,kts,kte,cumulus)
+
+! Output variables match
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)')
+! write(*,'(10ES20.12)')
+! do k=kts,kte
+!    write(*,'(10ES20.12)') tn(1,k), po_cup(1,k), p_liq_ice(1,k), melting_layer(1,k)
+! end do
+
 !---meltglac-------------------------------------------------
 !$acc kernels
       do i=its,itf
@@ -788,12 +893,29 @@ contains
       jprnt=0
       iloop=1
       if(imid.eq.1)iloop=5
+
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)') k22(1), kbcon(1), kbmax(1)
+   ! write(*,'(10ES20.12)') cap_max_increment(1), hkbo(1), cap_max(1), ztexec(1), zqexec(1), entr_rate(1)
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') heo_cup(1,k), heso_cup(1,k), po_cup(1,k), z_cup(1,k), heo(1,k)
+   ! end do
+
       call cup_kbcon(ierrc,cap_max_increment,iloop,k22,kbcon,heo_cup,heso_cup,  &
            hkbo,ierr,kbmax,po_cup,cap_max,                                      &
            ztexec,zqexec,                                                       &
            jprnt,itf,ktf,                                                       &
            its,ite, kts,kte,                                                    &
            z_cup,entr_rate,heo,imid)
+
+   ! Output variables match
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)') k22(1), kbcon(1), kbmax(1)
+   ! write(*,'(10ES20.12)') cap_max_increment(1), hkbo(1), cap_max(1), ztexec(1), zqexec(1), entr_rate(1)
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') heo_cup(1,k), heso_cup(1,k), po_cup(1,k), z_cup(1,k), heo(1,k)
+   ! end do
+
 !
 !> - Call cup_minimi() to increase detrainment in stable layers
 !
@@ -833,8 +955,29 @@ contains
 !> - Call get_inversion_layer() to get inversion layers for mid level cloud tops
 !
       if(imid.eq.1)then
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)') kbcon(1), kstabi(1)
+   ! write(*,'(10ES20.12)')
+   ! do k=kts,kte
+   !    write(*,'(9I4)') k_inv_layers(1,k)
+   ! end do
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') p_cup(1,k), t_cup(1,k), z_cup(1,k), q_cup(1,k), qes_cup(1,k), dtempdz(1,k)
+   ! end do
+
       call get_inversion_layers(ierr,p_cup,t_cup,z_cup,q_cup,qes_cup,k_inv_layers, &
                                kbcon,kstabi,dtempdz,itf,ktf,its,ite, kts,kte)
+
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)') kbcon(1), kstabi(1)
+   ! write(*,'(10ES20.12)')
+   ! do k=kts,kte
+   !    write(*,'(9I4)') k_inv_layers(1,k)
+   ! end do
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') p_cup(1,k), t_cup(1,k), z_cup(1,k), q_cup(1,k), qes_cup(1,k), dtempdz(1,k)
+   ! end do
+
       endif
 !$acc kernels
       do i=its,itf
@@ -880,12 +1023,46 @@ contains
       !- for mid level clouds we do not allow clouds taller than where stability
       !- changes
       if(imid.eq.1)then
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') ipr, ktop(1), xland1(1), kstabi(1), k22(1), csum(1), kpbl(1), ktopdby(1), pmin_lev(1)
+! write(*,'(10ES20.12)') rand_vmas(1), hkbo(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') po_cup(1,k), entr_rate_2d(1,k), heo(1,k), heso_cup(1,k), zo_cup(1,k), zuo(1,k)
+! end do
+
           call rates_up_pdf(rand_vmas,ipr,'mid',ktop,ierr,po_cup,entr_rate_2d,hkbo,heo,heso_cup,zo_cup, &
                             xland1,kstabi,k22,kbcon,its,ite,itf,kts,kte,ktf,zuo,kpbl,ktopdby,csum,pmin_lev)
+
+! Output variables match
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') ipr, ktop(1), xland1(1), kstabi(1), k22(1), csum(1), kpbl(1), ktopdby(1), pmin_lev(1)
+! write(*,'(10ES20.12)') rand_vmas(1), hkbo(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') po_cup(1,k), entr_rate_2d(1,k), heo(1,k), heso_cup(1,k), zo_cup(1,k), zuo(1,k)
+! end do
+
       else
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(10I4)') ipr, ktop(1), xland1(1), kstabi(1), k22(1), kbcon(1), csum(1), kpbl(1), ktopdby(1), pmin_lev(1)
+! write(*,'(10ES20.12)') rand_vmas(1), hkbo(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') po_cup(1,k), entr_rate_2d(1,k), heo(1,k), heso_cup(1,k), zo_cup(1,k), zuo(1,k)
+! end do
+
           call rates_up_pdf(rand_vmas,ipr,'deep',ktop,ierr,po_cup,entr_rate_2d,hkbo,heo,heso_cup,zo_cup, &
                             xland1,kstabi,k22,kbcon,its,ite,itf,kts,kte,ktf,zuo,kbcon,ktopdby,csum,pmin_lev)
+
+! Output variables match
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(10I4)') ipr, ktop(1), xland1(1), kstabi(1), k22(1), kbcon(1), csum(1), kpbl(1), ktopdby(1), pmin_lev(1)
+! write(*,'(10ES20.12)') rand_vmas(1), hkbo(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') po_cup(1,k), entr_rate_2d(1,k), heo(1,k), heso_cup(1,k), zo_cup(1,k), zuo(1,k)
+! end do
+
       endif
+
+
 !
 !
 !
@@ -919,15 +1096,59 @@ contains
 !> - Call get_lateral_massflux() to calculate mass entrainment and detrainment
 !
      if(imid.eq.1)then
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') ktop(1), k22(1), kbcon(1)
+! write(*,'(10ES20.12)') lambau(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo_cup(1,k), zuo(1,k), cd(1,k), entr_rate_2d(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') up_massentro(1,k), up_massdetro(1,k), up_massentr(1,k), up_massdetr(1,k), up_massentru(1,k), up_massdetru(1,k)
+! end do
+
       call get_lateral_massflux(itf,ktf, its,ite, kts,kte                                &
                                 ,ierr,ktop,zo_cup,zuo,cd,entr_rate_2d                    &
                                 ,up_massentro, up_massdetro ,up_massentr, up_massdetr    &
                                 ,3,kbcon,k22,up_massentru,up_massdetru,lambau)
+
+! Output variables match
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') ktop(1), k22(1), kbcon(1)
+! write(*,'(10ES20.12)') lambau(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo_cup(1,k), zuo(1,k), cd(1,k), entr_rate_2d(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') up_massentro(1,k), up_massdetro(1,k), up_massentr(1,k), up_massdetr(1,k), up_massentru(1,k), up_massdetru(1,k)
+! end do
+
      else
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') ktop(1), k22(1), kbcon(1)
+! write(*,'(10ES20.12)') lambau(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo_cup(1,k), zuo(1,k), cd(1,k), entr_rate_2d(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') up_massentro(1,k), up_massdetro(1,k), up_massentr(1,k), up_massdetr(1,k), up_massentru(1,k), up_massdetru(1,k)
+! end do
+
       call get_lateral_massflux(itf,ktf, its,ite, kts,kte                                &
                                 ,ierr,ktop,zo_cup,zuo,cd,entr_rate_2d                    &
                                 ,up_massentro, up_massdetro ,up_massentr, up_massdetr    &
                                 ,1,kbcon,k22,up_massentru,up_massdetru,lambau)
+
+! Output variables match
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') ktop(1), k22(1), kbcon(1)
+! write(*,'(10ES20.12)') lambau(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo_cup(1,k), zuo(1,k), cd(1,k), entr_rate_2d(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') up_massentro(1,k), up_massdetro(1,k), up_massentr(1,k), up_massdetr(1,k), up_massentru(1,k), up_massdetru(1,k)
+! end do
+
      endif
 
 
@@ -1019,9 +1240,25 @@ contains
 !
 !> - Call cup_minimi() to calculate downdraft originating level (\p jmin)
 !
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') k22(1), kzdown(1), jmin(1)
+! write(*,'(10ES20.12)')
+! do k=kts,kte
+!    write(*,'(10ES20.12)') heso_cup(1,k)
+! end do
+
       call cup_minimi(heso_cup,k22,kzdown,jmin,ierr, &
            itf,ktf, &
            its,ite, kts,kte)
+
+! Output variables match
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') k22(1), kzdown(1), jmin(1)
+! write(*,'(10ES20.12)')
+! do k=kts,kte
+!    write(*,'(10ES20.12)') heso_cup(1,k)
+! end do
+
 !$acc kernels
       do 100 i=its,itf
          if(ierr(i).eq.0)then
@@ -1084,19 +1321,74 @@ contains
 !> - Call cup_up_moisture() to calculate moisture properties of updraft
      !
       if(imid.eq.1)then
+         ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') k22(1), kbcon(1), ktop(1), autoconv
+! write(*,'(10ES20.12)') pwavo(1), xland(1), c0(1), zqexec(1), zqexec(1), ccn(1), ccnclean
+! write(*,'(10ES20.12)') psum(1), psumh(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo_cup(1,k), qco(1,k), qrco(1,k), pwo(1,k), p_cup(1,k), dbyo(1,k), clw_all(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') qo(1,k), gammao_cup(1,k), zuo(1,k), qeso_cup(1,k), qo_cup(1,k), c0t3d(1,k), rho(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') c1d(1,k), tn_cup(1,k), up_massentr(1,k), up_massdetr(1,k)
+! end do
         call cup_up_moisture('mid',ierr,zo_cup,qco,qrco,pwo,pwavo,               &
              p_cup,kbcon,ktop,dbyo,clw_all,xland1,                               &
              qo,gammao_cup,zuo,qeso_cup,k22,qo_cup,c0,c0t3d,                     &
              zqexec,ccn,ccnclean,rho,c1d,tn_cup,autoconv,up_massentr,up_massdetr,psum,psumh,       &
              1,itf,ktf,                                                          &
              its,ite, kts,kte)
+! Output variables match
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') k22(1), kbcon(1), ktop(1), autoconv
+! write(*,'(10ES20.12)') pwavo(1), xland(1), c0(1), zqexec(1), zqexec(1), ccn(1), ccnclean
+! write(*,'(10ES20.12)') psum(1), psumh(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo_cup(1,k), qco(1,k), qrco(1,k), pwo(1,k), p_cup(1,k), dbyo(1,k), clw_all(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') qo(1,k), gammao_cup(1,k), zuo(1,k), qeso_cup(1,k), qo_cup(1,k), c0t3d(1,k), rho(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') c1d(1,k), tn_cup(1,k), up_massentr(1,k), up_massdetr(1,k)
+! end do
       else
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') k22(1), kbcon(1), ktop(1), autoconv
+! write(*,'(10ES20.12)') pwavo(1), xland(1), c0(1), zqexec(1), zqexec(1), ccn(1), ccnclean
+! write(*,'(10ES20.12)') psum(1), psumh(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo_cup(1,k), qco(1,k), qrco(1,k), pwo(1,k), p_cup(1,k), dbyo(1,k), clw_all(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') qo(1,k), gammao_cup(1,k), zuo(1,k), qeso_cup(1,k), qo_cup(1,k), c0t3d(1,k), rho(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') c1d(1,k), tn_cup(1,k), up_massentr(1,k), up_massdetr(1,k)
+! end do
          call cup_up_moisture('deep',ierr,zo_cup,qco,qrco,pwo,pwavo,             &
              p_cup,kbcon,ktop,dbyo,clw_all,xland1,                               &
              qo,gammao_cup,zuo,qeso_cup,k22,qo_cup,c0,c0t3d,                     &
              zqexec,ccn,ccnclean,rho,c1d,tn_cup,autoconv,up_massentr,up_massdetr,psum,psumh,       &
              1,itf,ktf,                                                          &
              its,ite, kts,kte)
+! Output variables match
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') k22(1), kbcon(1), ktop(1), autoconv
+! write(*,'(10ES20.12)') pwavo(1), xland(1), c0(1), zqexec(1), zqexec(1), ccn(1), ccnclean
+! write(*,'(10ES20.12)') psum(1), psumh(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo_cup(1,k), qco(1,k), qrco(1,k), pwo(1,k), p_cup(1,k), dbyo(1,k), clw_all(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') qo(1,k), gammao_cup(1,k), zuo(1,k), qeso_cup(1,k), qo_cup(1,k), c0t3d(1,k), rho(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') c1d(1,k), tn_cup(1,k), up_massentr(1,k), up_massdetr(1,k)
+! end do
      endif
 !---meltglac-------------------------------------------------
 
@@ -1242,8 +1534,28 @@ contains
         cdd(i,jmin(i))=0.
         dd_massdetro(i,:)=0.
         dd_massentro(i,:)=0.
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') kdet(1), jmin(1), kpbl(1), ipr, xland1(1), csum(1), pmin_lev(1)
+! write(*,'(10ES20.12)') rand_vmas(1), beta
+! do k=kts,kte
+!    write(*,'(10ES20.12)') po_cup(1,k), zdo(1, k)
+! end do
+! do k=1,40
+!    write(*,'(10ES20.12)') zuh2(k)
+! end do
+
         call get_zu_zd_pdf_fim(0,po_cup(i,:),rand_vmas(i),0.0_kind_phys,ipr,xland1(i),zuh2,4, &
             ierr(i),kdet(i),jmin(i)+1,zdo(i,:),kts,kte,ktf,beta,kpbl(i),csum(i),pmin_lev(i))
+! Output variables match
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') kdet(1), jmin(1), kpbl(1), ipr, xland1(1), csum(1), pmin_lev(1)
+! write(*,'(10ES20.12)') rand_vmas(1), beta
+! do k=kts,kte
+!    write(*,'(10ES20.12)') po_cup(1,k), zdo(1, k)
+! end do
+! do k=1,40
+!    write(*,'(10ES20.12)') zuh2(k)
+! end do
         if(zdo(i,jmin(i)) .lt.1.e-8)then
           zdo(i,jmin(i))=0.
           jmin(i)=jmin(i)-1
@@ -1256,6 +1568,7 @@ contains
         endif
 
         itemp = maxloc(zdo(i,:),1)
+      !   write(*,*) 'itemp = ', itemp, 'jmin = ', jmin(i)
         do ki=jmin(i)  , itemp,-1
           !=> from jmin to maximum value zd -> change entrainment
           dzo=zo_cup(i,ki+1)-zo_cup(i,ki)
@@ -1267,6 +1580,8 @@ contains
              if(zdo(i,ki+1).gt.0.)cdd(i,ki)=dd_massdetro(i,ki)/(dzo*zdo(i,ki+1))
           endif
           if(zdo(i,ki+1).gt.0.)mentrd_rate_2d(i,ki)=dd_massentro(i,ki)/(dzo*zdo(i,ki+1))
+         !  write(*, *) 'dd_massentro(i,ki) = ', dd_massentro(i,ki)
+         !  write(*, *) 'dd_massdetro(i,ki) = ', dd_massdetro(i,ki)
         enddo
         mentrd_rate_2d(i,1)=0.
         do ki=itemp-1,1,-1
@@ -1280,12 +1595,16 @@ contains
             if(zdo(i,ki+1).gt.0.)mentrd_rate_2d(i,ki)=dd_massentro(i,ki)/(dzo*zdo(i,ki+1))
           endif
           if(zdo(i,ki+1).gt.0.)cdd(i,ki)= dd_massdetro(i,ki)/(dzo*zdo(i,ki+1))
+         !  write(*, *) 'dd_massentro(i,ki) = ', dd_massentro(i,ki)
+         !  write(*, *) 'dd_massdetro(i,ki) = ', dd_massdetro(i,ki)
         enddo
 !
 !> - Compute downdraft moist static energy + moisture budget
           do k=2,jmin(i)+1
            dd_massentru(i,k-1)=dd_massentro(i,k-1)+lambau(i)*dd_massdetro(i,k-1)
            dd_massdetru(i,k-1)=dd_massdetro(i,k-1)+lambau(i)*dd_massdetro(i,k-1)
+         !   write(*, *) 'dd_massentro(i,k-1) = ', dd_massentro(i,k-1)
+         !   write(*, *) 'dd_massdetro(i,k-1) = ', dd_massdetro(i,k-1)
           enddo
             dbydo(i,jmin(i))=hcdo(i,jmin(i))-heso_cup(i,jmin(i))
             bud(i)=dbydo(i,jmin(i))*(zo_cup(i,jmin(i)+1)-zo_cup(i,jmin(i)))
@@ -1324,11 +1643,39 @@ contains
 !
 !> - Call cup_dd_moisture() to calculate moisture properties of downdraft
 !
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') jmin(1)
+! write(*,'(10ES20.12)') pwevo(1), bu(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zdo(1,k), hcdo(1,k), heso_cup(1,k), qcdo(1,k), qeso_cup(1,k), pwdo(1,k), qo_cup(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo_cup(1,k), dd_massentro(1,k), dd_massdetro(1,k), gammao_cup(1,k), qrcdo(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') po_cup(1,k), qo(1,k), heo(1,k)
+! end do
+
       call cup_dd_moisture(ierrc,zdo,hcdo,heso_cup,qcdo,qeso_cup,                &
            pwdo,qo_cup,zo_cup,dd_massentro,dd_massdetro,jmin,ierr,gammao_cup,    &
            pwevo,bu,qrcdo,po_cup,qo,heo,1,                                              &
            itf,ktf,                                                              &
            its,ite, kts,kte)
+
+! Output variables match
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') jmin(1)
+! write(*,'(10ES20.12)') pwevo(1), bu(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zdo(1,k), hcdo(1,k), heso_cup(1,k), qcdo(1,k), qeso_cup(1,k), pwdo(1,k), qo_cup(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo_cup(1,k), dd_massentro(1,k), dd_massdetro(1,k), gammao_cup(1,k), qrcdo(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') po_cup(1,k), qo(1,k), heo(1,k)
+! end do
+
 !
 !$acc kernels
       do i=its,itf
@@ -1343,6 +1690,16 @@ contains
 !
 !> - Call cup_up_aa0() to calculate workfunctions for updrafts
 !
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') ktop(1), kbcon(1)
+! write(*,'(10ES20.12)') aa0(1), aa1(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') z(1,k), zu(1,k), dby(1,k), gamma_cup(1,k), t_cup(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo(1,k), zuo(1,k), dbyo(1,k), gammao_cup(1,k), tn_cup(1,k)
+! end do
+
       call cup_up_aa0(aa0,z,zu,dby,gamma_cup,t_cup,                              &
            kbcon,ktop,ierr,                                                      &
            itf,ktf,                                                              &
@@ -1351,6 +1708,17 @@ contains
            kbcon,ktop,ierr,                                                      &
            itf,ktf,                                                              &
            its,ite, kts,kte)
+
+! Output variables match
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') ktop(1), kbcon(1)
+! write(*,'(10ES20.12)') aa0(1), aa1(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') z(1,k), zu(1,k), dby(1,k), gamma_cup(1,k), t_cup(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo(1,k), zuo(1,k), dbyo(1,k), gammao_cup(1,k), tn_cup(1,k)
+! end do
 
 !$acc kernels
       do i=its,itf
@@ -1384,6 +1752,7 @@ contains
 !
 !$acc kernels
       do i=its,itf
+            ! write(*,*) "imid = ",imid, "ierr(i) = ", ierr(i)
             if(ierr(i).eq.0)then
                 !- mean vertical velocity 
                 wmean(i) = 3.0 ! m/s ! in the future change for wmean == integral( w dz) / cloud_depth
@@ -1393,6 +1762,7 @@ contains
                 tau_ecmwf(i)=max(tau_ecmwf(i),720.)
                 tau_ecmwf(i)= tau_ecmwf(i) * (1.0061 + 1.23e-2 * (dx(i)/1000.))! dx(i) must be in meters 
             endif
+            ! write(*,*) 'tau_ecmwf(i) = ', tau_ecmwf(i), "imid = ",imid
       enddo
       tau_bl(:)     = 0.
 !$acc end kernels
@@ -1429,10 +1799,26 @@ contains
            endif
           enddo
 !$acc end kernels
+
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)')
+! write(*,'(10ES20.12)') z1(1), psur(1), tcrit
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo(1,k), qeso_bl(1,k), heo_bl(1,k), heso_bl(1,k), tn_bl(1,k), qo_bl(1,k), po(1,k)
+! end do
+
           !> - Call cup_env() to calculate moist static energy, heights, qes, ... only by bl tendencies
           call cup_env(zo,qeso_bl,heo_bl,heso_bl,tn_bl,qo_bl,po,z1,                              &
                      psur,ierr,tcrit,-1,                                                         &
                      itf,ktf, its,ite, kts,kte)
+
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)')
+! write(*,'(10ES20.12)') z1(1), psur(1), tcrit
+! do k=kts,kte
+!    write(*,'(10ES20.12)') zo(1,k), qeso_bl(1,k), heo_bl(1,k), heso_bl(1,k), tn_bl(1,k), qo_bl(1,k), po(1,k)
+! end do
+
           !> - Call cup_env_clev() to calculate environmental values on cloud levels only by bl tendencies
           call cup_env_clev(tn_bl,qeso_bl,qo_bl,heo_bl,heso_bl,zo,po,qeso_cup_bl,qo_cup_bl,      &
                               heo_cup_bl,heso_cup_bl,zo_cup,po_cup,gammao_cup_bl,tn_cup_bl,psur, &
@@ -1542,19 +1928,58 @@ contains
 !
 !> - Call cup_dd_edt() to determine downdraft strength in terms of windshear
 !
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') ktop(1), kbcon(1), xland1(1), aeroevap
+! write(*,'(10ES20.12)') edt(1), pwavo(1), pwevo(1), ccn(1), ccnclean, edtmax(1), edtmin(1)
+! write(*,'(10ES20.12)') edtc(1,1), psum(1), psumh(1), pefc(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') us(1,k), vs(1,k), zo(1,k), po(1,k), pwo(1,k), rho(1,k)
+! end do
+
       call cup_dd_edt(ierr,us,vs,zo,ktop,kbcon,edt,po,pwavo,  &
            pwo,ccn,ccnclean,pwevo,edtmax,edtmin,edtc,psum,psumh,       &
            rho,aeroevap,pefc,xland1,itf,ktf,                              &
            its,ite, kts,kte)
+
+! Output variables match
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') ktop(1), kbcon(1), xland1(1), aeroevap
+! write(*,'(10ES20.12)') edt(1), pwavo(1), pwevo(1), ccn(1), ccnclean, edtmax(1), edtmin(1)
+! write(*,'(10ES20.12)') edtc(1,1), psum(1), psumh(1), pefc(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') us(1,k), vs(1,k), zo(1,k), po(1,k), pwo(1,k), rho(1,k)
+! end do
+
         do i=its,itf
         if(ierr(i)/=0)cycle
             edto(i)=edtc(i,1)
         enddo
 
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)')
+! write(*,'(10ES20.12)') edto(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') tn_cup(1,k), po_cup(1,k), p_liq_ice(1,k), melting_layer(1,k), qrco(1,k), pwo(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') pwdo(1,k), melting(1,k)
+! end do
+
 !> - Call get_melting_profile() to get melting profile
      call get_melting_profile(ierr,tn_cup,po_cup, p_liq_ice,melting_layer,qrco    &
                              ,pwo,edto,pwdo,melting                                &
                              ,itf,ktf,its,ite, kts,kte, cumulus                    )
+
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)')
+! write(*,'(10ES20.12)') edto(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') tn_cup(1,k), po_cup(1,k), p_liq_ice(1,k), melting_layer(1,k), qrco(1,k), pwo(1,k)
+! end do
+! do k=kts,kte
+!    write(*,'(10ES20.12)') pwdo(1,k), melting(1,k)
+! end do
+
 !$acc kernels
         do k=kts,ktf
         do i=its,itf
@@ -1804,18 +2229,61 @@ contains
 !
 !> - Call cup_env() to calculate moist static energy, heights, qes
 !
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)')
+! write(*,'(10ES20.12)') z1(1), psur(1), tcrit
+! do k=kts,kte
+!    write(*,'(10ES20.12)') xz(1,k), xqes(1,k), xhe(1,k), xhes(1,k), xt(1,k), xq(1,k), po(1,k)
+! end do
+
       call cup_env(xz,xqes,xhe,xhes,xt,xq,po,z1,                   &
            psur,ierr,tcrit,-1,                                     &
            itf,ktf,                                                &
            its,ite, kts,kte)
+
+! Output variables match
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)')
+! write(*,'(10ES20.12)') z1(1), psur(1), tcrit
+! do k=kts,kte
+!    write(*,'(10ES20.12)') xz(1,k), xqes(1,k), xhe(1,k), xhes(1,k), xt(1,k), xq(1,k), po(1,k)
+! end do
+
 !
 !> - Call cup_env_clev() to calculate environmental values on cloud levels
 !
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)')
+   ! write(*,'(10ES20.12)') z1(1), psur(1), tcrit
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') xt(1,k), xqes(1,k), xq(1,k), xhe(1,k), xhes(1,k), xz(1,k), po(1,k)
+   ! end do
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') xqes_cup(1,k), xq_cup(1,k), xhe_cup(1,k), xhes_cup(1,k), xz_cup(1,k), po_cup(1,k), gammao_cup(1,k)
+   ! end do
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') xt_cup(1,k)
+   ! end do
+
       call cup_env_clev(xt,xqes,xq,xhe,xhes,xz,po,xqes_cup,xq_cup, &
            xhe_cup,xhes_cup,xz_cup,po_cup,gamma_cup,xt_cup,psur,   &
            ierr,z1,                                                &
            itf,ktf,                                                &
            its,ite, kts,kte)
+
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)')
+   ! write(*,'(10ES20.12)') z1(1), psur(1), tcrit
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') xt(1,k), xqes(1,k), xq(1,k), xhe(1,k), xhes(1,k), xz(1,k), po(1,k)
+   ! end do
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') xqes_cup(1,k), xq_cup(1,k), xhe_cup(1,k), xhes_cup(1,k), xz_cup(1,k), po_cup(1,k), gammao_cup(1,k)
+   ! end do
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') xt_cup(1,k)
+   ! end do
+
 !
 !
 !**************************** static control
@@ -1875,10 +2343,26 @@ contains
 !
 !> - Call cup_up_aa0() to calculate workfunctions for updraft
 !
+
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') ktop(1), kbcon(1)
+! write(*,'(10ES20.12)') xaa0(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') xz(1,k), xzu(1,k), xdby(1,k), gamma_cup(1,k), xt_cup(1,k)
+! end do
+
       call cup_up_aa0(xaa0,xz,xzu,xdby,gamma_cup,xt_cup, &
            kbcon,ktop,ierr,                              &
            itf,ktf,                                      &
            its,ite, kts,kte)
+
+! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') ktop(1), kbcon(1)
+! write(*,'(10ES20.12)') xaa0(1)
+! do k=kts,kte
+!    write(*,'(10ES20.12)') xz(1,k), xzu(1,k), xdby(1,k), gamma_cup(1,k), xt_cup(1,k)
+! end do
+
 !$acc parallel loop
       do i=its,itf 
          if(ierr(i).eq.0)then
@@ -1938,23 +2422,70 @@ contains
          k22x(i)=k22(i)
       enddo
 !$acc end kernels
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)') kbmax(1), k22x(1)
+   ! write(*,'(10ES20.12)')
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') heo_cup(1,k)
+   ! end do
+
         call cup_maximi(heo_cup,2,kbmax,k22x,ierr,                        &
              itf,ktf,                                                     &
              its,ite, kts,kte)
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)') kbmax(1), k22x(1)
+   ! write(*,'(10ES20.12)')
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') heo_cup(1,k)
+   ! end do
+
+
         iloop=2
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)') iloop, imid, k22x(1), kbconx(1), kbmax(1)
+   ! write(*,'(10ES20.12)') cap_max_increment(1), hkbo(1), cap_max(1), ztexec(1), zqexec(1), entr_rate(1)
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') heo_cup(1,k), heso_cup(1,k), po_cup(1,k), z_cup(1,k), heo(1,k)
+   ! end do
+
         call cup_kbcon(ierrc,cap_max_increment,iloop,k22x,kbconx,heo_cup, &
              heso_cup,hkbo,ierr2,kbmax,po_cup,cap_max,                    &
              ztexec,zqexec,                                               &
              0,itf,ktf,                                                   &
              its,ite, kts,kte,                                            &
              z_cup,entr_rate,heo,imid)
+
+   ! Output variables match
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)') iloop, imid, k22x(1), kbconx(1), kbmax(1)
+   ! write(*,'(10ES20.12)') cap_max_increment(1), hkbo(1), cap_max(1), ztexec(1), zqexec(1), entr_rate(1)
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') heo_cup(1,k), heso_cup(1,k), po_cup(1,k), z_cup(1,k), heo(1,k)
+   ! end do
+
         iloop=3
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)') iloop, imid, k22x(1), kbconx(1), kbmax(1)
+   ! write(*,'(10ES20.12)') cap_max_increment(1), hkbo(1), cap_max(1), ztexec(1), zqexec(1), entr_rate(1)
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') heo_cup(1,k), heso_cup(1,k), po_cup(1,k), z_cup(1,k), heo(1,k)
+   ! end do
+
         call cup_kbcon(ierrc,cap_max_increment,iloop,k22x,kbconx,heo_cup, &
              heso_cup,hkbo,ierr3,kbmax,po_cup,cap_max,                    &
              ztexec,zqexec,                                               &
              0,itf,ktf,                                                   &
              its,ite, kts,kte,                                            &
              z_cup,entr_rate,heo,imid)
+
+   ! Output variables match
+   ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   ! write(*,'(9I4)') iloop, imid, k22x(1), kbconx(1), kbmax(1)
+   ! write(*,'(10ES20.12)') cap_max_increment(1), hkbo(1), cap_max(1), ztexec(1), zqexec(1), entr_rate(1)
+   ! do k=kts,kte
+   !    write(*,'(10ES20.12)') heo_cup(1,k), heso_cup(1,k), po_cup(1,k), z_cup(1,k), heo(1,k)
+   ! end do
+
 !
 !> - Call cup_forcing_ens_3d() to calculate cloud base mass flux
 !
@@ -1970,6 +2501,26 @@ contains
         enddo
       enddo
 !$acc end kernels
+
+      ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+      ! write(*,'(9I4)') xland1(1), maxens3, ktop(1), k22(1), kbcon(1), ichoice, imid, dicycle
+      ! write(*,'(10ES20.12)') closure_n(1), aa0(1), aa1(1), xaa0_ens(1,1), mbdt, dtime
+      ! write(*,'(10ES20.12)') axx(1), mconv(1), edto(1), edtm(1)
+      ! write(*,'(10ES20.12)') tau_ecmwf(1), aa1_bl(1), xf_dicycle(1)
+      ! do k=1,4
+      !   write(*,'(10ES20.12)') rand_clos(1,k)
+      ! end do
+      ! do k=kts,kte
+      !   write(*,'(10ES20.12)') po_cup(1,k), omeg(1,k), zdo(1,k), zdm(1,k), zuo(1,k)
+      ! end do
+      ! do k=1,10
+      !   write(*,'(10ES20.12)') forcing(1,k)
+      ! end do
+      ! do k=1,maxens3
+      !   write(*,'(10ES20.12)') xf_ens(1,k), pr_ens(1,k)
+      ! end do
+
+
       call cup_forcing_ens_3d(closure_n,xland1,aa0,aa1,xaa0_ens,mbdt,dtime, &
            ierr,ierr2,ierr3,xf_ens,axx,forcing,                             &
            maxens3,mconv,rand_clos,                                         &
@@ -1978,6 +2529,27 @@ contains
            imid,ipr,itf,ktf,                                                &
            its,ite, kts,kte,                                                &
            dicycle,tau_ecmwf,aa1_bl,xf_dicycle)
+
+      ! Looks good except for last element of po_cup
+      ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+      ! write(*,'(9I4)') xland1(1), maxens3, ktop(1), k22(1), kbcon(1), ichoice, imid, dicycle
+      ! write(*,'(10ES20.12)') closure_n(1), aa0(1), aa1(1), xaa0_ens(1, 1), mbdt, dtime
+      ! write(*,'(10ES20.12)') axx(1), mconv(1), edto(1), edtm(1)
+      ! write(*,'(10ES20.12)') tau_ecmwf(1), aa1_bl(1), xf_dicycle(1)
+      ! do k=1,4
+      !    write(*,'(10ES20.12)') rand_clos(1,k)
+      ! end do
+      ! do k=kts,kte
+      !    write(*,'(10ES20.12)') po_cup(1,k), omeg(1,k), zdo(1,k), zdm(1,k), zuo(1,k)
+      ! end do
+      ! do k=1,10
+      !    write(*,'(10ES20.12)') forcing(1,k)
+      ! end do
+      ! do k=1,maxens3
+      !    write(*,'(10ES20.12)') xf_ens(1,k), pr_ens(1,k)
+      ! end do
+
+! write(*,*) 'pre(1)=', pre(1), 'xmb(1)=', xmb(1)
 !
 !$acc kernels
       do k=kts,ktf
@@ -2025,6 +2597,9 @@ contains
          enddo
 !$acc end kernels
        endif
+
+! write(*,*) 'pre(1)=', pre(1), 'xmb(1)=', xmb(1)
+
        call cup_output_ens_3d(xff_mid,xf_ens,ierr,dellat_ens,dellaq_ens, &
             dellaqc_ens,outt,outq,outqc,dx,                              &
             zuo,pre,pwo_ens,xmb,ktop,                                    &
@@ -2036,10 +2611,13 @@ contains
             dicycle,xf_dicycle )
 
 !> - Call rain_evap_below_cloudbase() to calculate evaporation below cloud base
+! write(*,*) 'pre(1)=', pre(1), 'xmb(1)=', xmb(1)
 
       call rain_evap_below_cloudbase(itf,ktf,its,ite,                    &
            kts,kte,ierr,kbcon,xmb,psur,xland,qo_cup,                     &
            po_cup,qes_cup,pwavo,edto,pwevo,pre,outt,outq)      !,outbuoy)
+
+! write(*,*) 'pre(1)=', pre(1), 'xmb(1)=', xmb(1)
 
 !
 !
@@ -4169,6 +4747,8 @@ endif
 !
 !!!!! deep convection !!!!!!!!!!
       if(imid.eq.0)then
+         ! write(*,*) 'pre(1)=', pre(1), 'xmb(1)=', xmb(1), 'xf_dicycle(1)=', xf_dicycle(1), 'closure_n(1)=', closure_n(1)
+
 !$acc kernels
       do i=its,itf
         if(ierr(i).eq.0)then
@@ -4244,6 +4824,7 @@ endif
          enddo     ! i
 !$acc end kernels
       endif        ! imid=1
+! write(*,*) 'pre(1)=', pre(1), 'xmb(1)=', xmb(1), 'xf_dicycle(1)=', xf_dicycle(1), 'closure_n(1)=', closure_n(1)
 
 !$acc kernels
        do i=its,itf
@@ -5095,6 +5676,7 @@ endif
          if(alpha(k) >= alpha2)exit
         enddo
         k1=k+1
+      !   write(*,*)'k1 = ',k1
         if(alpha(k1) .ne. alpha(k1-1))then
            a=alpha(k1)-alpha(k1-1)
            b=alpha(k1-1)*(k1) -(k1-1)*alpha(k1)
@@ -5113,14 +5695,17 @@ endif
   do k=2,min(kte,kt-1)
       kratio= (p(k)-p(1))/(p(kt)-p(1)) !float(k)/float(kt+1)
       zu(k) = fzu*kratio**(alpha2-1.0) * (1.0-kratio)**(beta_dd-1.0)
+      ! write(*,*)'zu(k) = ',zu(k)
    enddo
 
     fzu=maxval(zu(kts:min(ktf,kt-1)))
    if(fzu.gt.0.)  &
       zu(kts:min(ktf,kt-1))= zu(kts:min(ktf,kt-1))/fzu
      zu(1)=0.
+   ! write(*,*)'kb = ',kb
    do k=1,kb-2 !kb,2,-1
      zu(kb-k)=zu(kb-k+1)-zu(kb)*(p(kb-k)-p(kb-k+1))/(p(1)-p(kb))
+   !   write(*,*)'zu(kb-k) = ',zu(kb-k)
    enddo
      zu(1)=0.
   endif

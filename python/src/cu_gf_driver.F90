@@ -837,6 +837,40 @@ contains
        jpr_deep=0 !340765
 !> - Call cu_gf_deep_run() for middle GF convection
       if(imid_gf == 1)then
+
+! write(*,'(9I4)') im, km, kdt, its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') dicycle_m, ichoicem, ipr, imid_gf, kpbli(1), cactiv_m(1), kbconm(1), ktopm(1), tropics(1)
+! write(*,'(9I4)') nchem, spp_cu_deep, do_cap_suppress_here, k22m(1), jminm(1)
+! write(*,'(10ES20.12)') ccn_m(1), ccnclean, dt, xlandi(1), ter11(1), psur(1), hfx(1), qfx(1), dx(1), mconv(1)
+! write(*,'(10ES20.12)') edtm(1), edtd(1), xmbm(1), xmb_dumm(1), xmbs(1), pretm(1), frhm(1),rand_mom(1),rand_vmas(1), cap_suppress_j(1)
+! do n=1,4
+!   write(*,'(10ES20.12)') rand_clos(1,n)
+! end do
+! do k=1,km
+!   write(*,'(10ES20.12)') dhdt(1,k), zo(1,k), t2d(1,k), q2d(1,k), tshall(1,k), qshall(1,k), p2d(1,k)
+! end do
+! do k=1,10
+!   write(*,'(10ES20.12)') forcing(1,k)
+! end do
+! do k=1, km
+!   write(*,'(10ES20.12)') us(1,k), vs(1,k), rhoi(1,k), omeg(1,k), cnvwtm(1,k), zum(1,k), zdm(1,k)
+! end do
+! do k=1,km
+!   write(*,'(10ES20.12)') zdd(1,k), outum(1,k), outvm(1,k), outtm(1,k), outqm(1,k), outqcm(1,k), cupclwm(1,k)
+! end do
+! do k=1,3
+!   write(*,'(10ES20.12)') fscav(k)
+! end do
+! do k=1,km
+!   do n=1,nchem
+!     write(*,'(10ES20.12)') chem3d(1, k, n)
+!   end do
+! end do
+! do n=1,nchem
+!   write(*,'(10ES20.12)') wetdpc_mid(1,n)
+! end do
+! write(*,'(10L)') do_smoke_transport
+
        call cu_gf_deep_run(        &
                itf,ktf,its,ite, kts,kte  &
               ,dicycle_m     &
@@ -907,6 +941,41 @@ contains
               ,do_cap_suppress_here,cap_suppress_j &
               ,k22m          &
               ,jminm,kdt,tropics)
+
+! Output variables match
+! write(*,'(9I4)') im, km, kdt, its, itf, ite, kts, ktf, kte
+! write(*,'(9I4)') dicycle_m, ichoicem, ipr, imid_gf, kpbli(1), cactiv_m(1), kbconm(1), ktopm(1), tropics(1)
+! write(*,'(9I4)') nchem, spp_cu_deep, do_cap_suppress_here, k22m(1), jminm(1)
+! write(*,'(10ES20.12)') ccn_m(1), ccnclean, dt, xlandi(1), ter11(1), psur(1), hfx(1), qfx(1), dx(1), mconv(1)
+! write(*,'(10ES20.12)') edtm(1), edtd(1), xmbm(1), xmb_dumm(1), xmbs(1), pretm(1), frhm(1),rand_mom(1),rand_vmas(1), cap_suppress_j(1)
+! do n=1,4
+!   write(*,'(10ES20.12)') rand_clos(1,n)
+! end do
+! do k=1,km
+!   write(*,'(10ES20.12)') dhdt(1,k), zo(1,k), t2d(1,k), q2d(1,k), tshall(1,k), qshall(1,k), p2d(1,k)
+! end do
+! do k=1,10
+!   write(*,'(10ES20.12)') forcing(1,k)
+! end do  
+! do k=1, km
+!   write(*,'(10ES20.12)') us(1,k), vs(1,k), rhoi(1,k), omeg(1,k), cnvwtm(1,k), zum(1,k), zdm(1,k)
+! end do
+! do k=1,km
+!   write(*,'(10ES20.12)') zdd(1,k), outum(1,k), outvm(1,k), outtm(1,k), outqm(1,k), outqcm(1,k), cupclwm(1,k)
+! end do
+! do k=1,3
+!   write(*,'(10ES20.12)') fscav(k)
+! end do
+! do k=1,km
+!   do n=1,nchem
+!     write(*,'(10ES20.12)') chem3d(1, k, n)
+!   end do
+! end do
+! do n=1,nchem
+!   write(*,'(10ES20.12)') wetdpc_mid(1,n)
+! end do
+! write(*,'(10L)') do_smoke_transport
+
 !$acc kernels
             do i=its,itf
              do k=kts,ktf
@@ -920,6 +989,42 @@ contains
      endif
 !> - Call cu_gf_deep_run() for deep GF convection
      if(ideep.eq.1)then
+
+      ! write(*,'(9I4)') im, km, kdt, its, itf, ite, kts, ktf, kte
+      ! write(*,'(9I4)') dicycle, ichoice, ipr, ideep, kpbli(1), cactiv(1), kbcon(1), ktop(1), tropics(1)
+      ! write(*,'(9I4)') nchem, spp_cu_deep, do_cap_suppress_here, k22(1), jmin(1)
+      ! write(*,'(10ES20.12)') ccn_gf(1), ccnclean, dt, xlandi(1), ter11(1), psur(1)
+      ! write(*,'(10ES20.12)') hfx(1), qfx(1), dx(1), mconv(1)
+      ! write(*,'(10ES20.12)') edt(1), edtm(1), xmbm(1), xmb(1), xmbs(1)
+      ! write(*,'(10ES20.12)') pret(1), frhd(1),rand_mom(1),rand_vmas(1), cap_suppress_j(1)
+      ! do n=1,4
+      !   write(*,'(10ES20.12)') rand_clos(1,n)
+      ! end do
+      ! do k=1,km
+      !   write(*,'(10ES20.12)') dhdt(1,k), zo(1,k), t2d(1,k), q2d(1,k), tn(1,k), qo(1,k), p2d(1,k)
+      ! end do
+      ! do k=1,10
+      !   write(*,'(10ES20.12)') forcing(1,k)
+      ! end do
+      ! do k=1, km
+      !   write(*,'(10ES20.12)') us(1,k), vs(1,k), rhoi(1,k), omeg(1,k), cnvwt(1,k), zu(1,k), zd(1,k)
+      ! end do
+      ! do k=1,km
+      !   write(*,'(10ES20.12)') zdd(1,k), outu(1,k), outv(1,k), outt(1,k), outq(1,k), outqc(1,k), cupclw(1,k)
+      ! end do
+      ! do k=1,3
+      !   write(*,'(10ES20.12)') fscav(k)
+      ! end do
+      ! do k=1,km
+      !   do n=1,nchem
+      !     write(*,'(10ES20.12)') chem3d(1, k, n)
+      !   end do
+      ! end do
+      ! do n=1,nchem
+      !   write(*,'(10ES20.12)') wetdpc_deep(1,n)
+      ! end do
+      ! write(*,'(10L)') do_smoke_transport
+
       call cu_gf_deep_run(        &
                itf,ktf,its,ite, kts,kte  &
 
@@ -993,6 +1098,43 @@ contains
               ,do_cap_suppress_here,cap_suppress_j &
               ,k22          &
               ,jmin,kdt,tropics)
+
+          ! write(*,'(9I4)') im, km, kdt, its, itf, ite, kts, ktf, kte
+          ! write(*,'(9I4)') dicycle, ichoice, ipr, ideep, kpbli(1), cactiv(1), kbcon(1), ktop(1), tropics(1)
+          ! write(*,'(9I4)') nchem, spp_cu_deep, do_cap_suppress_here, k22(1), jmin(1)
+          ! write(*,'(10ES20.12)') ccn_gf(1), ccnclean, dt, xlandi(1), ter11(1), psur(1)
+          ! write(*,'(10ES20.12)') hfx(1), qfx(1), dx(1), mconv(1)
+          ! write(*,'(10ES20.12)') edt(1), edtm(1), xmbm(1), xmb(1), xmbs(1)
+          ! write(*,'(10ES20.12)') pret(1), frhd(1),rand_mom(1),rand_vmas(1), cap_suppress_j(1)
+          ! do n=1,4
+          !   write(*,'(10ES20.12)') rand_clos(1,n)
+          ! end do
+          ! do k=1,km
+          !   write(*,'(10ES20.12)') dhdt(1,k), zo(1,k), t2d(1,k), q2d(1,k), tn(1,k), qo(1,k), p2d(1,k)
+          ! end do
+          ! do k=1,10
+          !   write(*,'(10ES20.12)') forcing(1,k)
+          ! end do
+          ! do k=1, km
+          !   write(*,'(10ES20.12)') us(1,k), vs(1,k), rhoi(1,k), omeg(1,k), cnvwt(1,k), zu(1,k), zd(1,k)
+          ! end do
+          ! do k=1,km
+          !   write(*,'(10ES20.12)') zdd(1,k), outu(1,k), outv(1,k), outt(1,k), outq(1,k), outqc(1,k), cupclw(1,k)
+          ! end do
+          ! do k=1,3
+          !   write(*,'(10ES20.12)') fscav(k)
+          ! end do
+          ! do k=1,km
+          !   do n=1,nchem
+          !     write(*,'(10ES20.12)') chem3d(1, k, n)
+          !   end do
+          ! end do
+          ! do n=1,nchem
+          !   write(*,'(10ES20.12)') wetdpc_deep(1,n)
+          ! end do
+          ! write(*,'(10L)') do_smoke_transport
+
+
           jpr=0
           ipr=0
 !$acc kernels

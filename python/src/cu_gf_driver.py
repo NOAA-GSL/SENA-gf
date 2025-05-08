@@ -794,6 +794,31 @@ def cu_gf_driver_run(state, errmsg, errflg):
     jpr_deep = 0  # Previously set to 340765 in commentsments
 
     if imid_gf == 1:
+
+        # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+        # print(f"{dicycle_m:>4}{ichoicem:>4}{ipr:>4}{imid_gf:>4}{kpbli[0]:>4}{cactiv_m[0]:>4}{kbconm[0]:>4}{ktopm[0]:>4}{tropics[0]:>4}")
+        # print(f"{nchem:>4}{spp_cu_deep:>4}{do_cap_suppress_here:>4}{k22m[0]:>4}{jminm[0]:>4}")
+        # print(f"{ccn_m[0]:>20.12E}{ccnclean:>20.12E}{dt:>20.12E}{xlandi[0]:>20.12E}{ter11[0]:>20.12E}{psur[0]:>20.12E}{hfx[0]:>20.12E}{qfx[0]:>20.12E}{dx[0]:>20.12E}{mconv[0]:>20.12E}")
+        # print(f"{edtm[0]:>20.12E}{edtd[0]:>20.12E}{xmbm[0]:>20.12E}{xmb_dumm[0]:>20.12E}{xmbs[0]:>20.12E}{pretm[0]:>20.12E}{frhm[0]:>20.12E}{rand_mom[0]:>20.12E}{rand_vmas[0]:>20.12E}{cap_suppress_j[0]:>20.12E}")
+        # for n in range(4):
+        #     print(f"{rand_clos[0,n]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{dhdt[0,k]:>20.12E}{zo[0,k]:>20.12E}{t2d[0,k]:>20.12E}{q2d[0,k]:>20.12E}{tshall[0,k]:>20.12E}{qshall[0,k]:>20.12E}{p2d[0,k]:>20.12E}")
+        # for k in range(10):
+        #     print(f"{forcing[0,k]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{rhoi[0,k]:>20.12E}{omeg[0,k]:>20.12E}{cnvwtm[0,k]:>20.12E}{zum[0,k]:>20.12E}{zdm[0,k]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{zdd[0,k]:>20.12E}{outum[0,k]:>20.12E}{outvm[0,k]:>20.12E}{outtm[0,k]:>20.12E}{outqm[0,k]:>20.12E}{outqcm[0,k]:>20.12E}{cupclwm[0,k]:>20.12E}")
+        # for n in range(3):
+        #     print(f"{fscav[n]:>20.12E}")
+        # for k in range(km):
+        #     for n in range(nchem):
+        #         print(f"{chem3d[0,k,n]:>20.12E}")
+        # for n in range(nchem):
+        #     print(f"{wetdpc_mid[0,n]:>20.12E}")
+        # print(f"{do_smoke_transport:>10}")
+
         cu_gf_deep_run(
             itf, ktf, its, ite, kts, kte,
             dicycle_m,
@@ -862,6 +887,31 @@ def cu_gf_driver_run(state, errmsg, errflg):
             tropics
         )
 
+        # Output variables match
+        # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+        # print(f"{dicycle_m:>4}{ichoicem:>4}{ipr:>4}{imid_gf:>4}{kpbli[0]:>4}{cactiv_m[0]:>4}{kbconm[0]:>4}{ktopm[0]:>4}{tropics[0]:>4}")
+        # print(f"{nchem:>4}{spp_cu_deep:>4}{do_cap_suppress_here:>4}{k22m[0]:>4}{jminm[0]:>4}")
+        # print(f"{ccn_m[0]:>20.12E}{ccnclean:>20.12E}{dt:>20.12E}{xlandi[0]:>20.12E}{ter11[0]:>20.12E}{psur[0]:>20.12E}{hfx[0]:>20.12E}{qfx[0]:>20.12E}{dx[0]:>20.12E}{mconv[0]:>20.12E}")
+        # print(f"{edtm[0]:>20.12E}{edtd[0]:>20.12E}{xmbm[0]:>20.12E}{xmb_dumm[0]:>20.12E}{xmbs[0]:>20.12E}{pretm[0]:>20.12E}{frhm[0]:>20.12E}{rand_mom[0]:>20.12E}{rand_vmas[0]:>20.12E}{cap_suppress_j[0]:>20.12E}")
+        # for n in range(4):
+        #     print(f"{rand_clos[0,n]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{dhdt[0,k]:>20.12E}{zo[0,k]:>20.12E}{t2d[0,k]:>20.12E}{q2d[0,k]:>20.12E}{tshall[0,k]:>20.12E}{qshall[0,k]:>20.12E}{p2d[0,k]:>20.12E}")
+        # for k in range(10):
+        #     print(f"{forcing[0,k]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{rhoi[0,k]:>20.12E}{omeg[0,k]:>20.12E}{cnvwtm[0,k]:>20.12E}{zum[0,k]:>20.12E}{zdm[0,k]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{zdd[0,k]:>20.12E}{outum[0,k]:>20.12E}{outvm[0,k]:>20.12E}{outtm[0,k]:>20.12E}{outqm[0,k]:>20.12E}{outqcm[0,k]:>20.12E}{cupclwm[0,k]:>20.12E}")
+        # for n in range(3):
+        #     print(f"{fscav[n]:>20.12E}")
+        # for k in range(km):
+        #     for n in range(nchem):
+        #         print(f"{chem3d[0,k,n]:>20.12E}")
+        # for n in range(nchem):
+        #     print(f"{wetdpc_mid[0,n]:>20.12E}")
+        # print(f"{do_smoke_transport}")
+
         # Update `qcheck` array
         for i in range(its, itf + 1):
             for k in range(kts, ktf + 1):
@@ -874,6 +924,33 @@ def cu_gf_driver_run(state, errmsg, errflg):
         )
 
     if ideep == 1:
+
+        # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+        # print(f"{dicycle_m:>4}{ichoice:>4}{ipr:>4}{ideep:>4}{kpbli[0]:>4}{cactiv[0]:>4}{kbcon[0]:>4}{ktop[0]:>4}{tropics[0]:>4}")
+        # print(f"{nchem:>4}{spp_cu_deep:>4}{do_cap_suppress_here:>4}{k22[0]:>4}{jmin[0]:>4}")
+        # print(f"{ccn_gf[0]:>20.12E}{ccnclean:>20.12E}{dt:>20.12E}{xlandi[0]:>20.12E}{ter11[0]:>20.12E}{psur[0]:>20.12E}")
+        # print(f"{hfx[0]:>20.12E}{qfx[0]:>20.12E}{dx[0]:>20.12E}{mconv[0]:>20.12E}")
+        # print(f"{edt[0]:>20.12E}{edtm[0]:>20.12E}{xmbm[0]:>20.12E}{xmb[0]:>20.12E}{xmbs[0]:>20.12E}")
+        # print(f"{pret[0]:>20.12E}{frhd[0]:>20.12E}{rand_mom[0]:>20.12E}{rand_vmas[0]:>20.12E}{cap_suppress_j[0]:>20.12E}")
+        # for n in range(4):
+        #     print(f"{rand_clos[0,n]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{dhdt[0,k]:>20.12E}{zo[0,k]:>20.12E}{t2d[0,k]:>20.12E}{q2d[0,k]:>20.12E}{tn[0,k]:>20.12E}{qo[0,k]:>20.12E}{p2d[0,k]:>20.12E}")
+        # for k in range(10):
+        #     print(f"{forcing[0,k]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{rhoi[0,k]:>20.12E}{omeg[0,k]:>20.12E}{cnvwt[0,k]:>20.12E}{zu[0,k]:>20.12E}{zd[0,k]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{zdd[0,k]:>20.12E}{outu[0,k]:>20.12E}{outv[0,k]:>20.12E}{outt[0,k]:>20.12E}{outq[0,k]:>20.12E}{outqc[0,k]:>20.12E}{cupclw[0,k]:>20.12E}")
+        # for n in range(3):
+        #     print(f"{fscav[n]:>20.12E}")
+        # for k in range(km):
+        #     for n in range(nchem):
+        #         print(f"{chem3d[0,k,n]:>20.12E}")
+        # for n in range(nchem):
+        #     print(f"{wetdpc_deep[0,n]:>20.12E}")
+        # print(f"{do_smoke_transport:>10}")
+
         cu_gf_deep_run(
             itf, ktf, its, ite, kts, kte,
             dicycle,
@@ -941,6 +1018,32 @@ def cu_gf_driver_run(state, errmsg, errflg):
             kdt,
             tropics
         )
+
+        # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+        # print(f"{dicycle_m:>4}{ichoice:>4}{ipr:>4}{ideep:>4}{kpbli[0]:>4}{cactiv[0]:>4}{kbcon[0]:>4}{ktop[0]:>4}{tropics[0]:>4}")
+        # print(f"{nchem:>4}{spp_cu_deep:>4}{do_cap_suppress_here:>4}{k22[0]:>4}{jmin[0]:>4}")
+        # print(f"{ccn_gf[0]:>20.12E}{ccnclean:>20.12E}{dt:>20.12E}{xlandi[0]:>20.12E}{ter11[0]:>20.12E}{psur[0]:>20.12E}")
+        # print(f"{hfx[0]:>20.12E}{qfx[0]:>20.12E}{dx[0]:>20.12E}{mconv[0]:>20.12E}")
+        # print(f"{edt[0]:>20.12E}{edtm[0]:>20.12E}{xmbm[0]:>20.12E}{xmb[0]:>20.12E}{xmbs[0]:>20.12E}")
+        # print(f"{pret[0]:>20.12E}{frhd[0]:>20.12E}{rand_mom[0]:>20.12E}{rand_vmas[0]:>20.12E}{cap_suppress_j[0]:>20.12E}")
+        # for n in range(4):
+        #     print(f"{rand_clos[0,n]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{dhdt[0,k]:>20.12E}{zo[0,k]:>20.12E}{t2d[0,k]:>20.12E}{q2d[0,k]:>20.12E}{tn[0,k]:>20.12E}{qo[0,k]:>20.12E}{p2d[0,k]:>20.12E}")
+        # for k in range(10):
+        #     print(f"{forcing[0,k]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{rhoi[0,k]:>20.12E}{omeg[0,k]:>20.12E}{cnvwt[0,k]:>20.12E}{zu[0,k]:>20.12E}{zd[0,k]:>20.12E}")
+        # for k in range(km):
+        #     print(f"{zdd[0,k]:>20.12E}{outu[0,k]:>20.12E}{outv[0,k]:>20.12E}{outt[0,k]:>20.12E}{outq[0,k]:>20.12E}{outqc[0,k]:>20.12E}{cupclw[0,k]:>20.12E}")
+        # for n in range(3):
+        #     print(f"{fscav[n]:>20.12E}")
+        # for k in range(km):
+        #     for n in range(nchem):
+        #         print(f"{chem3d[0,k,n]:>20.12E}")
+        # for n in range(nchem):
+        #     print(f"{wetdpc_deep[0,n]:>20.12E}")
+        # print(f"{do_smoke_transport:>10}")
 
         jpr = 0
         ipr = 0
@@ -1297,9 +1400,11 @@ def cu_gf_driver_run(state, errmsg, errflg):
     state.cld1d = cld1d  # Cloud fraction
     state.us = us  # Zonal wind
     state.vs = vs  # Meridional wind
-    state.t2di = t2di  # Temperature at model levels
+    # state.t2di = t2di  # Temperature at model levels
+    state.t2di = t  # Temperature at model levels
     state.w = w  # Vertical velocity
-    state.qv2di_spechum = qv2di_spechum  # Specific humidity at model levels
+    # state.qv2di_spechum = qv2di_spechum  # Specific humidity at model levels
+    state.qv2di_spechum = qv_spechum  # Specific humidity at model levels
     state.p2di = p2di  # Pressure at model levels
     state.psuri = psuri  # Surface pressure
     state.hbot = hbot  # Height of the bottom of the cloud
