@@ -482,6 +482,8 @@ def cu_gf_deep_run(
     evfact = 0.25  # Default value
     evfactl = 0.25  # Default value for land
 
+    # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
+
     # Set proportionality constant for pressure gradient
     pgcon = 0.0
 
@@ -1514,6 +1516,7 @@ def cu_gf_deep_run(
     #     print(f"{z[0,k]:>20.12E}{zu[0,k]:>20.12E}{dby[0,k]:>20.12E}{gamma_cup[0,k]:>20.12E}{t_cup[0,k]:>20.12E}")
     # for k in range(kte+1):
     #     print(f"{zo[0,k]:>20.12E}{zuo[0,k]:>20.12E}{dbyo[0,k]:>20.12E}{gammao_cup[0,k]:>20.12E}{tn_cup[0,k]:>20.12E}")
+    # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
 
     # First call to cup_up_aa0
     cup_up_aa0(
@@ -1984,6 +1987,8 @@ def cu_gf_deep_run(
             k = start_level[i]
             xhc[i, k] = xhkb[i]
 
+    # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
+
     # Update xhc and xdby based on environmental tendencies
     for i in range(its, itf + 1):  # Adjust loop to start at zero
         if ierr[i] == 0:
@@ -2114,6 +2119,8 @@ def cu_gf_deep_run(
     # for k in range(kte+1):
     #     print(f"{heo_cup[0,k]:>20.12E}{heso_cup[0,k]:>20.12E}{po_cup[0,k]:>20.12E}{z_cup[0,k]:>20.12E}{heo[0,k]:>20.12E}")
 
+    # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
+
     cup_kbcon(
         ierrc, cap_max_increment, iloop, k22x, kbconx, heo_cup,
         heso_cup, hkbo, ierr3, kbmax, po_cup, cap_max,
@@ -2166,6 +2173,8 @@ def cu_gf_deep_run(
         dicycle, tau_ecmwf, aa1_bl, xf_dicycle
     )
 
+    # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
+
     # Looks good except for the last element of po_cup
     # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
     # print(f"{xland1[0]:>4}{MAXENS3:>4}{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{ichoice:>4}{imid:>4}{dicycle:>4}")
@@ -2216,6 +2225,19 @@ def cu_gf_deep_run(
                 forcing[i, 1] = xff_mid[i, 1]
 
     # print("pre(1): ", pre[0], "xmb(0): ", xmb[0])
+    # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
+
+    # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+    # print(f"{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{MAXENS3:>4}{ichoice:>4}{imid:>4}{ipr:>4}{dicycle:>4}{xland1[0]:>4}")
+    # print(f"{xff_mid[0,1]:>20.12E}{xff_mid[0,1]:>20.12E}{dx[0]:>20.12E}{xmb[0]:>20.12E}{closure_n[0]:>20.12E}{sig[0]:>20.12E}{xmbm_in[0]:>20.12E}{xmbs_in[0]:>20.12E}")
+    # print(f"{xf_dicycle[0]:>20.12E}{pre[0]:>20.12E}{edto[0]:>20.12E}")
+    # for k in range(kte+1):
+    #     print(f"{dellat_ens[0,k,0]:>20.12E}{dellaq_ens[0,k,0]:>20.12E}{dellaqc_ens[0,k,0]:>20.12E}{outt[0,k]:>20.12E}{outq[0,k]:>20.12E}")
+    # for k in range(kte+1):
+    #     print(f"{outqc[0,k]:>20.12E}{zuo[0,k]:>20.12E}{pwo_ens[0,k,0]:>20.12E}{po_cup[0,k]:>20.12E}{pwdo[0,k]:>20.12E}")
+    # for k in range(MAXENS3):
+    #     print(f"{xf_ens[0,k]:>20.12E}{pr_ens[0,k]:>20.12E}")
+
 
     # Call cup_output_ens_3d to output ensemble results
     cup_output_ens_3d(
@@ -2229,7 +2251,21 @@ def cu_gf_deep_run(
         its, ite, kts, kte,
         dicycle, xf_dicycle
     )
+
+    # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+    # print(f"{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{MAXENS3:>4}{ichoice:>4}{imid:>4}{ipr:>4}{dicycle:>4}{xland1[0]:>4}")
+    # print(f"{xff_mid[0,1]:>20.12E}{xff_mid[0,1]:>20.12E}{dx[0]:>20.12E}{xmb[0]:>20.12E}{closure_n[0]:>20.12E}{sig[0]:>20.12E}{xmbm_in[0]:>20.12E}{xmbs_in[0]:>20.12E}")
+    # print(f"{xf_dicycle[0]:>20.12E}{pre[0]:>20.12E}{edto[0]:>20.12E}")
+    # for k in range(kte+1):
+    #     print(f"{dellat_ens[0,k,0]:>20.12E}{dellaq_ens[0,k,0]:>20.12E}{dellaqc_ens[0,k,0]:>20.12E}{outt[0,k]:>20.12E}{outq[0,k]:>20.12E}")
+    # for k in range(kte+1):
+    #     print(f"{outqc[0,k]:>20.12E}{zuo[0,k]:>20.12E}{pwo_ens[0,k,0]:>20.12E}{po_cup[0,k]:>20.12E}{pwdo[0,k]:>20.12E}")
+    # for k in range(MAXENS3):
+    #     print(f"{xf_ens[0,k]:>20.12E}{pr_ens[0,k]:>20.12E}")
+
     # print("pre(1): ", pre[0], "xmb(0): ", xmb[0])
+
+    # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
 
     # Call rain_evap_below_cloudbase to calculate evaporation below cloud base
     rain_evap_below_cloudbase(
@@ -2238,6 +2274,7 @@ def cu_gf_deep_run(
         po_cup, qes_cup, pwavo, edto, pwevo, pre, outt, outq
     )
     # print("pre(1): ", pre[0], "xmb(0): ", xmb[0])
+    # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
 
     if do_smoke_transport and nchem > 0:
         # Initialize tracers if they exist
@@ -2464,6 +2501,7 @@ def cu_gf_deep_run(
                 for k in range(kts, ktop[i] + 1):  # Adjust for zero-based indexing
                     fp = math.sqrt(outu[i, k]**2 + outv[i, k]**2) / fpi
                     outt[i, k] += fp * dts * G / CP
+    # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
 
 
 def fct1d3(ktop, n, dt, z, tracr, massflx, trflx_in, dellac, g):
@@ -3635,7 +3673,7 @@ def cup_output_ens_3d(xff_mid, xf_ens, ierr, dellat, dellaq, dellaqc,
                 if ichoice == 1 or ichoice == 2:
                     xmb_ave[i] = sig[i] * xff_mid[i, ichoice - 1]
                 elif ichoice > 2:
-                    k = -1
+                    k = 0
                     for n in range(maxens3):  # Zero-based indexing for ensembles
                         k += 1
                         xmb_ave[i] += xf_ens[i, n]

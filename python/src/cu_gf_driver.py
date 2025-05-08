@@ -86,7 +86,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
     kdt = state.kdt  # Time step index
 
     # Write input state for sanity check - Should be identical to input_state_0400.nc.baseline
-    state.write_state('input_state_0400.nc')
+    state.write_state(f'input_state_{kdt:>04}.nc')
 
     imid_gf = 1
     

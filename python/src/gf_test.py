@@ -8,9 +8,13 @@ errflg = 0
 
 state = GFState()
 
-state.read_state(input_file)
+for n in range(1,577):
+# for n in range(78,79):
+    input_file = f"data/input_state_{n:04d}.nc"
+    state.read_state(input_file)
 
-# Call GF driver
-cu_gf_driver_run(state, errmsg, errflg)
+    # Call GF driver
+    cu_gf_driver_run(state, errmsg, errflg)
 
-state.write_state(output_file)
+    output_file = f"output_state_{n:04d}.nc"
+    state.write_state(output_file)

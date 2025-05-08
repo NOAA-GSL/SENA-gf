@@ -998,9 +998,9 @@ def cu_gf_sh_run(
                 ierrc[i] = "21"
 
         if ierr[i] != 0:  # Handle error case
-            k22[i] = 0
-            kbcon[i] = 0
-            ktop[i] = 0
+            k22[i] = -1
+            kbcon[i] = -1
+            ktop[i] = -1
             xmb[i] = 0.0
             outt[i, :] = 0.0
             outu[i, :] = 0.0
@@ -1043,6 +1043,15 @@ def cu_gf_sh_run(
                 for k in range(kts, ktop[i] + 1):  # Loop over vertical levels
                     fp = np.sqrt(outu[i, k]**2 + outv[i, k]**2) / fpi  # Compute fp
                     outt[i, k] += fp * dts * G / CP  # Update temperature tendency
+    # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+    # print(f"{kpbl[0]:>4}{ichoice:>4}{kbcon[0]:>4}{ktop[0]:>4}{k22[0]:>4}{ipr:>4}{tropics[0]:>4}")
+    # print(f"{z1[0]:>20.12E}{psur[0]:>20.12E}{hfx[0]:>20.12E}{qfx[0]:>20.12E}{xland[0]:>20.12E}{tcrit:>20.12E}{dtime:>20.12E}{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
+    # for k in range(kte+1):
+    #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{zo[0,k]:>20.12E}{t[0,k]:>20.12E}{q[0,k]:>20.12E}{tn[0,k]:>20.12E}{qo[0,k]:>20.12E}")
+    # for k in range(kte+1):
+    #     print(f"{po[0,k]:>20.12E}{dhdt[0,k]:>20.12E}{rho[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
+    # for k in range(kte+1):
+    #     print(f"{outt[0,k]:>20.12E}{outq[0,k]:>20.12E}{outqc[0,k]:>20.12E}{outu[0,k]:>20.12E}{outv[0,k]:>20.12E}{cnvwt[0,k]:>20.12E}{cupclw[0,k]:>20.12E}")
 
     # return (q, qo, zuo, xmb_out, kbcon, ktop, k22, ierr, 
     #         outt, outq, outqc, outu, outv, cnvwt, pre, cupclw)

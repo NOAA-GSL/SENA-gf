@@ -464,6 +464,7 @@ contains
       evfact=0.25 ! .4
       evfactl=0.25 ! .2
 
+! write(*,'(10ES20.12)') xmb_out(1), pre(1)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
@@ -1699,6 +1700,8 @@ contains
 ! do k=kts,kte
 !    write(*,'(10ES20.12)') zo(1,k), zuo(1,k), dbyo(1,k), gammao_cup(1,k), tn_cup(1,k)
 ! end do
+      ! write(*,'(10ES20.12)') xmb_out(1), pre(1)
+
 
       call cup_up_aa0(aa0,z,zu,dby,gamma_cup,t_cup,                              &
            kbcon,ktop,ierr,                                                      &
@@ -2312,6 +2315,8 @@ contains
       enddo
 !$acc end parallel
 !
+! write(*,'(10ES20.12)') xmb_out(1), pre(1)
+
 !
 !$acc kernels
       do i=its,itf
@@ -2470,6 +2475,7 @@ contains
    ! do k=kts,kte
    !    write(*,'(10ES20.12)') heo_cup(1,k), heso_cup(1,k), po_cup(1,k), z_cup(1,k), heo(1,k)
    ! end do
+      !   write(*,'(10ES20.12)') xmb_out(1), pre(1)
 
         call cup_kbcon(ierrc,cap_max_increment,iloop,k22x,kbconx,heo_cup, &
              heso_cup,hkbo,ierr3,kbmax,po_cup,cap_max,                    &
@@ -2529,6 +2535,8 @@ contains
            imid,ipr,itf,ktf,                                                &
            its,ite, kts,kte,                                                &
            dicycle,tau_ecmwf,aa1_bl,xf_dicycle)
+
+   ! write(*,'(10ES20.12)') xmb_out(1), pre(1)
 
       ! Looks good except for last element of po_cup
       ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
@@ -2599,6 +2607,22 @@ contains
        endif
 
 ! write(*,*) 'pre(1)=', pre(1), 'xmb(1)=', xmb(1)
+! write(*,'(10ES20.12)') xmb_out(1), pre(1)
+
+write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+write(*,'(9I4)') ktop(1), k22(1), kbcon(1), maxens3, ichoice, imid, ipr, dicycle, xland1(1)
+write(*,'(10ES20.12)') xff_mid(1,1), xff_mid(1,2), dx(1), xmb(1), closure_n(1), sig(1), xmbm_in(1), xmbs_in(1)
+write(*,'(10ES20.12)') xf_dicycle(1), pre(1), edto(1)
+do k=kts,kte
+   write(*,'(10ES20.12)') dellat_ens(1,k,1), dellaq_ens(1,k,1), dellaqc_ens(1,k,1), outt(1,k), outq(1,k)
+end do
+do k=kts,kte
+   write(*,'(10ES20.12)') outqc(1,k), zuo(1,k), pwo_ens(1,k,1), po_cup(1,k), pwdo(1,k)
+end do
+do k=1,maxens3
+   write(*,'(10ES20.12)') xf_ens(1,k), pr_ens(1,k)
+end do
+
 
        call cup_output_ens_3d(xff_mid,xf_ens,ierr,dellat_ens,dellaq_ens, &
             dellaqc_ens,outt,outq,outqc,dx,                              &
@@ -2610,14 +2634,32 @@ contains
             its,ite, kts,kte,                                            &
             dicycle,xf_dicycle )
 
+
+write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+write(*,'(9I4)') ktop(1), k22(1), kbcon(1), maxens3, ichoice, imid, ipr, dicycle, xland1(1)
+write(*,'(10ES20.12)') xff_mid(1,1), xff_mid(1,2), dx(1), xmb(1), closure_n(1), sig(1), xmbm_in(1), xmbs_in(1)
+write(*,'(10ES20.12)') xf_dicycle(1), pre(1), edto(1)
+do k=kts,kte
+   write(*,'(10ES20.12)') dellat_ens(1,k,1), dellaq_ens(1,k,1), dellaqc_ens(1,k,1), outt(1,k), outq(1,k)
+end do
+do k=kts,kte
+   write(*,'(10ES20.12)') outqc(1,k), zuo(1,k), pwo_ens(1,k,1), po_cup(1,k), pwdo(1,k)
+end do
+do k=1,maxens3
+   write(*,'(10ES20.12)') xf_ens(1,k), pr_ens(1,k)
+end do
+
 !> - Call rain_evap_below_cloudbase() to calculate evaporation below cloud base
 ! write(*,*) 'pre(1)=', pre(1), 'xmb(1)=', xmb(1)
+
+! write(*,'(10ES20.12)') xmb_out(1), pre(1)
 
       call rain_evap_below_cloudbase(itf,ktf,its,ite,                    &
            kts,kte,ierr,kbcon,xmb,psur,xland,qo_cup,                     &
            po_cup,qes_cup,pwavo,edto,pwevo,pre,outt,outq)      !,outbuoy)
 
 ! write(*,*) 'pre(1)=', pre(1), 'xmb(1)=', xmb(1)
+! write(*,'(10ES20.12)') xmb_out(1), pre(1)
 
 !
 !
@@ -2927,7 +2969,8 @@ contains
 
 !
 !---------------------------done------------------------------
-!
+! write(*,'(10ES20.12)') xmb_out(1), pre(1)
+
 
    end subroutine cu_gf_deep_run
 

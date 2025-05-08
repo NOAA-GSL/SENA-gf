@@ -4,5 +4,8 @@
 *.exe
 a.out
 
+# Ignore netcdf files
+*.nc
+
 # Ignore backup files
 *~

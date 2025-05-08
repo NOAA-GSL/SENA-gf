@@ -1275,6 +1275,19 @@ contains
 !              print*,'hlisq',qco(1,k),qrco(1,k),pwo(1,k)
 !             enddo
 
+   !   write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+   !   write(*,'(9I4)') kpbl(1), ichoice, kbcon(1), ktop(1), k22(1), ipr, tropics(1)
+   !   write(*,'(10ES20.12)')  z1(1), psur(1), hfx(1), qfx(1), xland(1), tcrit, dtime, xmb_out(1), pre(1)
+   !   do k=kts,kte
+   !     write(*,'(10ES20.12)') us(1,k), vs(1,k), zo(1,k), t(1,k), q(1,k), tn(1,k), qo(1,k)
+   !   end do
+   !   do k=kts, kte
+   !     write(*,'(10ES20.12)') po(1,k), dhdt(1,k), rho(1,k), zuo(1,k)
+   !   end do
+   !   do k=kts,kte
+   !     write(*,'(10ES20.12)') outt(1,k),outq(1,k),outqc(1,k),outu(1,k),outv(1,k),cnvwt(1,k),cupclw(1,k)
+   !   end do
+
    end subroutine cu_gf_sh_run
 !> @}
 end module cu_gf_sh

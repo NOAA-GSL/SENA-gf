@@ -79,7 +79,7 @@ program test_gf
    integer :: errflg
 
    ! Read the GF driver kernel inputs
-   filename = "input_state_0400.nc.baseline"
+   filename = "data/input_state_0078.nc"
    call cu_gf_io_read_state(trim(filename),                  &
       ntracer=ntracer,                                       &
       garea=garea,                                           &
