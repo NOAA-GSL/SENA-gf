@@ -2147,19 +2147,19 @@ def cu_gf_deep_run(
             mconv[i] += omeg[i, k] * dq / G
 
 
-    # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-    # print(f"{xland1[0]:>4}{MAXENS3:>4}{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{ichoice:>4}{imid:>4}{dicycle:>4}")
-    # print(f"{closure_n[0]:>20.12E}{aa0[0]:>20.12E}{aa1[0]:>20.12E}{xaa0_ens[0, 0]:>20.12E}{mbdt:>20.12E}{dtime:>20.12E}")
-    # print(f"{axx[0]:>20.12E}{mconv[0]:>20.12E}{edto[0]:>20.12E}{edtm[0]:>20.12E}")
-    # print(f"{tau_ecmwf[0]:>20.12E}{aa1_bl[0]:>20.12E}{xf_dicycle[0]:>20.12E}")
-    # for n in range(4):
-    #     print(f"{rand_clos[0,n]:>20.12E}")
-    # for k in range(kte+1):
-    #     print(f"{po_cup[0,k]:>20.12E}{omeg[0,k]:>20.12E}{zdo[0,k]:>20.12E}{zdm[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
-    # for k in range(10):
-    #     print(f"{forcing[0,k]:>20.12E}")
-    # for k in range(MAXENS3):
-    #     print(f"{xf_ens[0,k]:>20.12E}{pr_ens[0,k]:>20.12E}")
+    print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+    print(f"{xland1[0]:>4}{MAXENS3:>4}{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{ichoice:>4}{imid:>4}{dicycle:>4}")
+    print(f"{closure_n[0]:>20.12E}{aa0[0]:>20.12E}{aa1[0]:>20.12E}{xaa0_ens[0, 0]:>20.12E}{mbdt:>20.12E}{dtime:>20.12E}")
+    print(f"{axx[0]:>20.12E}{mconv[0]:>20.12E}{edto[0]:>20.12E}{edtm[0]:>20.12E}")
+    print(f"{tau_ecmwf[0]:>20.12E}{aa1_bl[0]:>20.12E}{xf_dicycle[0]:>20.12E}")
+    for n in range(4):
+        print(f"{rand_clos[0,n]:>20.12E}")
+    for k in range(kte+1):
+        print(f"{po_cup[0,k]:>20.12E}{omeg[0,k]:>20.12E}{zdo[0,k]:>20.12E}{zdm[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
+    for k in range(10):
+        print(f"{forcing[0,k]:>20.12E}")
+    for k in range(MAXENS3):
+        print(f"{xf_ens[0,k]:>20.12E}{pr_ens[0,k]:>20.12E}")
 
     # Call cup_forcing_ens_3d to calculate cloud base mass flux
     cup_forcing_ens_3d(
@@ -2176,19 +2176,19 @@ def cu_gf_deep_run(
     # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
 
     # Looks good except for the last element of po_cup
-    # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-    # print(f"{xland1[0]:>4}{MAXENS3:>4}{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{ichoice:>4}{imid:>4}{dicycle:>4}")
-    # print(f"{closure_n[0]:>20.12E}{aa0[0]:>20.12E}{aa1[0]:>20.12E}{xaa0_ens[0, 0]:>20.12E}{mbdt:>20.12E}{dtime:>20.12E}")
-    # print(f"{axx[0]:>20.12E}{mconv[0]:>20.12E}{edto[0]:>20.12E}{edtm[0]:>20.12E}")
-    # print(f"{tau_ecmwf[0]:>20.12E}{aa1_bl[0]:>20.12E}{xf_dicycle[0]:>20.12E}")
-    # for n in range(4):
-    #     print(f"{rand_clos[0,n]:>20.12E}")
-    # for k in range(kte+1):
-    #     print(f"{po_cup[0,k]:>20.12E}{omeg[0,k]:>20.12E}{zdo[0,k]:>20.12E}{zdm[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
-    # for k in range(10):
-    #     print(f"{forcing[0,k]:>20.12E}")
-    # for k in range(MAXENS3):
-    #     print(f"{xf_ens[0,k]:>20.12E}{pr_ens[0,k]:>20.12E}")
+    print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+    print(f"{xland1[0]:>4}{MAXENS3:>4}{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{ichoice:>4}{imid:>4}{dicycle:>4}")
+    print(f"{closure_n[0]:>20.12E}{aa0[0]:>20.12E}{aa1[0]:>20.12E}{xaa0_ens[0, 0]:>20.12E}{mbdt:>20.12E}{dtime:>20.12E}")
+    print(f"{axx[0]:>20.12E}{mconv[0]:>20.12E}{edto[0]:>20.12E}{edtm[0]:>20.12E}")
+    print(f"{tau_ecmwf[0]:>20.12E}{aa1_bl[0]:>20.12E}{xf_dicycle[0]:>20.12E}")
+    for n in range(4):
+        print(f"{rand_clos[0,n]:>20.12E}")
+    for k in range(kte+1):
+        print(f"{po_cup[0,k]:>20.12E}{omeg[0,k]:>20.12E}{zdo[0,k]:>20.12E}{zdm[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
+    for k in range(10):
+        print(f"{forcing[0,k]:>20.12E}")
+    for k in range(MAXENS3):
+        print(f"{xf_ens[0,k]:>20.12E}{pr_ens[0,k]:>20.12E}")
 
     # print("pre(1): ", pre[0], "xmb(0): ", xmb[0])
     # Update ensemble tendencies and precipitation
@@ -2233,6 +2233,7 @@ def cu_gf_deep_run(
     # print(f"{xf_dicycle[0]:>20.12E}{pre[0]:>20.12E}{edto[0]:>20.12E}")
     # for k in range(kte+1):
     #     print(f"{dellat_ens[0,k,0]:>20.12E}{dellaq_ens[0,k,0]:>20.12E}{dellaqc_ens[0,k,0]:>20.12E}{outt[0,k]:>20.12E}{outq[0,k]:>20.12E}")
+    # print("")
     # for k in range(kte+1):
     #     print(f"{outqc[0,k]:>20.12E}{zuo[0,k]:>20.12E}{pwo_ens[0,k,0]:>20.12E}{po_cup[0,k]:>20.12E}{pwdo[0,k]:>20.12E}")
     # for k in range(MAXENS3):
