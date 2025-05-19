@@ -2147,19 +2147,19 @@ def cu_gf_deep_run(
             mconv[i] += omeg[i, k] * dq / G
 
 
-    print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-    print(f"{xland1[0]:>4}{MAXENS3:>4}{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{ichoice:>4}{imid:>4}{dicycle:>4}")
-    print(f"{closure_n[0]:>20.12E}{aa0[0]:>20.12E}{aa1[0]:>20.12E}{xaa0_ens[0, 0]:>20.12E}{mbdt:>20.12E}{dtime:>20.12E}")
-    print(f"{axx[0]:>20.12E}{mconv[0]:>20.12E}{edto[0]:>20.12E}{edtm[0]:>20.12E}")
-    print(f"{tau_ecmwf[0]:>20.12E}{aa1_bl[0]:>20.12E}{xf_dicycle[0]:>20.12E}")
-    for n in range(4):
-        print(f"{rand_clos[0,n]:>20.12E}")
-    for k in range(kte+1):
-        print(f"{po_cup[0,k]:>20.12E}{omeg[0,k]:>20.12E}{zdo[0,k]:>20.12E}{zdm[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
-    for k in range(10):
-        print(f"{forcing[0,k]:>20.12E}")
-    for k in range(MAXENS3):
-        print(f"{xf_ens[0,k]:>20.12E}{pr_ens[0,k]:>20.12E}")
+    # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+    # print(f"{xland1[0]:>4}{MAXENS3:>4}{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{ichoice:>4}{imid:>4}{dicycle:>4}")
+    # print(f"{closure_n[0]:>20.12E}{aa0[0]:>20.12E}{aa1[0]:>20.12E}{xaa0_ens[0, 0]:>20.12E}{mbdt:>20.12E}{dtime:>20.12E}")
+    # print(f"{axx[0]:>20.12E}{mconv[0]:>20.12E}{edto[0]:>20.12E}{edtm[0]:>20.12E}")
+    # print(f"{tau_ecmwf[0]:>20.12E}{aa1_bl[0]:>20.12E}{xf_dicycle[0]:>20.12E}")
+    # for n in range(4):
+    #     print(f"{rand_clos[0,n]:>20.12E}")
+    # for k in range(kte+1):
+    #     print(f"{po_cup[0,k]:>20.12E}{omeg[0,k]:>20.12E}{zdo[0,k]:>20.12E}{zdm[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
+    # for k in range(10):
+    #     print(f"{forcing[0,k]:>20.12E}")
+    # for k in range(MAXENS3):
+    #     print(f"{xf_ens[0,k]:>20.12E}{pr_ens[0,k]:>20.12E}")
 
     # Call cup_forcing_ens_3d to calculate cloud base mass flux
     cup_forcing_ens_3d(
@@ -2175,20 +2175,20 @@ def cu_gf_deep_run(
 
     # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
 
-    # Looks good except for the last element of po_cup
-    print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-    print(f"{xland1[0]:>4}{MAXENS3:>4}{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{ichoice:>4}{imid:>4}{dicycle:>4}")
-    print(f"{closure_n[0]:>20.12E}{aa0[0]:>20.12E}{aa1[0]:>20.12E}{xaa0_ens[0, 0]:>20.12E}{mbdt:>20.12E}{dtime:>20.12E}")
-    print(f"{axx[0]:>20.12E}{mconv[0]:>20.12E}{edto[0]:>20.12E}{edtm[0]:>20.12E}")
-    print(f"{tau_ecmwf[0]:>20.12E}{aa1_bl[0]:>20.12E}{xf_dicycle[0]:>20.12E}")
-    for n in range(4):
-        print(f"{rand_clos[0,n]:>20.12E}")
-    for k in range(kte+1):
-        print(f"{po_cup[0,k]:>20.12E}{omeg[0,k]:>20.12E}{zdo[0,k]:>20.12E}{zdm[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
-    for k in range(10):
-        print(f"{forcing[0,k]:>20.12E}")
-    for k in range(MAXENS3):
-        print(f"{xf_ens[0,k]:>20.12E}{pr_ens[0,k]:>20.12E}")
+    # Looks good
+    # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+    # print(f"{xland1[0]:>4}{MAXENS3:>4}{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{ichoice:>4}{imid:>4}{dicycle:>4}")
+    # print(f"{closure_n[0]:>20.12E}{aa0[0]:>20.12E}{aa1[0]:>20.12E}{xaa0_ens[0, 0]:>20.12E}{mbdt:>20.12E}{dtime:>20.12E}")
+    # print(f"{axx[0]:>20.12E}{mconv[0]:>20.12E}{edto[0]:>20.12E}{edtm[0]:>20.12E}")
+    # print(f"{tau_ecmwf[0]:>20.12E}{aa1_bl[0]:>20.12E}{xf_dicycle[0]:>20.12E}")
+    # for n in range(4):
+    #     print(f"{rand_clos[0,n]:>20.12E}")
+    # for k in range(kte+1):
+    #     print(f"{po_cup[0,k]:>20.12E}{omeg[0,k]:>20.12E}{zdo[0,k]:>20.12E}{zdm[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
+    # for k in range(10):
+    #     print(f"{forcing[0,k]:>20.12E}")
+    # for k in range(MAXENS3):
+    #     print(f"{xf_ens[0,k]:>20.12E}{pr_ens[0,k]:>20.12E}")
 
     # print("pre(1): ", pre[0], "xmb(0): ", xmb[0])
     # Update ensemble tendencies and precipitation
@@ -3034,9 +3034,6 @@ def cup_forcing_ens_3d(closure_n, xland, aa0, aa1, xaa0, mbdt, dtime, ierr, ierr
     Calculates an ensemble of closures and the resulting ensemble average to determine cloud base mass flux.
     """
 
-    # Local variables
-    import numpy as np
-
     # Scalars
     xff_dicycle = 0.0
     a1 = 0.0
@@ -3061,6 +3058,7 @@ def cup_forcing_ens_3d(closure_n, xland, aa0, aa1, xaa0, mbdt, dtime, ierr, ierr
             a_ave = min(a_ave, aa1[i])
             a_ave = max(0.0, a_ave)  # Ensure a_ave is within valid bounds
             xff0 = (aa1[i] - aa0[i]) / dtime
+            # print(f"xff0 = {xff0:>20.12E}, aa0 = {aa0[i]:>20.12E}, aa1 = {aa1[i]:>20.12E}, dtime = {dtime:>20.12E}")
             xff_ens3[0] = max(0.0, xff0)  # Adjusted for zero-based indexing
             xff_ens3[1] = max(0.0, xff0)
             xff_ens3[2] = max(0.0, xff0)
@@ -3115,6 +3113,7 @@ def cup_forcing_ens_3d(closure_n, xland, aa0, aa1, xaa0, mbdt, dtime, ierr, ierr
                     xff_ens3[15] = 0.0
 
             xk[0] = (xaa0[i, 0] - aa1[i]) / mbdt
+            # print(f"xk[0] = {xk[0]:>20.12E}, xaa0 = {xaa0[i, 0]:>20.12E}, aa1 = {aa1[i]:>20.12E}, mbdt = {mbdt:>20.12E}")
             forcing[i, 7] = mbdt * xk[0] / aa1[i]
 
             if xk[0] < 0.0 and xk[0] > -0.01 * mbdt:
@@ -3278,7 +3277,7 @@ def cup_kbcon(ierrc, cap_inc, iloop_in, k22, kbcon, he_cup, hes_cup,
             iloop[i] = 5
 
         if ierr[i] != 0:
-            break
+            continue
 
         start_level[i] = k22[i]
         kbcon[i] = k22[i] + 1
@@ -3294,66 +3293,73 @@ def cup_kbcon(ierrc, cap_inc, iloop_in, k22, kbcon, he_cup, hes_cup,
                          (1. + 0.5 * entr_rate[i] * dz)
 
         while True:
-            # print(f"top of while true in cup_kbcon  {hkb[0]:>20.12E}")
-            hetest = hcot[i, kbcon[i]]
-            if hetest < hes_cup[i, kbcon[i]]:
-                kbcon[i] += 1
-                if kbcon[i] > kbmax[i] + 2:
-                    if iloop[i] != 4:
-                        ierr[i] = 3
-                        ierrc[i] = "could not find reasonable kbcon in cup_kbcon"
-                    return
-                continue
-            # print(f"while true in cup_kbcon 1  {hkb[0]:>20.12E}")
+            while True:
+                # print(f"top of while true in cup_kbcon  {hkb[0]:>20.12E}")
+                hetest = hcot[i, kbcon[i]]
+                if hetest < hes_cup[i, kbcon[i]]:
+                    kbcon[i] += 1
+                    if kbcon[i] > kbmax[i] + 2:
+                        if iloop[i] != 4:
+                            ierr[i] = 3
+                            ierrc[i] = "could not find reasonable kbcon in cup_kbcon"
+                    #     return
+                    # continue
+                        break
+                    else:
+                        continue
+                # print(f"while true in cup_kbcon 1  {hkb[0]:>20.12E}")
 
-            # Cloud base pressure and max moist static energy pressure
-            if kbcon[i] - k22[i] == 1:
-                return
-            if iloop[i] == 5 and (kbcon[i] - k22[i]) <= 2:
-                return
-            # print(f"while true in cup_kbcon 2  {hkb[0]:>20.12E}")
+                # Cloud base pressure and max moist static energy pressure
+                if kbcon[i] - k22[i] == 1:
+                    break
+                if iloop[i] == 5 and (kbcon[i] - k22[i]) <= 2:
+                    break
+                # print(f"while true in cup_kbcon 2  {hkb[0]:>20.12E}")
 
-            pbcdif = -p_cup[i, kbcon[i]] + p_cup[i, k22[i]]
-            plus = max(25., cap_max[i] - float(iloop[i] - 1) * cap_inc[i])
-            if iloop[i] == 4:
-                plus = cap_max[i]
+                pbcdif = -p_cup[i, kbcon[i]] + p_cup[i, k22[i]]
+                plus = max(25., cap_max[i] - float(iloop[i] - 1) * cap_inc[i])
+                if iloop[i] == 4:
+                    plus = cap_max[i]
 
-            # For shallow convection
-            if iloop[i] == 5:
-                plus = 150.
-            if iloop[i] == 5 and cap_max[i] > 200:
-                pbcdif = -p_cup[i, kbcon[i]] + cap_max[i]
-
-            if pbcdif <= plus:
-                # print(f"if pbcdif in cup_kbcon  {hkb[0]:>20.12E}")
-                return
-            elif pbcdif > plus:
-                # print("elif pbcdif in cup_kbcon")
-                k22[i] += 1
-                kbcon[i] = k22[i] + 1
-
-                # Recalculate hkb since k22 has changed
-                x_add = XLV * zqexec[i] + CP * ztexec[i]
-                # print("before get_cloud_bc")
-                hkb[i] = get_cloud_bc(kte, he_cup[i, :kte + 1], hkb[i], k22[i], x_add)
-                # print("after get_cloud_bc")
-
-                start_level[i] = k22[i]
-                hcot[i, :start_level[i] + 1] = hkb[i]
-                for k in range(start_level[i] + 1, kbmax[i] + 4):
-                    dz = z_cup[i, k] - z_cup[i, k - 1]
-                    hcot[i, k] = ((1. - 0.5 * entr_rate[i] * dz) * hcot[i, k - 1] +
-                                  entr_rate[i] * dz * heo[i, k - 1]) / \
-                                 (1. + 0.5 * entr_rate[i] * dz)
-
+                # For shallow convection
                 if iloop[i] == 5:
-                    kbcon[i] = k22[i]
-                if kbcon[i] > kbmax[i] + 2:
-                    if iloop[i] != 4:
-                        ierr[i] = 3
-                        ierrc[i] = "could not find reasonable kbcon in cup_kbcon"
-                    return
-            # print("after while true in cup_kbcon")
+                    plus = 150.
+                if iloop[i] == 5 and cap_max[i] > 200:
+                    pbcdif = -p_cup[i, kbcon[i]] + cap_max[i]
+
+                if pbcdif <= plus:
+                    # print(f"if pbcdif in cup_kbcon  {hkb[0]:>20.12E}")
+                    break
+                elif pbcdif > plus:
+                    # print("elif pbcdif in cup_kbcon")
+                    k22[i] += 1
+                    kbcon[i] = k22[i] + 1
+
+                    # Recalculate hkb since k22 has changed
+                    x_add = XLV * zqexec[i] + CP * ztexec[i]
+                    # print("before get_cloud_bc")
+                    hkb[i] = get_cloud_bc(kte, he_cup[i, :kte + 1], hkb[i], k22[i], x_add)
+                    # print("after get_cloud_bc")
+
+                    start_level[i] = k22[i]
+                    hcot[i, :start_level[i] + 1] = hkb[i]
+                    for k in range(start_level[i] + 1, kbmax[i] + 4):
+                        dz = z_cup[i, k] - z_cup[i, k - 1]
+                        hcot[i, k] = ((1. - 0.5 * entr_rate[i] * dz) * hcot[i, k - 1] +
+                                        entr_rate[i] * dz * heo[i, k - 1]) / \
+                                        (1. + 0.5 * entr_rate[i] * dz)
+
+                    if iloop[i] == 5:
+                        kbcon[i] = k22[i]
+                    if kbcon[i] > kbmax[i] + 2:
+                        if iloop[i] != 4:
+                            ierr[i] = 3
+                            ierrc[i] = "could not find reasonable kbcon in cup_kbcon"
+                        break
+
+                # print("after while true in cup_kbcon")
+            break
+
 
         # while True:
         #     kbcon[i] += 1

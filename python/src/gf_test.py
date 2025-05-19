@@ -9,7 +9,7 @@ errflg = 0
 state = GFState()
 
 for n in range(1,577):
-# for n in range(78,79):
+# for n in range(76,77):
     input_file = f"data/input_state_{n:04d}.nc"
     state.read_state(input_file)
 

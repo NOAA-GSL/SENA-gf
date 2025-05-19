@@ -760,18 +760,25 @@ contains
 !> - Call shallow: cu_gf_sh_run()
 !
 ! write(*,'(9I4)') im, km, kdt, its, itf, ite, kts, ktf, kte
-! write(*,'(9I4)') kpbli(1), ichoice_s, kbcons(1), ktops(1), k22s(1), ipr, tropics(1)
-! write(*,'(10ES20.12)')  ter11(1), psur(1), hfx(1), qfx(1), xlandi(1), tcrit, dt, xmbs(1), prets(1)
-! do k=1,km
-!   write(*,'(10ES20.12)') us(1,k), vs(1,k), zo(1,k), t2d(1,k), q2d(1,k), tshall(1,k), qshall(1,k)
+! write(*,'(9I4)') ichoice_s, ipr
+! do i=1,im
+!   write(*,'(9I4)') kpbli(i), kbcons(i), ktops(i), k22s(i), tropics(i)
 ! end do
-! do k=1, km
-!   write(*,'(10ES20.12)') p2d(1,k), dhdt(1,k), rhoi(1,k), zus(1,k)
+! write(*,'(10ES20.12)')  tcrit, dt
+! do i=1,im
+!   write(*,'(10ES20.12)')  ter11(i), psur(i), hfx(i), qfx(i), xlandi(i), xmbs(i), prets(i)
 ! end do
-! do k=1,km
-!   write(*,'(10ES20.12)') outts(1,k),outqs(1,k),outqcs(1,k),outus(1,k),outvs(1,k),cnvwt(1,k),cupclws(1,k)
+! do i=1,im
+!   do k=1,km
+!     write(*,'(10ES20.12)') us(i,k), vs(i,k), zo(i,k), t2d(i,k), q2d(i,k), tshall(i,k), qshall(i,k)
+!   end do
+!   do k=1, km
+!     write(*,'(10ES20.12)') p2d(i,k), dhdt(i,k), rhoi(i,k), zus(i,k)
+!   end do
+!   do k=1,km
+!     write(*,'(10ES20.12)') outts(i,k),outqs(i,k),outqcs(i,k),outus(i,k),outvs(i,k),cnvwt(i,k),cupclws(i,k)
+!   end do
 ! end do
-
 
           call cu_gf_sh_run (us,vs,                                              &
 ! input variables, must be supplied
@@ -787,16 +794,24 @@ contains
 
 ! Output variables match
 ! write(*,'(9I4)') im, km, kdt, its, itf, ite, kts, ktf, kte
-! write(*,'(9I4)') kpbli(1), ichoice_s, kbcons(1), ktops(1), k22s(1), ipr, tropics(1)
-! write(*,'(10ES20.12)')  ter11(1), psur(1), hfx(1), qfx(1), xlandi(1), tcrit, dt, xmbs(1), prets(1)
-! do k=1,km
-!   write(*,'(10ES20.12)') us(1,k), vs(1,k), zo(1,k), t2d(1,k), q2d(1,k), tshall(1,k), qshall(1,k)
+! write(*,'(9I4)') ichoice_s, ipr
+! do i=1,im
+!   write(*,'(9I4)') kpbli(i), kbcons(i), ktops(i), k22s(i), tropics(i)
 ! end do
-! do k=1, km
-!   write(*,'(10ES20.12)') p2d(1,k), dhdt(1,k), rhoi(1,k), zus(1,k)
+! write(*,'(10ES20.12)')  tcrit, dt
+! do i=1,im
+!   write(*,'(10ES20.12)')  ter11(i), psur(i), hfx(i), qfx(i), xlandi(i), xmbs(i), prets(i)
 ! end do
-! do k=1,km
-!   write(*,'(10ES20.12)') outts(1,k),outqs(1,k),outqcs(1,k),outus(1,k),outvs(1,k),cnvwt(1,k),cupclws(1,k)
+! do i=1,im
+!   do k=1,km
+!     write(*,'(10ES20.12)') us(i,k), vs(i,k), zo(i,k), t2d(i,k), q2d(i,k), tshall(i,k), qshall(i,k)
+!   end do
+!   do k=1, km
+!     write(*,'(10ES20.12)') p2d(i,k), dhdt(i,k), rhoi(i,k), zus(i,k)
+!   end do
+!   do k=1,km
+!     write(*,'(10ES20.12)') outts(i,k),outqs(i,k),outqcs(i,k),outus(i,k),outvs(i,k),cnvwt(i,k),cupclws(i,k)
+!   end do
 ! end do
 
 

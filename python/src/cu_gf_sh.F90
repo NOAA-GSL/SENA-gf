@@ -560,10 +560,16 @@ contains
 !$acc end kernels
 
    ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
-   ! write(*,'(9I4)') k22(1), kbcon(1), kbmax(1)
-   ! write(*,'(10ES20.12)') cap_max_increment(1), hkbo(1), cap_max(1), ztexec(1), zqexec(1), entr_rate(1)
-   ! do k=kts,kte
-   !    write(*,'(10ES20.12)') heo_cup(1,k), heso_cup(1,k), po_cup(1,k), z_cup(1,k), heo(1,k)
+   ! do i=its,itf
+   !    write(*,'(9I4)') k22(i), kbcon(i), kbmax(i)
+   ! end do
+   ! do i=its,itf
+   !    write(*,'(10ES20.12)') cap_max_increment(i), hkbo(i), cap_max(i), ztexec(i), zqexec(i), entr_rate(i)
+   ! end do
+   ! do i=its,itf
+   !    do k=kts,kte
+   !       write(*,'(10ES20.12)') heo_cup(i,k), heso_cup(i,k), po_cup(i,k), z_cup(i,k), heo(i,k)
+   !    end do
    ! end do
 
       call cup_kbcon(ierrc,cap_max_increment,5,k22,kbcon,heo_cup,heso_cup, &
@@ -575,10 +581,16 @@ contains
 
    !  Output variables match
    ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
-   ! write(*,'(9I4)') k22(1), kbcon(1), kbmax(1)
-   ! write(*,'(10ES20.12)') cap_max_increment(1), hkbo(1), cap_max(1), ztexec(1), zqexec(1), entr_rate(1)
-   ! do k=kts,kte
-   !    write(*,'(10ES20.12)') heo_cup(1,k), heso_cup(1,k), po_cup(1,k), z_cup(1,k), heo(1,k)
+   ! do i=its,itf
+   !    write(*,'(9I4)') k22(i), kbcon(i), kbmax(i)
+   ! end do
+   ! do i=its,itf
+   !    write(*,'(10ES20.12)') cap_max_increment(i), hkbo(i), cap_max(i), ztexec(i), zqexec(i), entr_rate(i)
+   ! end do
+   ! do i=its,itf
+   !    do k=kts,kte
+   !       write(*,'(10ES20.12)') heo_cup(i,k), heso_cup(i,k), po_cup(i,k), z_cup(i,k), heo(i,k)
+   !    end do
    ! end do
 
    ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
@@ -667,22 +679,35 @@ contains
 
 
 ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
-! write(*,'(9I4)') ipr, ktop(1), xland1(1), kstabi(1), k22(1), kbcon(1), kpbl(1), ktopx(1), pmin_lev(1)
-! write(*,'(10ES20.12)') rand_vmas(1), hkbo(1)
-! do k=kts,kte
-!    write(*,'(10ES20.12)') po_cup(1,k), entr_rate_2d(1,k), heo(1,k), heso_cup(1,k), zo_cup(1,k), zuo(1,k)
+! write(*,'(9I4)') ipr
+! do i=its,itf
+!    write(*,'(9I4)') ktop(i), xland1(i), kstabi(i), k22(i), kbcon(i), kpbl(i), ktopx(i), pmin_lev(i)
 ! end do
-
+! do i=1,itf
+!    write(*,'(10ES20.12)') rand_vmas(i), hkbo(i)
+! end do
+! do i=its,itf
+!    do k=kts,kte
+!       write(*,'(10ES20.12)') po_cup(i,k), entr_rate_2d(i,k), heo(i,k), heso_cup(i,k), zo_cup(i,k), zuo(i,k)
+!    end do
+! end do
 !> - Call rates_up_pdf() to get normalized mass flux profile
       call rates_up_pdf(rand_vmas,ipr,'shallow',ktop,ierr,po_cup,entr_rate_2d,hkbo,heo,heso_cup,zo_cup, &
            xland1,kstabi,k22,kbcon,its,ite,itf,kts,kte,ktf,zuo,kpbl,ktopx,kbcon,pmin_lev)
 
 ! Output variables match
 ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
-! write(*,'(9I4)') ipr, ktop(1), xland1(1), kstabi(1), k22(1), kbcon(1), kpbl(1), ktopx(1), pmin_lev(1)
-! write(*,'(10ES20.12)') rand_vmas(1), hkbo(1)
-! do k=kts,kte
-!    write(*,'(10ES20.12)') po_cup(1,k), entr_rate_2d(1,k), heo(1,k), heso_cup(1,k), zo_cup(1,k), zuo(1,k)
+! write(*,'(9I4)') ipr
+! do i=its,itf
+!    write(*,'(9I4)') ktop(i), xland1(i), kstabi(i), k22(i), kbcon(i), kpbl(i), ktopx(i), pmin_lev(i)
+! end do
+! do i=1,itf
+!    write(*,'(10ES20.12)') rand_vmas(i), hkbo(i)
+! end do
+! do i=its,itf
+!    do k=kts,kte
+!       write(*,'(10ES20.12)') po_cup(i,k), entr_rate_2d(i,k), heo(i,k), heso_cup(i,k), zo_cup(i,k), zuo(i,k)
+!    end do
 ! end do
 
 !$acc kernels

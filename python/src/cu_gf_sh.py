@@ -125,9 +125,9 @@ def cu_gf_sh_run(
     # Initialize arrays based on their usage in the code
     u_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud x wind
     v_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud y wind
-    kbmax = np.zeros(itf - its + 1, dtype=int)  # Maximum cloud base level
-    hkb = np.zeros(itf - its + 1)  # Cloud base moist static energy
-    hkbo = np.zeros(itf - its + 1)  # Environmental cloud base moist static energy
+    kbmax = np.zeros(num_horizontal_points, dtype=int)  # Maximum cloud base level
+    hkb = np.zeros(num_horizontal_points)  # Cloud base moist static energy
+    hkbo = np.zeros(num_horizontal_points)  # Environmental cloud base moist static energy
     dbyt = np.zeros((num_horizontal_points, num_vertical_levels))  # Buoyancy tendency
     k_inv_layers = np.full((num_horizontal_points, num_vertical_levels), -1, dtype=int)  # Inversion layers (10 is an assumed max number of layers)
     xt = np.zeros((num_horizontal_points, num_vertical_levels))  # Temperature tendency
@@ -139,31 +139,31 @@ def cu_gf_sh_run(
     fp = 0.0  # Fractional potential energy
 
     # Translate Fortran array allocations to Python
-    start_level = np.zeros(ite - its + 1, dtype=int)  # Equivalent to "start_level(:)=0"
-    rand_vmas = np.zeros(ite - its + 1)  # Equivalent to "rand_vmas(:)=0."
-    flux_tun = np.full(ite - its + 1, FLUXTUNE)  # Equivalent to "flux_tun(:)=fluxtune"
-    lambau = np.full(ite - its + 1, 2.0)  # Equivalent to "lambau(:)=2."
+    start_level = np.zeros(num_horizontal_points, dtype=int)  # Equivalent to "start_level(:)=0"
+    rand_vmas = np.zeros(num_horizontal_points)  # Equivalent to "rand_vmas(:)=0."
+    flux_tun = np.full(num_horizontal_points, FLUXTUNE)  # Equivalent to "flux_tun(:)=fluxtune"
+    lambau = np.full(num_horizontal_points, 2.0)  # Equivalent to "lambau(:)=2."
     # c1d = np.zeros((ite - its + 1, kte - kts + 1))  # Equivalent to "c1d(:,:)=0."
 
     # Initialize arrays based on their usage in the code
     uc = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud x wind
     vc = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud y wind
-    xhkb = np.zeros(itf - its + 1)  # Cloud base moist static energy (alternative)
-    xhco = np.zeros(itf - its + 1)  # Environmental cloud base moist static energy (alternative)
-    kstabi = np.zeros(itf - its + 1, dtype=int)  # Stability index
+    xhkb = np.zeros(num_horizontal_points)  # Cloud base moist static energy (alternative)
+    xhco = np.zeros(num_horizontal_points)  # Environmental cloud base moist static energy (alternative)
+    kstabi = np.zeros(num_horizontal_points, dtype=int)  # Stability index
     dtempdz = np.zeros((num_horizontal_points, num_vertical_levels))  # Temperature gradient with height
 
     # Initialize scalar variables
     frh = 0.0  # Fractional relative humidity
-    pmin_lev = np.zeros(itf - its + 1, dtype=int)  # Equivalent to "xland1(its:ite)"
+    pmin_lev = np.zeros(num_horizontal_points, dtype=int)  # Equivalent to "xland1(its:ite)"
 
 
     # Initialize arrays based on Fortran ranges
-    xland1 = np.zeros(itf - its + 1, dtype=int)  # Equivalent to "xland1(its:ite)"
-    ktopx = np.zeros(itf - its + 1, dtype=int)  # Equivalent to "ktopx(its:ite)"
-    cap_max_increment = np.zeros(itf - its + 1)  # Equivalent to "cap_max_increment(its:ite)"
-    entr_rate = np.zeros(itf - its + 1)  # Equivalent to "entr_rate(its:ite)"
-    # pre = np.zeros(itf - its + 1)  # Equivalent to "pre(its:ite)"
+    xland1 = np.zeros(num_horizontal_points, dtype=int)  # Equivalent to "xland1(its:ite)"
+    ktopx = np.zeros(num_horizontal_points, dtype=int)  # Equivalent to "ktopx(its:ite)"
+    cap_max_increment = np.zeros(num_horizontal_points)  # Equivalent to "cap_max_increment(its:ite)"
+    entr_rate = np.zeros(num_horizontal_points)  # Equivalent to "entr_rate(its:ite)"
+    # pre = np.zeros(num_horizontal_points)  # Equivalent to "pre(its:ite)"
     up_massentro = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "up_massentro(its:ite, kts:kte)"
     up_massdetro = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "up_massdetro(its:ite, kts:kte)"
     up_massentru = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "up_massentru(its:ite, kts:kte)"
@@ -175,13 +175,13 @@ def cu_gf_sh_run(
     cd = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "cd(its:ite, kts:kte)"
     dellaqc = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "dellaqc(its:ite, kts:kte)"
     # cupclw = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "cupclw(its:ite, kts:kte)"
-    kbmax = np.zeros(itf - its + 1, dtype=int)  # Equivalent to "kbmax(its:ite)"
-    aa0 = np.zeros(itf - its + 1)  # Equivalent to "aa0(its:ite)"
-    aa1 = np.zeros(itf - its + 1)  # Equivalent to "aa1(its:ite)"
-    cap_max = np.zeros(itf - its + 1)  # Equivalent to "cap_max(its:ite)"
-    ztexec = np.zeros(itf - its + 1)  # Equivalent to "ztexec(its:ite)"
-    zqexec = np.zeros(itf - its + 1)  # Equivalent to "zqexec(its:ite)"
-    zws = np.zeros(itf - its + 1)  # Equivalent to "zws(its:ite)"
+    kbmax = np.zeros(num_horizontal_points, dtype=int)  # Equivalent to "kbmax(its:ite)"
+    aa0 = np.zeros(num_horizontal_points)  # Equivalent to "aa0(its:ite)"
+    aa1 = np.zeros(num_horizontal_points)  # Equivalent to "aa1(its:ite)"
+    cap_max = np.zeros(num_horizontal_points)  # Equivalent to "cap_max(its:ite)"
+    ztexec = np.zeros(num_horizontal_points)  # Equivalent to "ztexec(its:ite)"
+    zqexec = np.zeros(num_horizontal_points)  # Equivalent to "zqexec(its:ite)"
+    zws = np.zeros(num_horizontal_points)  # Equivalent to "zws(its:ite)"
     qes = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "qes(its:ite, kts:kte)"
     he = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "he(its:ite, kts:kte)"
     hes = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "hes(its:ite, kts:kte)"
@@ -206,8 +206,8 @@ def cu_gf_sh_run(
     tn_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "tn_cup(its:ite, kts:kte)"
 
     # Initialize arrays based on their usage in the code
-    xaa0 = np.zeros(itf - its + 1)  # Cloud work function for updraft
-    xaa1 = np.zeros(itf - its + 1)  # Cloud work function for environment
+    xaa0 = np.zeros(num_horizontal_points)  # Cloud work function for updraft
+    xaa1 = np.zeros(num_horizontal_points)  # Cloud work function for environment
     xhc = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud moist static energy
     xdby = np.zeros((num_horizontal_points, num_vertical_levels))  # Buoyancy term
     dellat = np.zeros((num_horizontal_points, num_vertical_levels))  # Temperature tendency
@@ -294,7 +294,7 @@ def cu_gf_sh_run(
     #     print(f"{outt[0,k]:>20.12E}{outq[0,k]:>20.12E}{outqc[0,k]:>20.12E}{outu[0,k]:>20.12E}{outv[0,k]:>20.12E}{cnvwt[0,k]:>20.12E}{cupclw[0,k]:>20.12E}")
 
     # Initialize surface variables
-    for i in range(itf - its + 1):  # Adjusted to retain the same number of iterations
+    for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
         xland1[i] = int(xland[i] + 0.001)  # Convert to integer
         ktopx[i] = -1
         if xland[i] > 1.5 or xland[i] < 0.5:
@@ -306,7 +306,7 @@ def cu_gf_sh_run(
         ierrc[i] = " "  # Set error description to an empty string
 
     for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
-        for i in range(itf - its + 1):  # Adjusted to retain the same number of iterations
+        for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
             up_massentro[i, k] = 0.0
             up_massdetro[i, k] = 0.0
             up_massentru[i, k] = 0.0
@@ -516,10 +516,13 @@ def cu_gf_sh_run(
 
 
     # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-    # print(f"{k22[0]:>4}{kbcon[0]:>4}{kbmax[0]:>4}")
-    # print(f"{cap_max_increment[0]:>20.12E}{hkbo[0]:>20.12E}{cap_max[0]:>20.12E}{ztexec[0]:>20.12E}{zqexec[0]:>20.12E}{entr_rate[0]:>20.12E}")
-    # for k in range(kte+1):
-    #     print(f"{heo_cup[0,k]:>20.12E}{heso_cup[0,k]:>20.12E}{po_cup[0,k]:>20.12E}{z_cup[0,k]:>20.12E}{heo[0,k]:>20.12E}")
+    # for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
+    #     print(f"{k22[i]:>4}{kbcon[i]:>4}{kbmax[i]:>4}")
+    # for i in range(its, itf + 1):
+    #     print(f"{cap_max_increment[i]:>20.12E}{hkbo[i]:>20.12E}{cap_max[i]:>20.12E}{ztexec[i]:>20.12E}{zqexec[i]:>20.12E}{entr_rate[i]:>20.12E}")
+    # for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
+    #     for k in range(kte+1):
+    #         print(f"{heo_cup[i,k]:>20.12E}{heso_cup[i,k]:>20.12E}{po_cup[i,k]:>20.12E}{z_cup[i,k]:>20.12E}{heo[i,k]:>20.12E}")
 
     # Call cup_kbcon() to determine the level of convective cloud base (kbcon)
     cup_kbcon(
@@ -533,10 +536,13 @@ def cu_gf_sh_run(
 
     # Output variables match
     # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-    # print(f"{k22[0]:>4}{kbcon[0]:>4}{kbmax[0]:>4}")
-    # print(f"{cap_max_increment[0]:>20.12E}{hkbo[0]:>20.12E}{cap_max[0]:>20.12E}{ztexec[0]:>20.12E}{zqexec[0]:>20.12E}{entr_rate[0]:>20.12E}")
-    # for k in range(kte+1):
-    #     print(f"{heo_cup[0,k]:>20.12E}{heso_cup[0,k]:>20.12E}{po_cup[0,k]:>20.12E}{z_cup[0,k]:>20.12E}{heo[0,k]:>20.12E}")
+    # for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
+    #     print(f"{k22[i]:>4}{kbcon[i]:>4}{kbmax[i]:>4}")
+    # for i in range(its, itf + 1):
+    #     print(f"{cap_max_increment[i]:>20.12E}{hkbo[i]:>20.12E}{cap_max[i]:>20.12E}{ztexec[i]:>20.12E}{zqexec[i]:>20.12E}{entr_rate[i]:>20.12E}")
+    # for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
+    #     for k in range(kte+1):
+    #         print(f"{heo_cup[i,k]:>20.12E}{heso_cup[i,k]:>20.12E}{po_cup[i,k]:>20.12E}{z_cup[i,k]:>20.12E}{heo[i,k]:>20.12E}")
 
     # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
     # print(f"{kbcon[0]:>4}{kbmax[0]:>4}{kstabi[0]:>4}")
@@ -612,10 +618,14 @@ def cu_gf_sh_run(
     # Call rates_up_pdf() to get normalized mass flux profile
  
     # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-    # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{kstabi[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{kpbl[0]:>4}{ktopx[0]:>4}{pmin_lev[0]:>4}")
-    # print(f"{rand_vmas[0]:>20.12E}{hkbo[0]:>20.12E}")
-    # for k in range(kte+1):
-    #     print(f"{po_cup[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{heo[0,k]:>20.12E}{heso_cup[0,k]:>20.12E}{zo_cup[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
+    # print(f"{ipr:>4}")
+    # for i in range(its, itf + 1):
+    #     print(f"{ktop[i]:>4}{xland1[i]:>4}{kstabi[i]:>4}{k22[i]:>4}{kbcon[i]:>4}{kpbl[i]:>4}{ktopx[i]:>4}{pmin_lev[i]:>4}")
+    # for i in range(its, itf + 1):
+    #     print(f"{rand_vmas[i]:>20.12E}{hkbo[i]:>20.12E}")
+    # for i in range(its, itf + 1):
+    #     for k in range(kte+1):
+    #         print(f"{po_cup[i,k]:>20.12E}{entr_rate_2d[i,k]:>20.12E}{heo[i,k]:>20.12E}{heso_cup[i,k]:>20.12E}{zo_cup[i,k]:>20.12E}{zuo[i,k]:>20.12E}")
 
     rates_up_pdf(
         rand_vmas, ipr, 'shallow', ktop, ierr, po_cup, entr_rate_2d, hkbo, heo, heso_cup, zo_cup,
@@ -624,10 +634,14 @@ def cu_gf_sh_run(
  
     # # Output variables match
     # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-    # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{kstabi[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{kpbl[0]:>4}{ktopx[0]:>4}{pmin_lev[0]:>4}")
-    # print(f"{rand_vmas[0]:>20.12E}{hkbo[0]:>20.12E}")
-    # for k in range(kte+1):
-    #     print(f"{po_cup[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{heo[0,k]:>20.12E}{heso_cup[0,k]:>20.12E}{zo_cup[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
+    # print(f"{ipr:>4}")
+    # for i in range(its, itf + 1):
+    #     print(f"{ktop[i]:>4}{xland1[i]:>4}{kstabi[i]:>4}{k22[i]:>4}{kbcon[i]:>4}{kpbl[i]:>4}{ktopx[i]:>4}{pmin_lev[i]:>4}")
+    # for i in range(its, itf + 1):
+    #     print(f"{rand_vmas[i]:>20.12E}{hkbo[i]:>20.12E}")
+    # for i in range(its, itf + 1):
+    #     for k in range(kte+1):
+    #         print(f"{po_cup[i,k]:>20.12E}{entr_rate_2d[i,k]:>20.12E}{heo[i,k]:>20.12E}{heso_cup[i,k]:>20.12E}{zo_cup[i,k]:>20.12E}{zuo[i,k]:>20.12E}")
 
     for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
         if ierr[i] == 0:  # Equivalent to "if(ierr(i).eq.0)"

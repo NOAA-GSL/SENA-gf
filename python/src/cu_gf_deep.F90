@@ -2508,23 +2508,23 @@ contains
       enddo
 !$acc end kernels
 
-      write(*,'(9I4)') its, itf, ite, kts, ktf, kte
-      write(*,'(9I4)') xland1(1), maxens3, ktop(1), k22(1), kbcon(1), ichoice, imid, dicycle
-      write(*,'(10ES20.12)') closure_n(1), aa0(1), aa1(1), xaa0_ens(1,1), mbdt, dtime
-      write(*,'(10ES20.12)') axx(1), mconv(1), edto(1), edtm(1)
-      write(*,'(10ES20.12)') tau_ecmwf(1), aa1_bl(1), xf_dicycle(1)
-      do k=1,4
-        write(*,'(10ES20.12)') rand_clos(1,k)
-      end do
-      do k=kts,kte
-        write(*,'(10ES20.12)') po_cup(1,k), omeg(1,k), zdo(1,k), zdm(1,k), zuo(1,k)
-      end do
-      do k=1,10
-        write(*,'(10ES20.12)') forcing(1,k)
-      end do
-      do k=1,maxens3
-        write(*,'(10ES20.12)') xf_ens(1,k), pr_ens(1,k)
-      end do
+      ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+      ! write(*,'(9I4)') xland1(1), maxens3, ktop(1), k22(1), kbcon(1), ichoice, imid, dicycle
+      ! write(*,'(10ES20.12)') closure_n(1), aa0(1), aa1(1), xaa0_ens(1,1), mbdt, dtime
+      ! write(*,'(10ES20.12)') axx(1), mconv(1), edto(1), edtm(1)
+      ! write(*,'(10ES20.12)') tau_ecmwf(1), aa1_bl(1), xf_dicycle(1)
+      ! do k=1,4
+      !   write(*,'(10ES20.12)') rand_clos(1,k)
+      ! end do
+      ! do k=kts,kte
+      !   write(*,'(10ES20.12)') po_cup(1,k), omeg(1,k), zdo(1,k), zdm(1,k), zuo(1,k)
+      ! end do
+      ! do k=1,10
+      !   write(*,'(10ES20.12)') forcing(1,k)
+      ! end do
+      ! do k=1,maxens3
+      !   write(*,'(10ES20.12)') xf_ens(1,k), pr_ens(1,k)
+      ! end do
 
 
       call cup_forcing_ens_3d(closure_n,xland1,aa0,aa1,xaa0_ens,mbdt,dtime, &
@@ -2538,24 +2538,24 @@ contains
 
    ! write(*,'(10ES20.12)') xmb_out(1), pre(1)
 
-      ! Looks good except for last element of po_cup
-      write(*,'(9I4)') its, itf, ite, kts, ktf, kte
-      write(*,'(9I4)') xland1(1), maxens3, ktop(1), k22(1), kbcon(1), ichoice, imid, dicycle
-      write(*,'(10ES20.12)') closure_n(1), aa0(1), aa1(1), xaa0_ens(1, 1), mbdt, dtime
-      write(*,'(10ES20.12)') axx(1), mconv(1), edto(1), edtm(1)
-      write(*,'(10ES20.12)') tau_ecmwf(1), aa1_bl(1), xf_dicycle(1)
-      do k=1,4
-         write(*,'(10ES20.12)') rand_clos(1,k)
-      end do
-      do k=kts,kte
-         write(*,'(10ES20.12)') po_cup(1,k), omeg(1,k), zdo(1,k), zdm(1,k), zuo(1,k)
-      end do
-      do k=1,10
-         write(*,'(10ES20.12)') forcing(1,k)
-      end do
-      do k=1,maxens3
-         write(*,'(10ES20.12)') xf_ens(1,k), pr_ens(1,k)
-      end do
+      ! Looks good
+      ! write(*,'(9I4)') its, itf, ite, kts, ktf, kte
+      ! write(*,'(9I4)') xland1(1), maxens3, ktop(1), k22(1), kbcon(1), ichoice, imid, dicycle
+      ! write(*,'(10ES20.12)') closure_n(1), aa0(1), aa1(1), xaa0_ens(1, 1), mbdt, dtime
+      ! write(*,'(10ES20.12)') axx(1), mconv(1), edto(1), edtm(1)
+      ! write(*,'(10ES20.12)') tau_ecmwf(1), aa1_bl(1), xf_dicycle(1)
+      ! do k=1,4
+      !    write(*,'(10ES20.12)') rand_clos(1,k)
+      ! end do
+      ! do k=kts,kte
+      !    write(*,'(10ES20.12)') po_cup(1,k), omeg(1,k), zdo(1,k), zdm(1,k), zuo(1,k)
+      ! end do
+      ! do k=1,10
+      !    write(*,'(10ES20.12)') forcing(1,k)
+      ! end do
+      ! do k=1,maxens3
+      !    write(*,'(10ES20.12)') xf_ens(1,k), pr_ens(1,k)
+      ! end do
 
 ! write(*,*) 'pre(1)=', pre(1), 'xmb(1)=', xmb(1)
 !
@@ -3938,6 +3938,7 @@ contains
              a_ave=max(0.,a_ave)
              xff_ens3(:)=0.
              xff0= (aa1(i)-aa0(i))/dtime
+            !  write(*,'(4(A,ES20.12))') "xff0=",xff0," aa0=",aa0(i)," aa1=",aa1(i),"dtime=",dtime
              xff_ens3(1)=max(0.,(aa1(i)-aa0(i))/dtime)
              xff_ens3(2)=max(0.,(aa1(i)-aa0(i))/dtime)
              xff_ens3(3)=max(0.,(aa1(i)-aa0(i))/dtime)
@@ -4016,6 +4017,7 @@ contains
              endif ! ichoice
 
              xk(1)=(xaa0(i,1)-aa1(i))/mbdt
+            !  write(*,'(4(A,ES20.12))') "xk(1)=",xk(1)," xaa0(i,1)=",xaa0(i,1)," aa1(i)=",aa1(i)," mbdt=",mbdt
              forcing(i,8)=mbdt*xk(1)/aa1(i)
 !             if(forcing(i,1).lt.0. .or. forcing(i,8).gt.-4.)ierr(i)=333
 !             if(forcing(i,2).lt.-0.05)ierr(i)=333

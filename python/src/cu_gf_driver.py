@@ -2,6 +2,10 @@ import numpy as np
 
 from cu_gf_sh import cu_gf_sh_run
 from cu_gf_deep import cu_gf_deep_run, neg_check, fct1d3
+# from ndsl.dsl.typing import FloatField
+# from ndsl.quantity import Quantity
+# from gt4py.cartesian.gtscript import PARALLEL, computation, interval, stencil
+
 
 def cu_gf_driver_run(state, errmsg, errflg):
     ntracer = state.ntracer  # Number of tracers
@@ -641,11 +645,6 @@ def cu_gf_driver_run(state, errmsg, errflg):
             tshall[i, k] = t2d[i, k]
             qshall[i, k] = q2d[i, k]
 
-    # if (kdt == 400):
-    #     print(im, km, kdt, its, itf, ite, kts, ktf, kte)
-    #     print(p2d[0,:], po[0,:], rhoi[0,:], qcheck[0,:], tn[0,:], qo[0,:], t2d[0,:], q2d[0,:], tshall[0,:], qshall[0,:])
-    #     raise
-
     # Loop over horizontal grid points and vertical levels
     for i in range(its, itf + 1):  # Loop over horizontal grid points
         for k in range(kts, kpbli[i] + 1):  # Loop over vertical levels up to `kpbli`
@@ -673,13 +672,6 @@ def cu_gf_driver_run(state, errmsg, errflg):
         for k in range(kts, kpbli[i] + 1):  # Loop over vertical levels up to `kpbli`
             dhdt[i, k] = cp * (forcet[i, k] + (t[i, k] - t2di[i, k]) / dt) + \
                          xlv * (forceqv[i, k] + (qv[i, k] - qv2di[i, k]) / dt)
-
-    # if (kdt == 400):
-    #     print(im, km, kdt, its, itf, ite, kts, ktf, kte)
-    #     print(hfx[0], qfx[0], dx[0])
-    #     print(tshall[0,:], qshall[0,:], tn[0,:], qo[0,:], dhdt[0,:])
-    #     raise
-
 
     # Compute umean, vmean, and pmean
     for k in range(kts + 1, ktf):
@@ -721,13 +713,6 @@ def cu_gf_driver_run(state, errmsg, errflg):
     if dx[its] < 6500.0:
         imid_gf = 0
 
-    # if (kdt == 400):
-    #     print(im, km, kdt, its, itf, ite, kts, ktf, kte)
-    #     print(imid_gf, ierr[0])
-    #     print(dp, umean[0], vmean[0], pmean[0], psum, clwtot, forcing[0,6], forcing2[0,6], mconv[0])
-    #     print(omeg[0,:])
-    #     raise
-
     # Call cumulus parameterization
     if ishallow_g3 == 1:
         # Initialize `ierrs` and `ierrm`
@@ -736,14 +721,19 @@ def cu_gf_driver_run(state, errmsg, errflg):
             ierrm[i] = 0
 
         # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{kpbli[0]:>4}{ichoice_s:>4}{kbcons[0]:>4}{ktops[0]:>4}{k22s[0]:>4}{ipr:>4}{tropics[0]:>4}")
-        # print(f"{ter11[0]:>20.12E}{psur[0]:>20.12E}{hfx[0]:>20.12E}{qfx[0]:>20.12E}{xlandi[0]:>20.12E}{tcrit:>20.12E}{dt:>20.12E}{xmbs[0]:>20.12E}{prets[0]:>20.12E}")
-        # for k in range(km):
-        #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{zo[0,k]:>20.12E}{t2d[0,k]:>20.12E}{q2d[0,k]:>20.12E}{tshall[0,k]:>20.12E}{qshall[0,k]:>20.12E}")
-        # for k in range(km):
-        #     print(f"{p2d[0,k]:>20.12E}{dhdt[0,k]:>20.12E}{rhoi[0,k]:>20.12E}{zus[0,k]:>20.12E}")
-        # for k in range(km):
-        #     print(f"{outts[0,k]:>20.12E}{outqs[0,k]:>20.12E}{outqcs[0,k]:>20.12E}{outus[0,k]:>20.12E}{outvs[0,k]:>20.12E}{cnvwt[0,k]:>20.12E}{cupclws[0,k]:>20.12E}")
+        # print(f"{ichoice_s:>4}{ipr:>4}")
+        # for i in range(im):
+        #     print(f"{kpbli[i]:>4}{kbcons[i]:>4}{ktops[i]:>4}{k22s[i]:>4}{tropics[i]:>4}")
+        # print(f"{tcrit:>20.12E}{dt:>20.12E}")
+        # for i in range(im):
+        #     print(f"{ter11[i]:>20.12E}{psur[i]:>20.12E}{hfx[i]:>20.12E}{qfx[i]:>20.12E}{xlandi[i]:>20.12E}{xmbs[i]:>20.12E}{prets[i]:>20.12E}")
+        # for i in range(im):
+        #     for k in range(km):
+        #         print(f"{us[i,k]:>20.12E}{vs[i,k]:>20.12E}{zo[i,k]:>20.12E}{t2d[i,k]:>20.12E}{q2d[i,k]:>20.12E}{tshall[i,k]:>20.12E}{qshall[i,k]:>20.12E}")
+        #     for k in range(km):
+        #         print(f"{p2d[i,k]:>20.12E}{dhdt[i,k]:>20.12E}{rhoi[i,k]:>20.12E}{zus[i,k]:>20.12E}")
+        #     for k in range(km):
+        #         print(f"{outts[i,k]:>20.12E}{outqs[i,k]:>20.12E}{outqcs[i,k]:>20.12E}{outus[i,k]:>20.12E}{outvs[i,k]:>20.12E}{cnvwt[i,k]:>20.12E}{cupclws[i,k]:>20.12E}")
 
         cu_gf_sh_run(
             us, vs, zo, t2d, q2d, ter11, tshall, qshall, p2d, psur, dhdt, kpbli,
@@ -754,14 +744,19 @@ def cu_gf_driver_run(state, errmsg, errflg):
         
         # Output variables match
         # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{kpbli[0]:>4}{ichoice_s:>4}{kbcons[0]:>4}{ktops[0]:>4}{k22s[0]:>4}{ipr:>4}{tropics[0]:>4}")
-        # print(f"{ter11[0]:>20.12E}{psur[0]:>20.12E}{hfx[0]:>20.12E}{qfx[0]:>20.12E}{xlandi[0]:>20.12E}{tcrit:>20.12E}{dt:>20.12E}{xmbs[0]:>20.12E}{prets[0]:>20.12E}")
-        # for k in range(km):
-        #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{zo[0,k]:>20.12E}{t2d[0,k]:>20.12E}{q2d[0,k]:>20.12E}{tshall[0,k]:>20.12E}{qshall[0,k]:>20.12E}")
-        # for k in range(km):
-        #     print(f"{p2d[0,k]:>20.12E}{dhdt[0,k]:>20.12E}{rhoi[0,k]:>20.12E}{zus[0,k]:>20.12E}")
-        # for k in range(km):
-        #     print(f"{outts[0,k]:>20.12E}{outqs[0,k]:>20.12E}{outqcs[0,k]:>20.12E}{outus[0,k]:>20.12E}{outvs[0,k]:>20.12E}{cnvwt[0,k]:>20.12E}{cupclws[0,k]:>20.12E}")
+        # print(f"{ichoice_s:>4}{ipr:>4}")
+        # for i in range(im):
+        #     print(f"{kpbli[i]:>4}{kbcons[i]:>4}{ktops[i]:>4}{k22s[i]:>4}{tropics[i]:>4}")
+        # print(f"{tcrit:>20.12E}{dt:>20.12E}")
+        # for i in range(im):
+        #     print(f"{ter11[i]:>20.12E}{psur[i]:>20.12E}{hfx[i]:>20.12E}{qfx[i]:>20.12E}{xlandi[i]:>20.12E}{xmbs[i]:>20.12E}{prets[i]:>20.12E}")
+        # for i in range(im):
+        #     for k in range(km):
+        #         print(f"{us[i,k]:>20.12E}{vs[i,k]:>20.12E}{zo[i,k]:>20.12E}{t2d[i,k]:>20.12E}{q2d[i,k]:>20.12E}{tshall[i,k]:>20.12E}{qshall[i,k]:>20.12E}")
+        #     for k in range(km):
+        #         print(f"{p2d[i,k]:>20.12E}{dhdt[i,k]:>20.12E}{rhoi[i,k]:>20.12E}{zus[i,k]:>20.12E}")
+        #     for k in range(km):
+        #         print(f"{outts[i,k]:>20.12E}{outqs[i,k]:>20.12E}{outqcs[i,k]:>20.12E}{outus[i,k]:>20.12E}{outvs[i,k]:>20.12E}{cnvwt[i,k]:>20.12E}{cupclws[i,k]:>20.12E}")
 
         # Update `cutens`, `ierrm`, and `ierr` based on `xmbs`
         for i in range(its, itf + 1):
