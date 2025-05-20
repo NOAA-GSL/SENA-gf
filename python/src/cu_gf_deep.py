@@ -3266,9 +3266,7 @@ def cup_kbcon(ierrc, cap_inc, iloop_in, k22, kbcon, he_cup, hes_cup,
     hetest = 0.0
     dz = 0.0
 
-    # print(f"top of cup_kbcon {hkb[0]:>20.12E}")
     for i in range(its, itf + 1):  # Adjust for zero-based indexing
-        # print(f"top of i loop in cup_kbcon {hkb[0]:>20.12E}")
 
         kbcon[i] = 0
 
@@ -3294,7 +3292,6 @@ def cup_kbcon(ierrc, cap_inc, iloop_in, k22, kbcon, he_cup, hes_cup,
 
         while True:
             while True:
-                # print(f"top of while true in cup_kbcon  {hkb[0]:>20.12E}")
                 hetest = hcot[i, kbcon[i]]
                 if hetest < hes_cup[i, kbcon[i]]:
                     kbcon[i] += 1
@@ -3302,19 +3299,15 @@ def cup_kbcon(ierrc, cap_inc, iloop_in, k22, kbcon, he_cup, hes_cup,
                         if iloop[i] != 4:
                             ierr[i] = 3
                             ierrc[i] = "could not find reasonable kbcon in cup_kbcon"
-                    #     return
-                    # continue
                         break
                     else:
                         continue
-                # print(f"while true in cup_kbcon 1  {hkb[0]:>20.12E}")
 
                 # Cloud base pressure and max moist static energy pressure
                 if kbcon[i] - k22[i] == 1:
                     break
                 if iloop[i] == 5 and (kbcon[i] - k22[i]) <= 2:
                     break
-                # print(f"while true in cup_kbcon 2  {hkb[0]:>20.12E}")
 
                 pbcdif = -p_cup[i, kbcon[i]] + p_cup[i, k22[i]]
                 plus = max(25., cap_max[i] - float(iloop[i] - 1) * cap_inc[i])
@@ -3328,18 +3321,14 @@ def cup_kbcon(ierrc, cap_inc, iloop_in, k22, kbcon, he_cup, hes_cup,
                     pbcdif = -p_cup[i, kbcon[i]] + cap_max[i]
 
                 if pbcdif <= plus:
-                    # print(f"if pbcdif in cup_kbcon  {hkb[0]:>20.12E}")
                     break
                 elif pbcdif > plus:
-                    # print("elif pbcdif in cup_kbcon")
                     k22[i] += 1
                     kbcon[i] = k22[i] + 1
 
                     # Recalculate hkb since k22 has changed
                     x_add = XLV * zqexec[i] + CP * ztexec[i]
-                    # print("before get_cloud_bc")
                     hkb[i] = get_cloud_bc(kte, he_cup[i, :kte + 1], hkb[i], k22[i], x_add)
-                    # print("after get_cloud_bc")
 
                     start_level[i] = k22[i]
                     hcot[i, :start_level[i] + 1] = hkb[i]
@@ -3357,64 +3346,8 @@ def cup_kbcon(ierrc, cap_inc, iloop_in, k22, kbcon, he_cup, hes_cup,
                             ierrc[i] = "could not find reasonable kbcon in cup_kbcon"
                         break
 
-                # print("after while true in cup_kbcon")
             break
 
-
-        # while True:
-        #     kbcon[i] += 1
-        #     if kbcon[i] > kbmax[i] + 2:
-        #         if iloop[i] != 4:
-        #             ierr[i] = 3
-        #             ierrc[i] = "could not find reasonable kbcon in cup_kbcon"
-        #         break
-
-        #     hetest = hcot[i, kbcon[i]]
-        #     if hetest < hes_cup[i, kbcon[i]]:
-        #         continue
-
-        #     # Cloud base pressure and max moist static energy pressure
-        #     if kbcon[i] - k22[i] == 1:
-        #         break
-        #     if iloop[i] == 5 and (kbcon[i] - k22[i]) <= 2:
-        #         break
-
-        #     pbcdif = -p_cup[i, kbcon[i]] + p_cup[i, k22[i]]
-        #     plus = max(25., cap_max[i] - float(iloop[i] - 1) * cap_inc[i])
-        #     if iloop[i] == 4:
-        #         plus = cap_max[i]
-
-        #     # For shallow convection
-        #     if iloop[i] == 5:
-        #         plus = 150.
-        #     if iloop[i] == 5 and cap_max[i] > 200:
-        #         pbcdif = -p_cup[i, kbcon[i]] + cap_max[i]
-
-        #     if pbcdif <= plus:
-        #         break
-        #     elif pbcdif > plus:
-        #         k22[i] += 1
-        #         kbcon[i] = k22[i] + 1
-
-        #         # Recalculate hkb since k22 has changed
-        #         x_add = XLV * zqexec[i] + CP * ztexec[i]
-        #         hkb[i] = get_cloud_bc(kte, he_cup[i, :kte + 1], hkb[i], k22[i], x_add)
-
-        #         start_level[i] = k22[i]
-        #         hcot[i, :start_level[i] + 1] = hkb[i]
-        #         for k in range(start_level[i] + 1, kbmax[i] + 4):
-        #             dz = z_cup[i, k] - z_cup[i, k - 1]
-        #             hcot[i, k] = ((1. - 0.5 * entr_rate[i] * dz) * hcot[i, k - 1] +
-        #                           entr_rate[i] * dz * heo[i, k - 1]) / \
-        #                          (1. + 0.5 * entr_rate[i] * dz)
-
-        #         if iloop[i] == 5:
-        #             kbcon[i] = k22[i]
-        #         if kbcon[i] > kbmax[i] + 2:
-        #             if iloop[i] != 4:
-        #                 ierr[i] = 3
-        #                 ierrc[i] = "could not find reasonable kbcon in cup_kbcon"
-        #             break
 
 def cup_maximi(array, ks, ke, maxx, ierr, itf, ktf, its, ite, kts, kte):
     """
