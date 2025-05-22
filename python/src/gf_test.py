@@ -10,6 +10,8 @@ state = GFState()
 
 for n in range(1,577):
 # for n in range(76,77):
+    print(f"Running GF test for state {n:04d}")
+
     input_file = f"data/input_state_{n:04d}.nc"
     state.read_state(input_file)
 

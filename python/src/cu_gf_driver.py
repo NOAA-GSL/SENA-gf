@@ -2,9 +2,9 @@ import numpy as np
 
 from cu_gf_sh import cu_gf_sh_run
 from cu_gf_deep import cu_gf_deep_run, neg_check, fct1d3
-# from ndsl.dsl.typing import FloatField
-# from ndsl.quantity import Quantity
-# from gt4py.cartesian.gtscript import PARALLEL, computation, interval, stencil
+from ndsl.dsl.typing import FloatField
+from ndsl.quantity import Quantity
+from gt4py.cartesian.gtscript import PARALLEL, computation, interval, stencil
 
 
 def cu_gf_driver_run(state, errmsg, errflg):
@@ -144,7 +144,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
     ter11 = np.zeros(im)  # Terrain height
 
     cnvw = np.zeros((im, km))  # Convective tendencies
-    cnvc = np.zeros((im, km))
+    # cnvc = np.zeros((im, km))
 
     gdc = np.zeros((im, km, 10))  # Diagnostic tendencies
     gdc2 = np.zeros((im, km, 10))
@@ -204,7 +204,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
     forcing2 = np.zeros((im, 10))  # Forcing array
 
-    dt_mf = np.zeros((im, km))  # Mass flux tendencies
+    # dt_mf = np.zeros((im, km))  # Mass flux tendencies
 
     tau_ecmwf = np.zeros(im)  # ECMWF tau array
 
@@ -307,7 +307,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
 
     # Initialize variables
-    dhdt = np.zeros_like(t)
+    dhdt = np.zeros((im, km))
     umean = np.zeros(t.shape[0])
     vmean = np.zeros(t.shape[0])
     pmean = np.zeros(t.shape[0])
@@ -322,17 +322,17 @@ def cu_gf_driver_run(state, errmsg, errflg):
     itime = 0 # CWH
     if do_cap_suppress:
         for itime in range(num_dfi_radar):  # Python indices start at 0
-            if ix_dfi_radar[itime] < 0:
+            if ix_dfi_radar.field[itime, 0, 0] < 0:
                 continue
-            if fhour < fh_dfi_radar[itime]:
+            if fhour < fh_dfi_radar.field[itime, 0, 0]:
                 continue
-            if fhour >= fh_dfi_radar[itime + 1]:
+            if fhour >= fh_dfi_radar.field[itime + 1, 0, 0]:
                 continue
             break
 
     if do_cap_suppress and itime < num_dfi_radar:
         do_cap_suppress_here = 1
-        cap_suppress_j[:] = cap_suppress[:, itime]
+        cap_suppress_j[:] = cap_suppress.field[:, itime, 0]
     else:
         do_cap_suppress_here = 0
         cap_suppress_j[:] = 0
@@ -342,15 +342,15 @@ def cu_gf_driver_run(state, errmsg, errflg):
             cliw_deep_idx = -1
             clcw_deep_idx = -1
         else:
-            cliw_deep_idx = dtidx[100 + ntiw, index_of_process_dcnv]
-            clcw_deep_idx = dtidx[100 + ntcw, index_of_process_dcnv]
+            cliw_deep_idx = dtidx.field[100 + ntiw, index_of_process_dcnv, 0]
+            clcw_deep_idx = dtidx.field[100 + ntcw, index_of_process_dcnv, 0]
 
         if flag_for_scnv_generic_tend:
             cliw_shal_idx = -1
             clcw_shal_idx = -1
         else:
-            cliw_shal_idx = dtidx[100 + ntiw, index_of_process_scnv]
-            clcw_shal_idx = dtidx[100 + ntcw, index_of_process_scnv]
+            cliw_shal_idx = dtidx.field[100 + ntiw, index_of_process_scnv, 0]
+            clcw_shal_idx = dtidx.field[100 + ntcw, index_of_process_scnv, 0]
 
         if (cliw_deep_idx >= 0 or clcw_deep_idx >= 0 or
             cliw_shal_idx >= 0 or clcw_shal_idx >= 0):
@@ -358,26 +358,13 @@ def cu_gf_driver_run(state, errmsg, errflg):
             cliw_save = np.zeros((im, km))
 
             # Copy data into clcw_save and cliw_save
-            clcw_save[:, :] = clcw[:, :]
-            cliw_save[:, :] = cliw[:, :]
-
-    # print("kdt = ", kdt)
-    # if (kdt == 400):
-    #    print(im, km, kdt)
-    #    print(ichoice, ichoicem, ichoice_s)
-    #    print(itime, do_cap_suppress_here)
-    #    print(cap_suppress_j[0])
-    #    print(cliw_deep_idx, clcw_deep_idx, cliw_shal_idx, clcw_shal_idx)
-    #    print(clcw_save[0,:])
-    #    print(cliw_save[0,:])
-    #    raise
-
-        
+            clcw_save[:, :] = clcw.field[:, 0, :]
+            cliw_save[:, :] = cliw.field[:, 0, :]
 
     # Scale specific humidity to dry mixing ratio
-    qv2di = qv2di_spechum / (1.0 - qv2di_spechum)
-    forceqv = forceqv_spechum / (1.0 - qv2di_spechum)
-    qv = qv_spechum / (1.0 - qv_spechum)
+    qv2di = qv2di_spechum.field[:, 0, :] / (1.0 - qv2di_spechum.field[:, 0, :])
+    forceqv = forceqv_spechum.field[:, 0, :] / (1.0 - qv2di_spechum.field[:, 0, :])
+    qv = qv_spechum.field[:, 0, :] / (1.0 - qv_spechum.field[:, 0, :])
 
     # Initialize random perturbations based on spp_cu_deep
     if spp_cu_deep == 0:
@@ -386,7 +373,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
         rand_clos[:, :] = 0.0
     else:
         for i in range(im):  # Python indices start at 0
-            spp_wts_cu_deep_tmp = min(max(-1.0, spp_wts_cu_deep[i, 0]), 1.0)
+            spp_wts_cu_deep_tmp = min(max(-1.0, spp_wts_cu_deep.field[i, 0, 0]), 1.0)
             rand_mom[i] = spp_wts_cu_deep_tmp
             rand_vmas[i] = spp_wts_cu_deep_tmp
             rand_clos[i, :] = spp_wts_cu_deep_tmp
@@ -441,21 +428,21 @@ def cu_gf_driver_run(state, errmsg, errflg):
     qfm = 0.0
 
     # Initialize arrays
-    ud_mf[:, :] = 0.0
-    dd_mf[:, :] = 0.0
-    dt_mf[:, :] = 0.0
+    ud_mf.field[:, 0, :] = 0.0
+    dd_mf.field[:, 0, :] = 0.0
+    dt_mf.field[:, 0, :] = 0.0
     tau_ecmwf[:] = 0.0
 
     # Initialize `j`
     j = 1
 
     # Initialize `ht` array
-    ht[:] = phil[:, 0] / g
+    ht[:] = phil.field[:, 0, 0] / g
 
     # Loop over grid points to calculate `zo`, `dz8w`, and `zh`
     for i in range(its, ite + 1):  # Adjusted for Python's zero-based indexing
-        cld1d[i] = 0.0
-        zo[i, :] = phil[i, :] / g
+        cld1d.field[i, 0, 0] = 0.0
+        zo[i, :] = phil.field[i, 0, :] / g
         dz8w[i, 0] = zo[i, 1] - zo[i, 0]
         zh[0] = 0.0
         kpbli[i] = 1
@@ -465,18 +452,9 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
         for k in range(kts + 1, ktf + 1):
             zh[k] = zh[k - 1] + dz8w[i, k - 1]
-            if zh[k] > pbl[i]:
+            if zh[k] > pbl.field[i, 0, 0]:
                 kpbli[i] = max(1, k)
                 break
-    # if (kdt == 400):
-    #     print(im, km, kdt)
-    #     print(cld1d[:])
-    #     print(kpbli[:])
-    #     print(dz8w[0,:])
-    #     print(zh[:])
-    #     print(zo[0,:])
-    #     raise
-
 
     # Initialize arrays and variables
     for i in range(its, itf + 1):  # Loop over horizontal grid points
@@ -487,31 +465,23 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
         # Set AOD and CCN
         if flag_init and not flag_restart:
-            aod_gf[i] = aodc0
+            aod_gf.field[i, 0, 0] = aodc0
         else:
-            if cactiv[i] == 0 and cactiv_m[i] == 0:
-                if aodc0 > aod_gf[i]:
-                    aod_gf[i] += (aodc0 - aod_gf[i]) * (dt / (aodreturn * 60))
-                if aod_gf[i] > aodc0:
-                    aod_gf[i] = aodc0
+            if cactiv.field[i] == 0 and cactiv_m.field[i] == 0:
+                if aodc0 > aod_gf.field[i, 0, 0]:
+                    aod_gf.field[i, 0, 0] += (aodc0 - aod_gf.field[i, 0, 0]) * (dt / (aodreturn * 60))
+                if aod_gf.field[i, 0, 0] > aodc0:
+                    aod_gf.field[i, 0, 0] = aodc0
 
-        ccn_gf[i] = max(5.0, (aod_gf[i] / 0.0027) ** (1 / 0.640))
+        ccn_gf[i] = max(5.0, (aod_gf.field[i, 0, 0] / 0.0027) ** (1 / 0.640))
         ccn_m[i] = ccn_gf[i]
 
         ccnclean = max(5.0, (aodc0 / 0.0027) ** (1 / 0.640))
 
-        hbot[i] = kte
-        htop[i] = kts
-        raincv[i] = 0.0
-        xlandi[i] = float(xland[i])  # Convert to real (float in Python)
-
-    # if (kdt == 400):
-    #     print(im, km, kdt)
-    #     print(ccn_gf[0], ccn_m[0], aod_gf[0], ccnclean, raincv[0],  xlandi[0])
-    #     print(hbot[0], htop[0])
-    #     print(forcing[0,:])
-    #     print(forcing2[0,:])
-    #     raise
+        hbot.field[i, 0, 0] = kte
+        htop.field[i, 0, 0] = kts
+        raincv.field[i, 0, 0] = 0.0
+        xlandi[i] = float(xland.field[i, 0, 0])  # Convert to real (float in Python)
 
     # Initialize `mconv` array
     for i in range(its, itf + 1):  # Loop over horizontal grid points
@@ -528,7 +498,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
             zdm[i, k] = 0.0
 
     # Scale surface pressure
-    psur[:] = 0.01 * psuri[:]
+    psur[:] = 0.01 * psuri.field[:, 0, 0]
 
     # Compute `ter11` array
     for i in range(its, itf + 1):  # Loop over horizontal grid points
@@ -538,7 +508,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
     for k in range(kts, kte + 1):  # Loop over vertical levels
         for i in range(its, ite + 1):  # Loop over horizontal grid points
             cnvw[i, k] = 0.0
-            cnvc[i, k] = 0.0
+            cnvc.field[i, 0, k] = 0.0
             gdc[i, k, 0] = 0.0
             gdc[i, k, 1] = 0.0
             gdc[i, k, 2] = 0.0
@@ -632,13 +602,13 @@ def cu_gf_driver_run(state, errmsg, errflg):
     # Loop over vertical levels and horizontal grid points
     for k in range(kts, ktf + 1):  # Loop over vertical levels
         for i in range(its, itf + 1):  # Loop over horizontal grid points
-            p2d[i, k] = 0.01 * p2di[i, k]
+            p2d[i, k] = 0.01 * p2di.field[i, 0, k]
             po[i, k] = p2d[i, k]
-            rhoi[i, k] = 100.0 * p2d[i, k] / (287.04 * (t2di[i, k] * (1.0 + 0.608 * qv2di[i, k])))
+            rhoi[i, k] = 100.0 * p2d[i, k] / (287.04 * (t2di.field[i, 0, k] * (1.0 + 0.608 * qv2di[i, k])))
             qcheck[i, k] = qv[i, k]
-            tn[i, k] = t[i, k]
+            tn[i, k] = t.field[i, 0, k]
             qo[i, k] = max(1.0e-16, qv[i, k])
-            t2d[i, k] = t2di[i, k] - forcet[i, k] * dt
+            t2d[i, k] = t2di.field[i, 0, k] - forcet.field[i, 0, k] * dt
             q2d[i, k] = max(1.0e-16, qv2di[i, k] - forceqv[i, k] * dt)
             if qo[i, k] < 1.0e-16:
                 qo[i, k] = 1.0e-16
@@ -648,19 +618,19 @@ def cu_gf_driver_run(state, errmsg, errflg):
     # Loop over horizontal grid points and vertical levels
     for i in range(its, itf + 1):  # Loop over horizontal grid points
         for k in range(kts, kpbli[i] + 1):  # Loop over vertical levels up to `kpbli`
-            tshall[i, k] = t[i, k]
+            tshall[i, k] = t.field[i, 0, k]
             qshall[i, k] = max(1.0e-16, qv[i, k])
 
     # Convert `hfx2` and `qfx2` to W/m²
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        hfx[i] = hfx2[i] * cp * rhoi[i, 0]
-        qfx[i] = qfx2[i] * xlv * rhoi[i, 0]
-        dx[i] = np.sqrt(garea[i])
+        hfx[i] = hfx2.field[i, 0, 0] * cp * rhoi[i, 0]
+        qfx[i] = qfx2.field[i, 0, 0] * xlv * rhoi[i, 0]
+        dx[i] = np.sqrt(garea.field[i])
 
     # Update `tn` and `qo` arrays
     for i in range(its, itf + 1):  # Loop over horizontal grid points
         for k in range(kts, kpbli[i] + 1):  # Loop over vertical levels up to `kpbli`
-            tn[i, k] = t[i, k]
+            tn[i, k] = t.field[i, 0, k]
             qo[i, k] = max(1.0e-16, qv[i, k])
 
     # Initialize `nbegin` and `nend`
@@ -670,7 +640,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
     # Compute `dhdt` array
     for i in range(its, itf + 1):  # Loop over horizontal grid points
         for k in range(kts, kpbli[i] + 1):  # Loop over vertical levels up to `kpbli`
-            dhdt[i, k] = cp * (forcet[i, k] + (t[i, k] - t2di[i, k]) / dt) + \
+            dhdt[i, k] = cp * (forcet.field[i, 0, k] + (t.field[i, 0, k] - t2di.field[i, 0, k]) / dt) + \
                          xlv * (forceqv[i, k] + (qv[i, k] - qv2di[i, k]) / dt)
 
     # Compute umean, vmean, and pmean
@@ -678,18 +648,18 @@ def cu_gf_driver_run(state, errmsg, errflg):
         for i in range(its, itf + 1):
             if (p2d[i, 1] - p2d[i, k]) > 150 and p2d[i, k] > 300:
                 dp = -0.5 * (p2d[i, k + 1] - p2d[i, k - 1])
-                umean[i] += us[i, k] * dp
-                vmean[i] += vs[i, k] * dp
+                umean[i] += us.field[i, 0, k] * dp
+                vmean[i] += vs.field[i, 0, k] * dp
                 pmean[i] += dp
 
     # Compute `psum` and update `forcing` arrays
     for i in range(its, itf + 1):  # Loop over horizontal grid points
         psum = 0.0
         for k in range(kts, ktf - 2):  # Loop over vertical levels
-            if clcw[i, k] > -999.0 and clcw[i, k + 1] > -999.0:
+            if clcw.field[i, 0, k] > -999.0 and clcw.field[i, 0, k + 1] > -999.0:
                 dp = p2d[i, k] - p2d[i, k + 1]
                 psum += dp
-                clwtot = cliw[i, k] + clcw[i, k]
+                clwtot = cliw.field[i, 0, k] + clcw.field[i, 0, k]
                 if clwtot < 1.0e-32:
                     clwtot = 0.0
                 forcing[i, 6] += clwtot * dp
@@ -700,13 +670,13 @@ def cu_gf_driver_run(state, errmsg, errflg):
     # Update `omeg` array
     for k in range(kts, ktf):  # Loop over vertical levels
         for i in range(its, itf + 1):  # Loop over horizontal grid points
-            omeg[i, k] = w[i, k]  # Original Fortran comment: `!-g*rhoi(i,k)*w(i,k)`
+            omeg[i, k] = w.field[i, 0, k]  # Original Fortran comment: `!-g*rhoi(i,k)*w(i,k)`
 
     # Update `mconv` and `ierr` arrays
     for i in range(its, itf + 1):  # Loop over horizontal grid points
         if mconv[i] < 0.0:
             mconv[i] = 0.0
-        if dx[i] < 6500.0 and do_mynnedmf and maxMF[i] > 0.0:
+        if dx[i] < 6500.0 and do_mynnedmf and maxMF.field[i, 0, 0] > 0.0:
             ierr[i] = 555
 
    # Check if `dx` at `its` is less than 6500
@@ -736,7 +706,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
         #         print(f"{outts[i,k]:>20.12E}{outqs[i,k]:>20.12E}{outqcs[i,k]:>20.12E}{outus[i,k]:>20.12E}{outvs[i,k]:>20.12E}{cnvwt[i,k]:>20.12E}{cupclws[i,k]:>20.12E}")
 
         cu_gf_sh_run(
-            us, vs, zo, t2d, q2d, ter11, tshall, qshall, p2d, psur, dhdt, kpbli,
+            us.field[:, 0, :], vs.field[:, 0, :], zo, t2d, q2d, ter11, tshall, qshall, p2d, psur, dhdt, kpbli,
             rhoi, hfx, qfx, xlandi, ichoice_s, tcrit, dt, zus, xmbs, kbcons, ktops,
             k22s, ierrs, ierrcs, outts, outqs, outqcs, outus, outvs, cnvwt, prets,
             cupclws, itf, ktf, its, ite, kts, kte, ipr, tropics
@@ -835,15 +805,15 @@ def cu_gf_driver_run(state, errmsg, errflg):
             qshall,
             p2d,
             psur,
-            us,
-            vs,
+            us.field[:, 0, :],
+            vs.field[:, 0, :],
             rhoi,
             hfx,
             qfx,
             dx,
             mconv,
             omeg,
-            cactiv_m,
+            cactiv_m.field,
             cnvwtm,
             zum,
             zdm,
@@ -866,8 +836,8 @@ def cu_gf_driver_run(state, errmsg, errflg):
             ierrm,
             ierrcm,
             nchem,
-            fscav,
-            chem3d,
+            fscav.field,
+            chem3d if chem3d is None else chem3d.field,
             wetdpc_mid,
             do_smoke_transport,
             rand_mom,
@@ -967,15 +937,15 @@ def cu_gf_driver_run(state, errmsg, errflg):
             qo,
             p2d,
             psur,
-            us,
-            vs,
+            us.field[:, 0, :],
+            vs.field[:, 0, :],
             rhoi,
             hfx,
             qfx,
             dx,
             mconv,
             omeg,
-            cactiv,
+            cactiv.field,
             cnvwt,
             zu,
             zd,
@@ -998,9 +968,9 @@ def cu_gf_driver_run(state, errmsg, errflg):
             ierr,
             ierrc,
             nchem,
-            fscav,
-            chem3d,
-            wetdpc_deep,
+            fscav.field,
+            chem3d if chem3d is None else chem3d.field,
+            wetdpc_deep if wetdpc_deep is None else wetdpc_deep.field,
             do_smoke_transport,
             rand_mom,
             rand_vmas,
@@ -1056,9 +1026,9 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
     # Initialize `kcnv` and update related arrays
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        kcnv[i] = 0
+        kcnv.field[i, 0, 0] = 0
         if pretm[i] > 0.0:
-            kcnv[i] = 1  # Previously `jmin(i)` in comments
+            kcnv.field[i, 0, 0] = 1  # Previously `jmin(i)` in comments
             cutenm[i] = 1.0
         else:
             kbconm[i] = -1
@@ -1069,7 +1039,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
             cuten[i] = 1.0
             cutenm[i] = 0.0
             pretm[i] = 0.0
-            kcnv[i] = 1  # Previously `jmin(i)` in comments
+            kcnv.field[i, 0, 0] = 1  # Previously `jmin(i)` in comments
             ktopm[i] = -1
             kbconm[i] = -1
         else:
@@ -1097,22 +1067,22 @@ def cu_gf_driver_run(state, errmsg, errflg):
             kstop = max(kstop, ktops[i])
 
         if kstop > 1:
-            htop[i] = kstop
+            htop.field[i, 0, 0] = kstop
             if kbcon[i] > 1 or kbconm[i] > 1:
-                hbot[i] = max(kbconm[i], kbcon[i])
+                hbot.field[i, 0, 0] = max(kbconm[i], kbcon[i])
 
             dtime_max = dt
             forcing2[i, 2] = 0.0
 
             # Loop over vertical levels up to `kstop`
             for k in range(kts, kstop + 1):
-                cnvc[i, k] = (
+                cnvc.field[i, 0, k] = (
                     0.04 * np.log(1.0 + 675.0 * zu[i, k] * xmb[i]) +
                     0.04 * np.log(1.0 + 675.0 * zum[i, k] * xmbm[i]) +
                     0.04 * np.log(1.0 + 675.0 * zus[i, k] * xmbs[i])
                 )
-                cnvc[i, k] = min(cnvc[i, k], 0.6)
-                cnvc[i, k] = max(cnvc[i, k], 0.0)
+                cnvc.field[i, 0, k] = min(cnvc.field[i, 0, k], 0.6)
+                cnvc.field[i, 0, k] = max(cnvc.field[i, 0, k], 0.0)
 
                 cnvw[i, k] = (
                     cnvwt[i, k] * xmb[i] * dt +
@@ -1120,10 +1090,10 @@ def cu_gf_driver_run(state, errmsg, errflg):
                     cnvwtm[i, k] * xmbm[i] * dt
                 )
 
-                ud_mf[i, k] = cuten[i] * zu[i, k] * xmb[i] * dt
-                dd_mf[i, k] = cuten[i] * zd[i, k] * edt[i] * xmb[i] * dt
+                ud_mf.field[i, 0, k] = cuten[i] * zu[i, k] * xmb[i] * dt
+                dd_mf.field[i, 0, k] = cuten[i] * zd[i, k] * edt[i] * xmb[i] * dt
 
-                t[i, k] += dt * (
+                t.field[i, 0, k] += dt * (
                     cutens[i] * outts[i, k] +
                     cutenm[i] * outtm[i, k] +
                     outt[i, k] * cuten[i]
@@ -1138,15 +1108,15 @@ def cu_gf_driver_run(state, errmsg, errflg):
                     )
                 )
 
-                gdc[i, k, 6] = np.sqrt(us[i, k]**2 + vs[i, k]**2)
+                gdc[i, k, 6] = np.sqrt(us.field[i, 0, k]**2 + vs.field[i, 0, k]**2)
 
-                us[i, k] += (
+                us.field[i, 0, k] += (
                     outu[i, k] * cuten[i] * dt +
                     outum[i, k] * cutenm[i] * dt +
                     outus[i, k] * cutens[i] * dt
                 )
 
-                vs[i, k] += (
+                vs.field[i, 0, k] += (
                     outv[i, k] * cuten[i] * dt +
                     outvm[i, k] * cutenm[i] * dt +
                     outvs[i, k] * cutens[i] * dt
@@ -1161,13 +1131,13 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 )
 
                 # Initialize qci_conv
-                qci_conv[i, k] = gdc2[i, k, 0]
+                qci_conv.field[i, 0, k] = gdc2[i, k, 0]
 
                 # Update gdc array with tendencies and other parameters
                 gdc[i, k, 1] = outt[i, k] * 86400.0
                 gdc[i, k, 2] = outtm[i, k] * 86400.0
                 gdc[i, k, 3] = outts[i, k] * 86400.0
-                gdc[i, k, 6] = -(gdc[i, k, 6] - np.sqrt(us[i, k]**2 + vs[i, k]**2)) / dt
+                gdc[i, k, 6] = -(gdc[i, k, 6] - np.sqrt(us.field[i, 0, k]**2 + vs.field[i, 0, k]**2)) / dt
                 gdc[i, k, 7] = (outqm[i, k] + outqs[i, k] + outq[i, k]) * 86400.0 * xlv / cp
                 gdc[i, k, 8] = gdc[i, k, 1] + gdc[i, k, 2] + gdc[i, k, 3]
 
@@ -1176,11 +1146,11 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 dtime_max = min(dtime_max, 0.5 * dp)
                 po_cup[k] = 0.5 * (p2d[i, k] + p2d[i, k + 1])
 
-                if clcw[i, k] > -999.0 and clcw[i, k + 1] > -999.0:
-                    clwtot = cliw[i, k] + clcw[i, k]
+                if clcw.field[i, 0, k] > -999.0 and clcw.field[i, 0, k + 1] > -999.0:
+                    clwtot = cliw.field[i, 0, k] + clcw.field[i, 0, k]
                     if clwtot < 1.0e-32:
                         clwtot = 0.0
-                    clwtot1 = cliw[i, k + 1] + clcw[i, k + 1]
+                    clwtot1 = cliw.field[i, 0, k + 1] + clcw.field[i, 0, k + 1]
                     if clwtot1 < 1.0e-32:
                         clwtot1 = 0.0
 
@@ -1211,13 +1181,13 @@ def cu_gf_driver_run(state, errmsg, errflg):
                     outqcm[i, k] * cutenm[i] +
                     clw_ten[i, k]
                 )
-                tem1 = max(0.0, min(1.0, (tcr - t[i, k]) * tcrf))
+                tem1 = max(0.0, min(1.0, (tcr - t.field[i, 0, k]) * tcrf))
 
-                if clcw[i, k] > -999.0:
-                    cliw[i, k] = max(0.0, cliw[i, k] + tem * tem1)  # Ice
-                    clcw[i, k] = max(0.0, clcw[i, k] + tem * (1.0 - tem1))  # Water
+                if clcw.field[i, 0, k] > -999.0:
+                    cliw.field[i, 0, k] = max(0.0, cliw.field[i, 0, k] + tem * tem1)  # Ice
+                    clcw.field[i, 0, k] = max(0.0, clcw.field[i, 0, k] + tem * (1.0 - tem1))  # Water
                 else:
-                    cliw[i, k] = max(0.0, cliw[i, k] + tem)
+                    cliw.field[i, 0, k] = max(0.0, cliw.field[i, 0, k] + tem)
 
             # Update `gdc` array with forcing and other parameters
             gdc[i, 0, 9] = forcing[i, 0]
@@ -1236,32 +1206,32 @@ def cu_gf_driver_run(state, errmsg, errflg):
             gdc[i, 15, 9] = pret[i] * 3600.0
 
             # Calculate maximum upward mass flux
-            maxupmf[i] = 0.0
+            maxupmf.field[i, 0, 0] = 0.0
             if forcing2[i, 5] > 0.0:
-                maxupmf[i] = max(xmb[i] * zu[i, kts:ktf + 1] / forcing2[i, 5])
+                maxupmf.field[i, 0, 0] = max(xmb[i] * zu[i, kts:ktf + 1] / forcing2[i, 5])
 
             # Update `dt_mf` for deep convection
             if ktop[i] > 1 and pret[i] > 0.0:
-                dt_mf[i, ktop[i] - 1] = ud_mf[i, ktop[i]]
+                dt_mf.field[i, 0, ktop[i] - 1] = ud_mf.field[i, 0, ktop[i]]
 
     # Loop over horizontal grid points
     for i in range(its, itf + 1):  # Python's 0-based indexing
         if pret[i] > 0.0:
-            cactiv[i] = 1
-            raincv[i] = 0.001 * (
+            cactiv.field[i] = 1
+            raincv.field[i, 0, 0] = 0.001 * (
                 cutenm[i] * pretm[i] +
                 cutens[i] * prets[i] +
                 cuten[i] * pret[i]
             ) * dt
         else:
-            cactiv[i] = 0
+            cactiv.field[i] = 0
             if pretm[i] > 0.0:
-                raincv[i] = 0.001 * cutenm[i] * pretm[i] * dt
+                raincv.field[i, 0, 0] = 0.001 * cutenm[i] * pretm[i] * dt
 
         if pretm[i] > 0.0:
-            cactiv_m[i] = 1
+            cactiv_m.field[i] = 1
         else:
-            cactiv_m[i] = 0
+            cactiv_m.field[i] = 0
 
         # Unify CCN
         if ccn_m[i] < ccn_gf[i]:
@@ -1271,40 +1241,40 @@ def cu_gf_driver_run(state, errmsg, errflg):
             ccn_gf[i] = 0.0
 
         # Convert CCN back to AOD
-        aod_gf[i] = 0.0027 * (ccn_gf[i] ** 0.64)
-        if aod_gf[i] < 0.007:
-            aod_gf[i] = 0.007
-            ccn_gf[i] = (aod_gf[i] / 0.0027) ** (1 / 0.64)
-        elif aod_gf[i] > aodc0:
-            aod_gf[i] = aodc0
-            ccn_gf[i] = (aod_gf[i] / 0.0027) ** (1 / 0.64)
+        aod_gf.field[i, 0, 0] = 0.0027 * (ccn_gf[i] ** 0.64)
+        if aod_gf.field[i, 0, 0] < 0.007:
+            aod_gf.field[i, 0, 0] = 0.007
+            ccn_gf[i] = (aod_gf.field[i, 0, 0] / 0.0027) ** (1 / 0.64)
+        elif aod_gf.field[i, 0, 0] > aodc0:
+            aod_gf.field[i, 0, 0] = aodc0
+            ccn_gf[i] = (aod_gf.field[i, 0, 0] / 0.0027) ** (1 / 0.64)
 
     # Scale dry mixing ratios for water vapor and cloud water to specific humidity / moist mixing ratios
-    qv_spechum = qv / (1.0 + qv)
-    cnvw_moist = cnvw / (1.0 + qv)
+    qv_spechum.field[:, 0, :] = qv / (1.0 + qv)
+    cnvw_moist.field[:, 0, :] = cnvw / (1.0 + qv)
 
     # Diagnostic tendency updates
     if ldiag3d:
         if ishallow_g3 == 1 and not flag_for_scnv_generic_tend:
-            uidx = dtidx[index_of_x_wind, index_of_process_scnv]
-            vidx = dtidx[index_of_y_wind, index_of_process_scnv]
-            tidx = dtidx[index_of_temperature, index_of_process_scnv]
-            qidx = dtidx[100 + ntqv, index_of_process_scnv]
+            uidx = dtidx.field[index_of_x_wind, index_of_process_scnv, 0]
+            vidx = dtidx.field[index_of_y_wind, index_of_process_scnv, 0]
+            tidx = dtidx.field[index_of_temperature, index_of_process_scnv, 0]
+            qidx = dtidx.field[100 + ntqv, index_of_process_scnv, 0]
 
             if uidx >= 0:
                 # Update tendencies for x-wind
                 for k in range(kts, ktf + 1):  # Python's 0-based indexing
-                    dtend[:, k, uidx] += cutens[:] * outus[:, k] * dt
+                    dtend.field[:, k, uidx] += cutens[:] * outus[:, k] * dt
 
             if vidx >= 0:
                 # Update tendencies for y-wind
                 for k in range(kts, ktf + 1):
-                    dtend[:, k, vidx] += cutens[:] * outvs[:, k] * dt
+                    dtend.field[:, k, vidx] += cutens[:] * outvs[:, k] * dt
 
             if tidx >= 0:
                 # Update tendencies for temperature
                 for k in range(kts, ktf + 1):
-                    dtend[:, k, tidx] += cutens[:] * outts[:, k] * dt
+                    dtend.field[:, k, tidx] += cutens[:] * outts[:, k] * dt
 
             if qidx >= 0:
                 # Update tendencies for specific humidity
@@ -1312,36 +1282,36 @@ def cu_gf_driver_run(state, errmsg, errflg):
                     for i in range(its, itf + 1):
                         tem = cutens[i] * outqs[i, k] * dt
                         tem = tem / (1.0 + tem)
-                        dtend[i, k, qidx] += tem
+                        dtend.field[i, k, qidx] += tem
 
         if ideep == 1 or imid_gf == 1 and not flag_for_dcnv_generic_tend:
-            uidx = dtidx[index_of_x_wind, index_of_process_dcnv]
-            vidx = dtidx[index_of_y_wind, index_of_process_dcnv]
-            tidx = dtidx[index_of_temperature, index_of_process_dcnv]
+            uidx = dtidx.field[index_of_x_wind, index_of_process_dcnv, 0]
+            vidx = dtidx.field[index_of_y_wind, index_of_process_dcnv, 0]
+            tidx = dtidx.field[index_of_temperature, index_of_process_dcnv, 0]
 
             if uidx >= 0:
                 # Update tendencies for x-wind
                 for k in range(kts, ktf + 1):
-                    dtend[:, k, uidx] += (cuten * outu[:, k] + cutenm * outum[:, k]) * dt
+                    dtend.field[:, k, uidx] += (cuten * outu[:, k] + cutenm * outum[:, k]) * dt
 
             if vidx >= 0:
                 # Update tendencies for y-wind
                 for k in range(kts, ktf + 1):
-                    dtend[:, k, vidx] += (cuten * outv[:, k] + cutenm * outvm[:, k]) * dt
+                    dtend.field[:, k, vidx] += (cuten * outv[:, k] + cutenm * outvm[:, k]) * dt
 
             if tidx >= 0:
                 # Update tendencies for temperature
                 for k in range(kts, ktf + 1):
-                    dtend[:, k, tidx] += (cuten * outt[:, k] + cutenm * outtm[:, k]) * dt
+                    dtend.field[:, k, tidx] += (cuten * outt[:, k] + cutenm * outtm[:, k]) * dt
 
-            qidx = dtidx[100 + ntqv, index_of_process_dcnv]
+            qidx = dtidx.field[100 + ntqv, index_of_process_dcnv, 0]
             if qidx >= 0:
                 # Update tendencies for specific humidity
                 for k in range(kts, ktf + 1):
                     for i in range(its, itf + 1):
                         tem = (cuten[i] * outq[i, k] + cutenm[i] * outqm[i, k]) * dt
                         tem = tem / (1.0 + tem)
-                        dtend[i, k, qidx] += tem
+                        dtend.field[i, k, qidx] += tem
 
     # Check if `clcw_save` is allocated
     if clcw_save is not None:
@@ -1351,7 +1321,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 tem_shal = dt * (outqcs[i, k] * cutens[i] + outqcm[i, k] * cutenm[i])
                 tem_deep = dt * (outqc[i, k] * cuten[i] + clw_ten[i, k])
                 tem = tem_shal + tem_deep
-                tem1 = max(0.0, min(1.0, (tcr - t[i, k]) * tcrf))
+                tem1 = max(0.0, min(1.0, (tcr - t.field[i, 0, k]) * tcrf))
                 weight_sum = abs(tem_shal) + abs(tem_deep)
 
                 if weight_sum < 1e-12:
@@ -1365,13 +1335,13 @@ def cu_gf_driver_run(state, errmsg, errflg):
                     clcw_both = 0.0
 
                 if cliw_deep_idx >= 0:
-                    dtend[i, k, cliw_deep_idx] += abs(tem_deep) / weight_sum * cliw_both
+                    dtend.field[i, k, cliw_deep_idx] += abs(tem_deep) / weight_sum * cliw_both
                 if clcw_deep_idx >= 0:
-                    dtend[i, k, clcw_deep_idx] += abs(tem_deep) / weight_sum * clcw_both
+                    dtend.field[i, k, clcw_deep_idx] += abs(tem_deep) / weight_sum * clcw_both
                 if cliw_shal_idx >= 0:
-                    dtend[i, k, cliw_shal_idx] += abs(tem_shal) / weight_sum * cliw_both
+                    dtend.field[i, k, cliw_shal_idx] += abs(tem_shal) / weight_sum * cliw_both
                 if clcw_shal_idx >= 0:
-                    dtend[i, k, clcw_shal_idx] += abs(tem_shal) / weight_sum * clcw_both
+                    dtend.field[i, k, clcw_shal_idx] += abs(tem_shal) / weight_sum * clcw_both
 
     state.ntracer = ntracer  # Number of tracers
     state.garea = garea  # Grid area
