@@ -27,7 +27,7 @@ def cu_gf_sh_run(
     hfx, qfx, xland, ichoice, tcrit, dtime,
     zuo, xmb_out, kbcon, ktop, k22, ierr, ierrc,
     outt, outq, outqc, outu, outv, cnvwt, pre, cupclw,
-    itf, ktf, its, ite, kts, kte, ipr, tropics
+    itf, jtf, ktf, its, ite, jts, jte, kts, kte, ipr, tropics
 ):
     """
     Grell-Freitas shallow convection scheme.
@@ -72,6 +72,8 @@ def cu_gf_sh_run(
     # ktop.fill(0)
     # k22.fill(0)
 
+    itf = (itf + 1) * (jtf + 1) - 1
+    ite = itf
 
     # Dimensions based on Fortran variables
     num_horizontal_points = ite - its + 1  # Number of horizontal grid points

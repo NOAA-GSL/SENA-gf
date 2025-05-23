@@ -10,7 +10,8 @@ from gt4py.cartesian.gtscript import PARALLEL, computation, interval, stencil
 def cu_gf_driver_run(state, errmsg, errflg):
     ntracer = state.ntracer  # Number of tracers
     garea = state.garea  # Grid area
-    im = state.im  # Number of horizontal grid points
+    im = state.im  # Number of horizontal grid points in the x-direction
+    jm = state.jm  # Number of horizontal grid points in the y-direction
     km = state.km  # Number of vertical levels
     dt = state.dt  # Time step
     flag_init = state.flag_init  # Initialization flag
@@ -107,79 +108,79 @@ def cu_gf_driver_run(state, errmsg, errflg):
     ipn = 0  # Process index for negative checks
     ideep=1
 
-    cap_suppress_j = np.zeros(im)  # 1D array with size equal to the horizontal grid dimension
+    cap_suppress_j = np.zeros((im, jm))  # 1D array with size equal to the horizontal grid dimension
 
-    rand_mom = np.zeros(im)  # 1D array with size equal to the horizontal grid dimension
-    rand_vmas = np.zeros(im)
-    rand_clos = np.zeros((im, km))  # 2D array with horizontal and vertical dimensions
+    rand_mom = np.zeros((im, jm))  # 1D array with size equal to the horizontal grid dimension
+    rand_vmas = np.zeros((im, jm))  # 1D array with size equal to the horizontal grid dimension
+    rand_clos = np.zeros((im, jm, km))  # 2D array with horizontal and vertical dimensions
 
-    tropics = np.zeros(im, dtype=int)  # Integer array for tropics flag
+    tropics = np.zeros((im, jm), dtype=int)  # Integer array for tropics flag
 
-    tun_rad_shall = np.zeros(im)  # Tuning constants for radiation coupling
-    tun_rad_mid = np.zeros(im)
-    tun_rad_deep = np.zeros(im)
+    tun_rad_shall = np.zeros((im, jm))  # Tuning constants for radiation coupling
+    tun_rad_mid = np.zeros((im, jm))
+    tun_rad_deep = np.zeros((im, jm))
 
-    edt = np.zeros(im)  # Eddy diffusivity arrays
-    edtm = np.zeros(im)
-    edtd = np.zeros(im)
+    edt = np.zeros((im, jm))  # Eddy diffusivity arrays
+    edtm = np.zeros((im, jm))
+    edtd = np.zeros((im, jm))
 
-    zdd = np.zeros((im, km))  # 2D array for downdraft mass flux
-    flux_tun = np.zeros(im)  # Flux tuning array
+    zdd = np.zeros((im, jm, km))  # 2D array for downdraft mass flux
+    flux_tun = np.zeros((im, jm))  # Flux tuning array
 
-    ht = np.zeros(im)  # Height array
-    dz8w = np.zeros((im, km))  # Vertical layer thickness
+    ht = np.zeros((im, jm))  # Height array
+    dz8w = np.zeros((im, jm, km))  # Vertical layer thickness
     zh = np.zeros(km)  # Vertical height levels
 
-    forcing = np.zeros((im, 10))  # Forcing arrays
-    forcing2 = np.zeros((im, 10))
+    forcing = np.zeros((im, jm, 10))  # Forcing arrays
+    forcing2 = np.zeros((im, jm, 10))
 
-    ccn_gf = np.zeros(im)  # Cloud condensation nuclei (CCN)
-    ccn_m = np.zeros(im)
+    ccn_gf = np.zeros((im, jm))  # Cloud condensation nuclei (CCN)
+    ccn_m = np.zeros((im, jm))
 
-    dx = np.zeros(im)  # Grid spacing
+    dx = np.zeros((im, jm))  # Grid spacing
 
-    mconv = np.zeros(im)  # Moisture convergence
-    omeg = np.zeros((im, km))  # Vertical velocity
+    mconv = np.zeros((im, jm))  # Moisture convergence
+    omeg = np.zeros((im, jm, km))  # Vertical velocity
 
-    ter11 = np.zeros(im)  # Terrain height
+    ter11 = np.zeros((im, jm))  # Terrain height
 
-    cnvw = np.zeros((im, km))  # Convective tendencies
+    cnvw = np.zeros((im, jm, km))  # Convective tendencies
     # cnvc = np.zeros((im, km))
 
-    gdc = np.zeros((im, km, 10))  # Diagnostic tendencies
-    gdc2 = np.zeros((im, km, 10))
+    gdc = np.zeros((im, jm, km, 10))  # Diagnostic tendencies
+    gdc2 = np.zeros((im, jm, km, 10))
 
     # qci_conv = np.zeros((im, km))  # Cloud ice mixing ratio
 
-    ierr = np.zeros(im, dtype=int)  # Error flags for deep convection
-    ierrm = np.zeros(im, dtype=int)  # Error flags
-    ierrs = np.zeros(im, dtype=int)
-    ierrc = np.full(im, " ", dtype="<U50")  # Error messages (strings)
+    ierr = np.zeros((im, jm), dtype=int)  # Error flags for deep convection
+    ierrm = np.zeros((im, jm), dtype=int)  # Error flags
+    ierrs = np.zeros((im, jm), dtype=int)
+    ierrc = np.full((im, jm), " ", dtype="<U50")  # Error messages (strings)
 
-    cuten = np.zeros(im)  # Convective tendencies
-    cutenm = np.zeros(im)
-    cutens = np.zeros(im)
+    cuten = np.zeros((im, jm))  # Convective tendencies
+    cutenm = np.zeros((im, jm))
+    cutens = np.zeros((im, jm))
 
-    kbcon = np.zeros(im, dtype=int)  # Convective base indices (deep convection)
-    kbcons = np.zeros(im, dtype=int)  # Convective base indices
-    kbconm = np.zeros(im, dtype=int)
-    ktop = np.zeros(im, dtype=int)  # Convective cloud top indices (deep convection))
-    ktops = np.zeros(im, dtype=int)
-    ktopm = np.zeros(im, dtype=int)
+    kbcon = np.zeros((im, jm), dtype=int)  # Convective base indices (deep convection)
+    kbcons = np.zeros((im, jm), dtype=int)  # Convective base indices
+    kbconm = np.zeros((im, jm), dtype=int)
+    ktop = np.zeros((im, jm), dtype=int)  # Convective cloud top indices (deep convection))
+    ktops = np.zeros((im, jm), dtype=int)
+    ktopm = np.zeros((im, jm), dtype=int)
 
-    xmb = np.zeros(im)  # Mass flux arrays
-    xmbm = np.zeros(im)
-    xmbs = np.zeros(im)
-    xmb_dumm = np.zeros(im)
+    xmb = np.zeros((im, jm))  # Mass flux arrays
+    xmbm = np.zeros((im, jm))
+    xmbs = np.zeros((im, jm))
+    xmb_dumm = np.zeros((im, jm))
 
-    pret = np.zeros(im)  # Precipitation arrays
-    pretm = np.zeros(im)
-    prets = np.zeros(im)
+    pret = np.zeros((im, jm))  # Precipitation arrays
+    pretm = np.zeros((im, jm))
+    prets = np.zeros((im, jm))
 
     # clcw_save = np.zeros((im, km))  # Cloud liquid water save arrays
     # cliw_save = np.zeros((im, km))
 
-    clw_ten = np.zeros((im, km))  # Cloud water tendencies
+    clw_ten = np.zeros((im, jm, km))  # Cloud water tendencies
 
     po_cup = np.zeros(km)  # Pressure at cloud levels
 
@@ -187,116 +188,116 @@ def cu_gf_driver_run(state, errmsg, errflg):
     trcflx_in1 = np.zeros(km)  # Tracer flux
     clw_in1 = np.zeros(km)  # Cloud water input
 
-    kpbli = np.zeros(im, dtype=int)  # Convective boundary layer index
+    kpbli = np.zeros((im, jm), dtype=int)  # Convective boundary layer index
 
-    dx = np.zeros(im)  # Grid spacing
+    dx = np.zeros((im, jm))  # Grid spacing
 
-    zu = np.zeros((im, km))  # Updraft mass flux
-    zum = np.zeros((im, km))  # Middle updraft mass flux
-    zus = np.zeros((im, km))  # Shallow updraft mass flux
-    zd = np.zeros((im, km))  # Downdraft mass flux
-    zdm = np.zeros((im, km))  # Middle downdraft mass flux
+    zu = np.zeros((im, jm, km))  # Updraft mass flux
+    zum = np.zeros((im, jm, km))  # Middle updraft mass flux
+    zus = np.zeros((im, jm, km))  # Shallow updraft mass flux
+    zd = np.zeros((im, jm, km))  # Downdraft mass flux
+    zdm = np.zeros((im, jm, km))  # Middle downdraft mass flux
 
-    psur = np.zeros(im)  # Surface pressure
+    psur = np.zeros((im, jm))  # Surface pressure
 
     # clcw = np.zeros((im, km))  # Cloud liquid water
     # cliw = np.zeros((im, km))  # Cloud ice water
 
-    forcing2 = np.zeros((im, 10))  # Forcing array
+    forcing2 = np.zeros((im, jm, 10))  # Forcing array
 
     # dt_mf = np.zeros((im, km))  # Mass flux tendencies
 
-    tau_ecmwf = np.zeros(im)  # ECMWF tau array
+    tau_ecmwf = np.zeros((im, jm))  # ECMWF tau array
 
-    qcheck = np.zeros((im, km))  # Specific humidity check array
+    qcheck = np.zeros((im, jm, km))  # Specific humidity check array
 
     massflx = np.zeros(km)  # Mass flux array
     trcflx_in1 = np.zeros(km)  # Tracer flux array
     clw_in1 = np.zeros(km)  # Cloud water input array
 
-    zo = np.zeros((im, km))  # Height at model levels
-    t2d = np.zeros((im, km))  # Temperature at model levels
-    q2d = np.zeros((im, km))  # Specific humidity at model levels
-    tn = np.zeros((im, km))  # Temperature tendency
-    qo = np.zeros((im, km))  # Specific humidity tendency
+    zo = np.zeros((im, jm, km))  # Height at model levels
+    t2d = np.zeros((im, jm, km))  # Temperature at model levels
+    q2d = np.zeros((im, jm, km))  # Specific humidity at model levels
+    tn = np.zeros((im, jm, km))  # Temperature tendency
+    qo = np.zeros((im, jm, km))  # Specific humidity tendency
 
-    outts = np.zeros((im, km))  # Temperature tendencies (shallow convection)
-    outqs = np.zeros((im, km))  # Specific humidity tendencies (shallow convection)
-    outqcs = np.zeros((im, km))  # Cloud water tendencies (shallow convection)
-    outus = np.zeros((im, km))  # U-wind tendencies (shallow convection)
-    outvs = np.zeros((im, km))  # V-wind tendencies (shallow convection)
+    outts = np.zeros((im, jm, km))  # Temperature tendencies (shallow convection)
+    outqs = np.zeros((im, jm, km))  # Specific humidity tendencies (shallow convection)
+    outqcs = np.zeros((im, jm, km))  # Cloud water tendencies (shallow convection)
+    outus = np.zeros((im, jm, km))  # U-wind tendencies (shallow convection)
+    outvs = np.zeros((im, jm, km))  # V-wind tendencies (shallow convection)
 
-    outtm = np.zeros((im, km))  # Temperature tendencies (middle convection)
-    outqm = np.zeros((im, km))  # Specific humidity tendencies (middle convection)
-    outqcm = np.zeros((im, km))  # Cloud water tendencies (middle convection)
-    outum = np.zeros((im, km))  # U-wind tendencies (middle convection)
-    outvm = np.zeros((im, km))  # V-wind tendencies (middle convection)
+    outtm = np.zeros((im, jm, km))  # Temperature tendencies (middle convection)
+    outqm = np.zeros((im, jm, km))  # Specific humidity tendencies (middle convection)
+    outqcm = np.zeros((im, jm, km))  # Cloud water tendencies (middle convection)
+    outum = np.zeros((im, jm, km))  # U-wind tendencies (middle convection)
+    outvm = np.zeros((im, jm, km))  # V-wind tendencies (middle convection)
 
-    outt = np.zeros((im, km))  # Temperature tendencies (deep convection)
-    outq = np.zeros((im, km))  # Specific humidity tendencies (deep convection)
-    outqc = np.zeros((im, km))  # Cloud water tendencies (deep convection)
-    outu = np.zeros((im, km))  # U-wind tendencies (deep convection)
-    outv = np.zeros((im, km))  # V-wind tendencies (deep convection)
+    outt = np.zeros((im, jm, km))  # Temperature tendencies (deep convection)
+    outq = np.zeros((im, jm, km))  # Specific humidity tendencies (deep convection)
+    outqc = np.zeros((im, jm, km))  # Cloud water tendencies (deep convection)
+    outu = np.zeros((im, jm, km))  # U-wind tendencies (deep convection)
+    outv = np.zeros((im, jm, km))  # V-wind tendencies (deep convection)
 
-    k22 = np.zeros(im, dtype=int)  # Updraft originating level (deep convection)
-    k22s = np.zeros(im, dtype=int)  # Updraft originating level (shallow convection)
-    k22m = np.zeros(im, dtype=int)  # Updraft originating level (middle convection)
+    k22 = np.zeros((im, jm), dtype=int)  # Updraft originating level (deep convection)
+    k22s = np.zeros((im, jm), dtype=int)  # Updraft originating level (shallow convection)
+    k22m = np.zeros((im, jm), dtype=int)  # Updraft originating level (middle convection)
 
-    jmin = np.zeros(im, dtype=int)  # Minimum convection level
-    jminm = np.zeros(im, dtype=int)  # Minimum convection level (middle convection)
+    jmin = np.zeros((im, jm), dtype=int)  # Minimum convection level
+    jminm = np.zeros((im, jm), dtype=int)  # Minimum convection level (middle convection)
 
-    pret = np.zeros(im)  # Precipitation rate (deep convection)
-    prets = np.zeros(im)  # Precipitation rate (shallow convection)
-    pretm = np.zeros(im)  # Precipitation rate (middle convection)
+    pret = np.zeros((im, jm))  # Precipitation rate (deep convection)
+    prets = np.zeros((im, jm))  # Precipitation rate (shallow convection)
+    pretm = np.zeros((im, jm))  # Precipitation rate (middle convection)
 
-    cupclw = np.zeros((im, km))  # Cloud water (deep convection)
-    cupclws = np.zeros((im, km))  # Cloud water (shallow convection)
-    cupclwm = np.zeros((im, km))  # Cloud water (middle convection)
+    cupclw = np.zeros((im, jm, km))  # Cloud water (deep convection)
+    cupclws = np.zeros((im, jm, km))  # Cloud water (shallow convection)
+    cupclwm = np.zeros((im, jm, km))  # Cloud water (middle convection)
 
-    cnvwt = np.zeros((im, km))  # Convective tendencies (deep convection)
-    cnvwts = np.zeros((im, km))  # Convective tendencies (shallow convection)
-    cnvwtm = np.zeros((im, km))  # Convective tendencies (middle convection)
+    cnvwt = np.zeros((im, jm, km))  # Convective tendencies (deep convection)
+    cnvwts = np.zeros((im, jm, km))  # Convective tendencies (shallow convection)
+    cnvwtm = np.zeros((im, jm, km))  # Convective tendencies (middle convection)
 
-    hco = np.zeros((im, km))  # Convective heating (deep convection)
-    hcom = np.zeros((im, km))  # Convective heating (middle convection)
-    hcdo = np.zeros((im, km))  # Convective cooling (deep convection)
-    hcdom = np.zeros((im, km))  # Convective cooling (middle convection)
+    hco = np.zeros((im, jm, km))  # Convective heating (deep convection)
+    hcom = np.zeros((im, jm, km))  # Convective heating (middle convection)
+    hcdo = np.zeros((im, jm, km))  # Convective cooling (deep convection)
+    hcdom = np.zeros((im, jm, km))  # Convective cooling (middle convection)
 
-    subm = np.zeros((im, km))  # Subsidence tendencies
-    dhdt = np.zeros((im, km))  # Heating rate tendencies
+    subm = np.zeros((im, jm, km))  # Subsidence tendencies
+    dhdt = np.zeros((im, jm, km))  # Heating rate tendencies
 
-    frhm = np.zeros(im)  # Moisture flux (middle convection)
-    frhd = np.zeros(im)  # Moisture flux (deep convection)
+    frhm = np.zeros((im, jm))  # Moisture flux (middle convection)
+    frhd = np.zeros((im, jm))  # Moisture flux (deep convection)
 
-    p2d = np.zeros((im, km))  # Pressure at model levels
-    qcheck = np.zeros((im, km))  # Specific humidity check
+    p2d = np.zeros((im, jm, km))  # Pressure at model levels
+    qcheck = np.zeros((im, jm, km))  # Specific humidity check
 
-    tshall = np.zeros((im, km))  # Shallow convection temperature
-    qshall = np.zeros((im, km))  # Shallow convection specific humidity
+    tshall = np.zeros((im, jm, km))  # Shallow convection temperature
+    qshall = np.zeros((im, jm, km))  # Shallow convection specific humidity
 
-    hfx = np.zeros(im)  # Surface heat flux
-    qfx = np.zeros(im)  # Surface moisture flux
+    hfx = np.zeros((im, jm))  # Surface heat flux
+    qfx = np.zeros((im, jm))  # Surface moisture flux
 
     massflx = np.zeros(km)  # Mass flux
     trcflx_in1 = np.zeros(km)  # Tracer flux
     clw_in1 = np.zeros(km)  # Cloud water input
 
-    clw_ten = np.zeros((im, km))  # Cloud water tendencies
+    clw_ten = np.zeros((im, jm, km))  # Cloud water tendencies
     po_cup = np.zeros(km)  # Pressure at cloud levels
 
-    xlandi = np.zeros(im)  # Land mask as a float array
+    xlandi = np.zeros((im, jm))  # Land mask as a float array
 
-    ierrcs = np.full(im, " ", dtype="<U50")  # Error messages for shallow convection
-    ierrcm = np.full(im, " ", dtype="<U50")  # Error messages for middle convection
+    ierrcs = np.full((im, jm), " ", dtype="<U50")  # Error messages for shallow convection
+    ierrcm = np.full((im, jm), " ", dtype="<U50")  # Error messages for middle convection
 
-    wetdpc_mid = np.zeros(im)  # Wet deposition for middle convection
+    wetdpc_mid = np.zeros((im, jm))  # Wet deposition for middle convection
 
-    xmbs2 = np.zeros(im)  # Additional mass flux array for shallow convection
+    xmbs2 = np.zeros((im, jm))  # Additional mass flux array for shallow convection
 
-    po = np.zeros((im, km))  # Pressure at model levels
-    rhoi = np.zeros((im, km))  # Air density at model levels
+    po = np.zeros((im, jm, km))  # Pressure at model levels
+    rhoi = np.zeros((im, jm, km))  # Air density at model levels
 
-    forcing2 = np.zeros((im, 10))  # Forcing array for convection calculations
+    forcing2 = np.zeros((im, jm, 10))  # Forcing array for convection calculations
 
     po_cup = np.zeros(km)  # Pressure at cloud levels
 
@@ -307,10 +308,10 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
 
     # Initialize variables
-    dhdt = np.zeros((im, km))
-    umean = np.zeros(t.shape[0])
-    vmean = np.zeros(t.shape[0])
-    pmean = np.zeros(t.shape[0])
+    dhdt = np.zeros((im, jm, km))
+    umean = np.zeros((im, jm))
+    vmean = np.zeros((im, jm))
+    pmean = np.zeros((im, jm))
 
     errmsg = ""
     errflg = 0
@@ -354,36 +355,37 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
         if (cliw_deep_idx >= 0 or clcw_deep_idx >= 0 or
             cliw_shal_idx >= 0 or clcw_shal_idx >= 0):
-            clcw_save = np.zeros((im, km))
-            cliw_save = np.zeros((im, km))
+            clcw_save = np.zeros((im, jm, km))
+            cliw_save = np.zeros((im, jm, km))
 
             # Copy data into clcw_save and cliw_save
-            clcw_save[:, :] = clcw.field[:, 0, :]
-            cliw_save[:, :] = cliw.field[:, 0, :]
+            clcw_save[:, :,:] = clcw.field[:, :, :]
+            cliw_save[:, :, :] = cliw.field[:, :, :]
 
     # Scale specific humidity to dry mixing ratio
-    qv2di = qv2di_spechum.field[:, 0, :] / (1.0 - qv2di_spechum.field[:, 0, :])
-    forceqv = forceqv_spechum.field[:, 0, :] / (1.0 - qv2di_spechum.field[:, 0, :])
-    qv = qv_spechum.field[:, 0, :] / (1.0 - qv_spechum.field[:, 0, :])
+    qv2di = qv2di_spechum.field[:, :, :] / (1.0 - qv2di_spechum.field[:, :, :])
+    forceqv = forceqv_spechum.field[:, :, :] / (1.0 - qv2di_spechum.field[:, :, :])
+    qv = qv_spechum.field[:, :, :] / (1.0 - qv_spechum.field[:, :, :])
 
     # Initialize random perturbations based on spp_cu_deep
     if spp_cu_deep == 0:
-        rand_mom[:] = 0.0
-        rand_vmas[:] = 0.0
-        rand_clos[:, :] = 0.0
+        rand_mom[:, :] = 0.0
+        rand_vmas[:, :] = 0.0
+        rand_clos[:, :, :] = 0.0
     else:
         for i in range(im):  # Python indices start at 0
-            spp_wts_cu_deep_tmp = min(max(-1.0, spp_wts_cu_deep.field[i, 0, 0]), 1.0)
-            rand_mom[i] = spp_wts_cu_deep_tmp
-            rand_vmas[i] = spp_wts_cu_deep_tmp
-            rand_clos[i, :] = spp_wts_cu_deep_tmp
+            for j in range(jm):
+                spp_wts_cu_deep_tmp = min(max(-1.0, spp_wts_cu_deep.field[i, j, 0]), 1.0)
+                rand_mom[i, j] = spp_wts_cu_deep_tmp
+                rand_vmas[i, j] = spp_wts_cu_deep_tmp
+                rand_clos[i, j, :] = spp_wts_cu_deep_tmp
 
    # Initialize indices and constants
     its = 0
     ite = im - 1
     itf = ite
     jts = 0
-    jte = 0
+    jte = jm - 1
     jtf = jte
     kts = 0
     kte = km - 1
@@ -428,210 +430,220 @@ def cu_gf_driver_run(state, errmsg, errflg):
     qfm = 0.0
 
     # Initialize arrays
-    ud_mf.field[:, 0, :] = 0.0
-    dd_mf.field[:, 0, :] = 0.0
-    dt_mf.field[:, 0, :] = 0.0
+    ud_mf.field[:, :, :] = 0.0
+    dd_mf.field[:, :, :] = 0.0
+    dt_mf.field[:, :, :] = 0.0
     tau_ecmwf[:] = 0.0
 
     # Initialize `j`
     j = 1
 
     # Initialize `ht` array
-    ht[:] = phil.field[:, 0, 0] / g
+    ht[:, :] = phil.field[:, :, 0] / g
 
     # Loop over grid points to calculate `zo`, `dz8w`, and `zh`
     for i in range(its, ite + 1):  # Adjusted for Python's zero-based indexing
-        cld1d.field[i, 0, 0] = 0.0
-        zo[i, :] = phil.field[i, 0, :] / g
-        dz8w[i, 0] = zo[i, 1] - zo[i, 0]
-        zh[0] = 0.0
-        kpbli[i] = 1
+        for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
+            cld1d.field[i, j, 0] = 0.0
+            zo[i, j, :] = phil.field[i, j, :] / g
+            dz8w[i, j, 0] = zo[i, j, 1] - zo[i, j, 0]
+            zh[0] = 0.0
+            kpbli[i, j] = 1
 
-        for k in range(kts + 1, ktf + 1):  # Loop over vertical levels
-            dz8w[i, k] = zo[i, k + 1] - zo[i, k]
+            for k in range(kts + 1, ktf + 1):  # Loop over vertical levels
+                dz8w[i, j, k] = zo[i, j, k + 1] - zo[i, j, k]
 
-        for k in range(kts + 1, ktf + 1):
-            zh[k] = zh[k - 1] + dz8w[i, k - 1]
-            if zh[k] > pbl.field[i, 0, 0]:
-                kpbli[i] = max(1, k)
-                break
+            for k in range(kts + 1, ktf + 1):
+                zh[k] = zh[k - 1] + dz8w[i, j, k - 1]
+                if zh[k] > pbl.field[i, j, 0]:
+                    kpbli[i, j] = max(1, k)
+                    break
 
     # Initialize arrays and variables
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        forcing[i, :] = 0.0
-        forcing2[i, :] = 0.0
-        ccn_gf[i] = 0.0
-        ccn_m[i] = 0.0
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            forcing[i, j, :] = 0.0
+            forcing2[i, j, :] = 0.0
+            ccn_gf[i, j] = 0.0
+            ccn_m[i, j] = 0.0
 
-        # Set AOD and CCN
-        if flag_init and not flag_restart:
-            aod_gf.field[i, 0, 0] = aodc0
-        else:
-            if cactiv.field[i] == 0 and cactiv_m.field[i] == 0:
-                if aodc0 > aod_gf.field[i, 0, 0]:
-                    aod_gf.field[i, 0, 0] += (aodc0 - aod_gf.field[i, 0, 0]) * (dt / (aodreturn * 60))
-                if aod_gf.field[i, 0, 0] > aodc0:
-                    aod_gf.field[i, 0, 0] = aodc0
+            # Set AOD and CCN
+            if flag_init and not flag_restart:
+                aod_gf.field[i, j, 0] = aodc0
+            else:
+                if cactiv.field[i, j] == 0 and cactiv_m.field[i, j] == 0:
+                    if aodc0 > aod_gf.field[i, j, 0]:
+                        aod_gf.field[i, j, 0] += (aodc0 - aod_gf.field[i, j, 0]) * (dt / (aodreturn * 60))
+                    if aod_gf.field[i, j, 0] > aodc0:
+                        aod_gf.field[i, j, 0] = aodc0
 
-        ccn_gf[i] = max(5.0, (aod_gf.field[i, 0, 0] / 0.0027) ** (1 / 0.640))
-        ccn_m[i] = ccn_gf[i]
+            ccn_gf[i, j] = max(5.0, (aod_gf.field[i, j, 0] / 0.0027) ** (1 / 0.640))
+            ccn_m[i, j] = ccn_gf[i, j]
 
-        ccnclean = max(5.0, (aodc0 / 0.0027) ** (1 / 0.640))
+            ccnclean = max(5.0, (aodc0 / 0.0027) ** (1 / 0.640))
 
-        hbot.field[i, 0, 0] = kte
-        htop.field[i, 0, 0] = kts
-        raincv.field[i, 0, 0] = 0.0
-        xlandi[i] = float(xland.field[i, 0, 0])  # Convert to real (float in Python)
+            hbot.field[i, j, 0] = kte
+            htop.field[i, j, 0] = kts
+            raincv.field[i, j, 0] = 0.0
+            xlandi[i, j] = float(xland.field[i, j, 0])  # Convert to real (float in Python)
 
     # Initialize `mconv` array
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        mconv[i] = 0.0
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            mconv[i, j] = 0.0
 
     # Initialize `omeg`, `zu`, `zum`, `zus`, `zd`, and `zdm` arrays
     for k in range(kts, kte + 1):  # Loop over vertical levels
         for i in range(its, itf + 1):  # Loop over horizontal grid points
-            omeg[i, k] = 0.0
-            zu[i, k] = 0.0
-            zum[i, k] = 0.0
-            zus[i, k] = 0.0
-            zd[i, k] = 0.0
-            zdm[i, k] = 0.0
+            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+                omeg[i, j, k] = 0.0
+                zu[i, j, k] = 0.0
+                zum[i, j, k] = 0.0
+                zus[i, j, k] = 0.0
+                zd[i, j, k] = 0.0
+                zdm[i, j, k] = 0.0
 
     # Scale surface pressure
-    psur[:] = 0.01 * psuri.field[:, 0, 0]
+    psur[:, :] = 0.01 * psuri.field[:, :, 0]
 
     # Compute `ter11` array
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        ter11[i] = max(0.0, ht[i])
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            ter11[i, j] = max(0.0, ht[i, j])
 
     # Initialize `cnvw`, `cnvc`, `gdc`, and `gdc2` arrays
     for k in range(kts, kte + 1):  # Loop over vertical levels
         for i in range(its, ite + 1):  # Loop over horizontal grid points
-            cnvw[i, k] = 0.0
-            cnvc.field[i, 0, k] = 0.0
-            gdc[i, k, 0] = 0.0
-            gdc[i, k, 1] = 0.0
-            gdc[i, k, 2] = 0.0
-            gdc[i, k, 3] = 0.0
-            gdc[i, k, 6] = 0.0
-            gdc[i, k, 7] = 0.0
-            gdc[i, k, 8] = 0.0
-            gdc[i, k, 9] = 0.0
-            gdc2[i, k, 0] = 0.0
+            for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
+                cnvw[i, j, k] = 0.0
+                cnvc.field[i, j, k] = 0.0
+                gdc[i, j, k, 0] = 0.0
+                gdc[i, j, k, 1] = 0.0
+                gdc[i, j, k, 2] = 0.0
+                gdc[i, j, k, 3] = 0.0
+                gdc[i, j, k, 6] = 0.0
+                gdc[i, j, k, 7] = 0.0
+                gdc[i, j, k, 8] = 0.0
+                gdc[i, j, k, 9] = 0.0
+                gdc2[i, j, k, 0] = 0.0
 
     # Initialize error arrays
-    ierr[:] = 0
-    ierrm[:] = 0
-    ierrs[:] = 0
+    ierr[:, :] = 0
+    ierrm[:, :] = 0
+    ierrs[:, :] = 0
 
     # Initialize tendency arrays
-    cuten[:] = 0.0
-    cutenm[:] = 0.0
-    cutens[:] = 0.0
-    ierrc[:] = " "
+    cuten[:, :] = 0.0
+    cutenm[:, :] = 0.0
+    cutens[:, :] = 0.0
+    ierrc[:, :] = " "
 
     # Initialize arrays
-    kbcon[:] = -1
-    kbcons[:] = -1
-    kbconm[:] = -1
+    kbcon[:, :] = -1
+    kbcons[:, :] = -1
+    kbconm[:, :] = -1
 
-    ktop[:] = -1
-    ktops[:] = -1
-    ktopm[:] = -1
+    ktop[:, :] = -1
+    ktops[:, :] = -1
+    ktopm[:, :] = -1
 
-    xmb[:] = 0.0
-    xmb_dumm[:] = 0.0
-    xmbm[:] = 0.0
-    xmbs[:] = 0.0
-    xmbs2[:] = 0.0
+    xmb[:, :] = 0.0
+    xmb_dumm[:, :] = 0.0
+    xmbm[:, :] = 0.0
+    xmbs[:, :] = 0.0
+    xmbs2[:, :] = 0.0
 
-    k22s[:] = -1
-    k22m[:] = -1
-    k22[:] = -1
+    k22s[:, :] = -1
+    k22m[:, :] = -1
+    k22[:, :] = -1
 
-    jmin[:] = -1
-    jminm[:] = -1
+    jmin[:, :] = -1
+    jminm[:, :] = -1
 
-    pret[:] = 0.0
-    prets[:] = 0.0
-    pretm[:] = 0.0
+    pret[:, :] = 0.0
+    prets[:, :] = 0.0
+    pretm[:, :] = 0.0
 
-    umean[:] = 0.0
-    vmean[:] = 0.0
-    pmean[:] = 0.0
+    umean[:, :] = 0.0
+    vmean[:, :] = 0.0
+    pmean[:, :] = 0.0
 
-    cupclw[:, :] = 0.0
-    cupclwm[:, :] = 0.0
-    cupclws[:, :] = 0.0
+    cupclw[:, :, :] = 0.0
+    cupclwm[:, :, :] = 0.0
+    cupclws[:, :, :] = 0.0
 
-    cnvwt[:, :] = 0.0
-    cnvwts[:, :] = 0.0
-    cnvwtm[:, :] = 0.0
+    cnvwt[:, :, :] = 0.0
+    cnvwts[:, :, :] = 0.0
+    cnvwtm[:, : ,:] = 0.0
 
-    hco[:, :] = 0.0
-    hcom[:, :] = 0.0
-    hcdo[:, :] = 0.0
-    hcdom[:, :] = 0.0
+    hco[:, :, :] = 0.0
+    hcom[:, :, :] = 0.0
+    hcdo[:, :, :] = 0.0
+    hcdom[:, :, :] = 0.0
 
-    outt[:, :] = 0.0
-    outts[:, :] = 0.0
-    outtm[:, :] = 0.0
+    outt[:, :, :] = 0.0
+    outts[:, :, :] = 0.0
+    outtm[:, :, :] = 0.0
 
-    outu[:, :] = 0.0
-    outus[:, :] = 0.0
-    outum[:, :] = 0.0
+    outu[:, :, :] = 0.0
+    outus[:, :, :] = 0.0
+    outum[:, :, :] = 0.0
 
-    outv[:, :] = 0.0
-    outvs[:, :] = 0.0
-    outvm[:, :] = 0.0
+    outv[:, :, :] = 0.0
+    outvs[:, :, :] = 0.0
+    outvm[:, :, :] = 0.0
 
-    outq[:, :] = 0.0
-    outqs[:, :] = 0.0
-    outqm[:, :] = 0.0
+    outq[:, :, :] = 0.0
+    outqs[:, :, :] = 0.0
+    outqm[:, :, :] = 0.0
 
-    outqc[:, :] = 0.0
-    outqcs[:, :] = 0.0
-    outqcm[:, :] = 0.0
+    outqc[:, :, :] = 0.0
+    outqcs[:, :, :] = 0.0
+    outqcm[:, :, :] = 0.0
 
-    subm[:, :] = 0.0
-    dhdt[:, :] = 0.0
+    subm[:, :, :] = 0.0
+    dhdt[:, :, :] = 0.0
 
-    frhm[:] = 0.0
-    frhd[:] = 0.0
+    frhm[:, :] = 0.0
+    frhd[:, :] = 0.0
 
     # Loop over vertical levels and horizontal grid points
     for k in range(kts, ktf + 1):  # Loop over vertical levels
         for i in range(its, itf + 1):  # Loop over horizontal grid points
-            p2d[i, k] = 0.01 * p2di.field[i, 0, k]
-            po[i, k] = p2d[i, k]
-            rhoi[i, k] = 100.0 * p2d[i, k] / (287.04 * (t2di.field[i, 0, k] * (1.0 + 0.608 * qv2di[i, k])))
-            qcheck[i, k] = qv[i, k]
-            tn[i, k] = t.field[i, 0, k]
-            qo[i, k] = max(1.0e-16, qv[i, k])
-            t2d[i, k] = t2di.field[i, 0, k] - forcet.field[i, 0, k] * dt
-            q2d[i, k] = max(1.0e-16, qv2di[i, k] - forceqv[i, k] * dt)
-            if qo[i, k] < 1.0e-16:
-                qo[i, k] = 1.0e-16
-            tshall[i, k] = t2d[i, k]
-            qshall[i, k] = q2d[i, k]
+            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+                p2d[i, j, k] = 0.01 * p2di.field[i, j, k]
+                po[i, j, k] = p2d[i, j, k]
+                rhoi[i, j, k] = 100.0 * p2d[i, j, k] / (287.04 * (t2di.field[i, j, k] * (1.0 + 0.608 * qv2di[i, j, k])))
+                qcheck[i, j, k] = qv[i, j, k]
+                tn[i, j, k] = t.field[i, j, k]
+                qo[i, j, k] = max(1.0e-16, qv[i, j, k])
+                t2d[i, j, k] = t2di.field[i, j, k] - forcet.field[i, j, k] * dt
+                q2d[i, j, k] = max(1.0e-16, qv2di[i, j, k] - forceqv[i, j, k] * dt)
+                if qo[i, j, k] < 1.0e-16:
+                    qo[i, j, k] = 1.0e-16
+                tshall[i, j, k] = t2d[i, j, k]
+                qshall[i, j, k] = q2d[i, j, k]
 
     # Loop over horizontal grid points and vertical levels
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        for k in range(kts, kpbli[i] + 1):  # Loop over vertical levels up to `kpbli`
-            tshall[i, k] = t.field[i, 0, k]
-            qshall[i, k] = max(1.0e-16, qv[i, k])
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            for k in range(kts, kpbli[i, j] + 1):  # Loop over vertical levels up to `kpbli`
+                tshall[i, j, k] = t.field[i, j, k]
+                qshall[i, j, k] = max(1.0e-16, qv[i, j, k])
 
     # Convert `hfx2` and `qfx2` to W/m²
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        hfx[i] = hfx2.field[i, 0, 0] * cp * rhoi[i, 0]
-        qfx[i] = qfx2.field[i, 0, 0] * xlv * rhoi[i, 0]
-        dx[i] = np.sqrt(garea.field[i])
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            hfx[i, j] = hfx2.field[i, j, 0] * cp * rhoi[i, j, 0]
+            qfx[i, j] = qfx2.field[i, j, 0] * xlv * rhoi[i, j, 0]
+            dx[i, j] = np.sqrt(garea.field[i, j])
 
     # Update `tn` and `qo` arrays
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        for k in range(kts, kpbli[i] + 1):  # Loop over vertical levels up to `kpbli`
-            tn[i, k] = t.field[i, 0, k]
-            qo[i, k] = max(1.0e-16, qv[i, k])
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            for k in range(kts, kpbli[i, j] + 1):  # Loop over vertical levels up to `kpbli`
+                tn[i, j, k] = t.field[i, j, k]
+                qo[i, j, k] = max(1.0e-16, qv[i, j, k])
 
     # Initialize `nbegin` and `nend`
     nbegin = 0
@@ -639,102 +651,141 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
     # Compute `dhdt` array
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        for k in range(kts, kpbli[i] + 1):  # Loop over vertical levels up to `kpbli`
-            dhdt[i, k] = cp * (forcet.field[i, 0, k] + (t.field[i, 0, k] - t2di.field[i, 0, k]) / dt) + \
-                         xlv * (forceqv[i, k] + (qv[i, k] - qv2di[i, k]) / dt)
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            for k in range(kts, kpbli[i, j] + 1):  # Loop over vertical levels up to `kpbli`
+                dhdt[i, j, k] = cp * (forcet.field[i, j, k] + (t.field[i, j, k] - t2di.field[i, j, k]) / dt) + \
+                            xlv * (forceqv[i, j, k] + (qv[i, j, k] - qv2di[i, j, k]) / dt)
 
     # Compute umean, vmean, and pmean
     for k in range(kts + 1, ktf):
         for i in range(its, itf + 1):
-            if (p2d[i, 1] - p2d[i, k]) > 150 and p2d[i, k] > 300:
-                dp = -0.5 * (p2d[i, k + 1] - p2d[i, k - 1])
-                umean[i] += us.field[i, 0, k] * dp
-                vmean[i] += vs.field[i, 0, k] * dp
-                pmean[i] += dp
+            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+                if (p2d[i, j, 1] - p2d[i, j, k]) > 150 and p2d[i, j, k] > 300:
+                    dp = -0.5 * (p2d[i, j, k + 1] - p2d[i, j, k - 1])
+                    umean[i, j] += us.field[i, j, k] * dp
+                    vmean[i, j] += vs.field[i, j, k] * dp
+                    pmean[i, j] += dp
 
     # Compute `psum` and update `forcing` arrays
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        psum = 0.0
-        for k in range(kts, ktf - 2):  # Loop over vertical levels
-            if clcw.field[i, 0, k] > -999.0 and clcw.field[i, 0, k + 1] > -999.0:
-                dp = p2d[i, k] - p2d[i, k + 1]
-                psum += dp
-                clwtot = cliw.field[i, 0, k] + clcw.field[i, 0, k]
-                if clwtot < 1.0e-32:
-                    clwtot = 0.0
-                forcing[i, 6] += clwtot * dp
-        if psum > 0.0:
-            forcing[i, 6] /= psum
-        forcing2[i, 6] = forcing[i, 6]
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            psum = 0.0
+            for k in range(kts, ktf - 2):  # Loop over vertical levels
+                if clcw.field[i, j, k] > -999.0 and clcw.field[i, j, k + 1] > -999.0:
+                    dp = p2d[i, j, k] - p2d[i, j, k + 1]
+                    psum += dp
+                    clwtot = cliw.field[i, j, k] + clcw.field[i, j, k]
+                    if clwtot < 1.0e-32:
+                        clwtot = 0.0
+                    forcing[i, j, 6] += clwtot * dp
+            if psum > 0.0:
+                forcing[i, j, 6] /= psum
+            forcing2[i, j, 6] = forcing[i, j, 6]
 
     # Update `omeg` array
     for k in range(kts, ktf):  # Loop over vertical levels
         for i in range(its, itf + 1):  # Loop over horizontal grid points
-            omeg[i, k] = w.field[i, 0, k]  # Original Fortran comment: `!-g*rhoi(i,k)*w(i,k)`
+            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+                omeg[i, j, k] = w.field[i, j, k]  # Original Fortran comment: `!-g*rhoi(i, j,k)*w(i, j,k)`
 
     # Update `mconv` and `ierr` arrays
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        if mconv[i] < 0.0:
-            mconv[i] = 0.0
-        if dx[i] < 6500.0 and do_mynnedmf and maxMF.field[i, 0, 0] > 0.0:
-            ierr[i] = 555
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            if mconv[i, j] < 0.0:
+                mconv[i, j] = 0.0
+            if dx[i, j] < 6500.0 and do_mynnedmf and maxMF.field[i, j, 0] > 0.0:
+                ierr[i, j] = 555
 
    # Check if `dx` at `its` is less than 6500
-    if dx[its] < 6500.0:
+    if dx[its, jts] < 6500.0:
         imid_gf = 0
 
     # Call cumulus parameterization
     if ishallow_g3 == 1:
         # Initialize `ierrs` and `ierrm`
         for i in range(its, ite + 1):
-            ierrs[i] = 0
-            ierrm[i] = 0
+            for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
+                ierrs[i, j] = 0
+                ierrm[i, j] = 0
 
         # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
         # print(f"{ichoice_s:>4}{ipr:>4}")
         # for i in range(im):
-        #     print(f"{kpbli[i]:>4}{kbcons[i]:>4}{ktops[i]:>4}{k22s[i]:>4}{tropics[i]:>4}")
+        #     print(f"{kpbli[i, j]:>4}{kbcons[i, j]:>4}{ktops[i, j]:>4}{k22s[i, j]:>4}{tropics[i, j]:>4}")
         # print(f"{tcrit:>20.12E}{dt:>20.12E}")
         # for i in range(im):
-        #     print(f"{ter11[i]:>20.12E}{psur[i]:>20.12E}{hfx[i]:>20.12E}{qfx[i]:>20.12E}{xlandi[i]:>20.12E}{xmbs[i]:>20.12E}{prets[i]:>20.12E}")
+        #     print(f"{ter11[i, j]:>20.12E}{psur[i, j]:>20.12E}{hfx[i, j]:>20.12E}{qfx[i, j]:>20.12E}{xlandi[i, j]:>20.12E}{xmbs[i, j]:>20.12E}{prets[i, j]:>20.12E}")
         # for i in range(im):
         #     for k in range(km):
-        #         print(f"{us[i,k]:>20.12E}{vs[i,k]:>20.12E}{zo[i,k]:>20.12E}{t2d[i,k]:>20.12E}{q2d[i,k]:>20.12E}{tshall[i,k]:>20.12E}{qshall[i,k]:>20.12E}")
+        #         print(f"{us[i, j,k]:>20.12E}{vs[i, j,k]:>20.12E}{zo[i, j,k]:>20.12E}{t2d[i, j,k]:>20.12E}{q2d[i, j,k]:>20.12E}{tshall[i, j,k]:>20.12E}{qshall[i, j,k]:>20.12E}")
         #     for k in range(km):
-        #         print(f"{p2d[i,k]:>20.12E}{dhdt[i,k]:>20.12E}{rhoi[i,k]:>20.12E}{zus[i,k]:>20.12E}")
+        #         print(f"{p2d[i, j,k]:>20.12E}{dhdt[i, j,k]:>20.12E}{rhoi[i, j,k]:>20.12E}{zus[i, j,k]:>20.12E}")
         #     for k in range(km):
-        #         print(f"{outts[i,k]:>20.12E}{outqs[i,k]:>20.12E}{outqcs[i,k]:>20.12E}{outus[i,k]:>20.12E}{outvs[i,k]:>20.12E}{cnvwt[i,k]:>20.12E}{cupclws[i,k]:>20.12E}")
+        #         print(f"{outts[i, j,k]:>20.12E}{outqs[i, j,k]:>20.12E}{outqcs[i, j,k]:>20.12E}{outus[i, j,k]:>20.12E}{outvs[i, j,k]:>20.12E}{cnvwt[i, j,k]:>20.12E}{cupclws[i, j,k]:>20.12E}")
 
         cu_gf_sh_run(
-            us.field[:, 0, :], vs.field[:, 0, :], zo, t2d, q2d, ter11, tshall, qshall, p2d, psur, dhdt, kpbli,
-            rhoi, hfx, qfx, xlandi, ichoice_s, tcrit, dt, zus, xmbs, kbcons, ktops,
-            k22s, ierrs, ierrcs, outts, outqs, outqcs, outus, outvs, cnvwt, prets,
-            cupclws, itf, ktf, its, ite, kts, kte, ipr, tropics
+            us.field.reshape((im * jm, km)),
+            vs.field.reshape((im * jm, km)),
+            zo.reshape((im * jm, km)),
+            t2d.reshape((im * jm, km)),
+            q2d.reshape((im * jm, km)),
+            ter11.reshape((im * jm)),
+            tshall.reshape((im * jm, km)),
+            qshall.reshape((im * jm, km)),
+            p2d.reshape((im * jm, km)),
+            psur.reshape((im * jm)),
+            dhdt.reshape((im * jm, km)),
+            kpbli.reshape((im * jm)),
+            rhoi.reshape((im * jm, km)),
+            hfx.reshape(im * jm),
+            qfx.reshape(im * jm),
+            xlandi.reshape(im * jm),
+            ichoice_s,
+            tcrit,
+            dt,
+            zus.reshape((im * jm, km)),
+            xmbs.reshape(im * jm),
+            kbcons.reshape(im * jm),
+            ktops.reshape(im * jm),
+            k22s.reshape(im * jm),
+            ierrs.reshape(im * jm),
+            ierrcs.reshape(im * jm),
+            outts.reshape((im * jm, km)),
+            outqs.reshape((im * jm, km)),
+            outqcs.reshape((im * jm, km)),
+            outus.reshape((im * jm, km)),
+            outvs.reshape((im * jm, km)),
+            cnvwt.reshape((im * jm, km)),
+            prets.reshape((im * jm)),
+            cupclws.reshape((im * jm, km)),
+            itf, jtf, ktf, its, ite, jts, jte, kts, kte, ipr,
+            tropics.reshape((im * jm))
         )
         
         # Output variables match
         # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
         # print(f"{ichoice_s:>4}{ipr:>4}")
         # for i in range(im):
-        #     print(f"{kpbli[i]:>4}{kbcons[i]:>4}{ktops[i]:>4}{k22s[i]:>4}{tropics[i]:>4}")
+        #     print(f"{kpbli[i, j]:>4}{kbcons[i, j]:>4}{ktops[i, j]:>4}{k22s[i, j]:>4}{tropics[i, j]:>4}")
         # print(f"{tcrit:>20.12E}{dt:>20.12E}")
         # for i in range(im):
-        #     print(f"{ter11[i]:>20.12E}{psur[i]:>20.12E}{hfx[i]:>20.12E}{qfx[i]:>20.12E}{xlandi[i]:>20.12E}{xmbs[i]:>20.12E}{prets[i]:>20.12E}")
+        #     print(f"{ter11[i, j]:>20.12E}{psur[i, j]:>20.12E}{hfx[i, j]:>20.12E}{qfx[i, j]:>20.12E}{xlandi[i, j]:>20.12E}{xmbs[i, j]:>20.12E}{prets[i, j]:>20.12E}")
         # for i in range(im):
         #     for k in range(km):
-        #         print(f"{us[i,k]:>20.12E}{vs[i,k]:>20.12E}{zo[i,k]:>20.12E}{t2d[i,k]:>20.12E}{q2d[i,k]:>20.12E}{tshall[i,k]:>20.12E}{qshall[i,k]:>20.12E}")
+        #         print(f"{us[i, j,k]:>20.12E}{vs[i, j,k]:>20.12E}{zo[i, j,k]:>20.12E}{t2d[i, j,k]:>20.12E}{q2d[i, j,k]:>20.12E}{tshall[i, j,k]:>20.12E}{qshall[i, j,k]:>20.12E}")
         #     for k in range(km):
-        #         print(f"{p2d[i,k]:>20.12E}{dhdt[i,k]:>20.12E}{rhoi[i,k]:>20.12E}{zus[i,k]:>20.12E}")
+        #         print(f"{p2d[i, j,k]:>20.12E}{dhdt[i, j,k]:>20.12E}{rhoi[i, j,k]:>20.12E}{zus[i, j,k]:>20.12E}")
         #     for k in range(km):
-        #         print(f"{outts[i,k]:>20.12E}{outqs[i,k]:>20.12E}{outqcs[i,k]:>20.12E}{outus[i,k]:>20.12E}{outvs[i,k]:>20.12E}{cnvwt[i,k]:>20.12E}{cupclws[i,k]:>20.12E}")
+        #         print(f"{outts[i, j,k]:>20.12E}{outqs[i, j,k]:>20.12E}{outqcs[i, j,k]:>20.12E}{outus[i, j,k]:>20.12E}{outvs[i, j,k]:>20.12E}{cnvwt[i, j,k]:>20.12E}{cupclws[i, j,k]:>20.12E}")
 
         # Update `cutens`, `ierrm`, and `ierr` based on `xmbs`
         for i in range(its, itf + 1):
-            if xmbs[i] > 0.0:
-                cutens[i] = 1.0
-                if dx[i] < 6500.0:
-                    ierrm[i] = 555
-                    ierr[i] = 555
+            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+                if xmbs[i, j] > 0.0:
+                    cutens[i, j] = 1.0
+                    if dx[i, j] < 6500.0:
+                        ierrm[i, j] = 555
+                        ierr[i, j] = 555
 
         # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
         # print(f"{ipn:>4}{ktops[0]:>4}")
@@ -744,8 +795,8 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
         # Call `neg_check` for GF shallow convection
         neg_check(
-            "shallow", ipn, dt, qcheck, outqs, outts, outus, outvs, outqcs, prets,
-            its, ite, kts, kte, itf, ktf, ktops
+            "shallow", ipn, dt, qcheck.reshape((im * jm, km)), outqs.reshape((im * jm, km)), outts.reshape((im * jm, km)), outus.reshape((im * jm, km)), outvs.reshape((im * jm, km)), outqcs.reshape((im * jm, km)), prets.reshape((im * jm)),
+            its, ite, jts, jte, kts, kte, itf, jtf, ktf, ktops.reshape((im * jm))
         )
 
         # Output variables match
@@ -785,69 +836,69 @@ def cu_gf_driver_run(state, errmsg, errflg):
         # print(f"{do_smoke_transport:>10}")
 
         cu_gf_deep_run(
-            itf, ktf, its, ite, kts, kte,
+            itf, jtf, ktf, its, ite, jts, jte, kts, kte,
             dicycle_m,
             ichoicem,
             ipr,
-            ccn_m,
+            ccn_m.reshape((im * jm)),
             ccnclean,
             dt,
             imid_gf,
-            kpbli,
-            dhdt,
-            xlandi,
-            zo,
-            forcing,
-            t2d,
-            q2d,
-            ter11,
-            tshall,
-            qshall,
-            p2d,
-            psur,
-            us.field[:, 0, :],
-            vs.field[:, 0, :],
-            rhoi,
-            hfx,
-            qfx,
-            dx,
-            mconv,
-            omeg,
-            cactiv_m.field,
-            cnvwtm,
-            zum,
-            zdm,
-            zdd,
-            edtm,
-            edtd,
-            xmbm,
-            xmb_dumm,
-            xmbs,
-            pretm,
-            outum,
-            outvm,
-            outtm,
-            outqm,
-            outqcm,
-            kbconm,
-            ktopm,
-            cupclwm,
-            frhm,
-            ierrm,
-            ierrcm,
+            kpbli.reshape((im * jm)),
+            dhdt.reshape((im * jm, km)),
+            xlandi.reshape(im * jm),
+            zo.reshape((im * jm, km)),
+            forcing.reshape((im * jm, 10)),
+            t2d.reshape((im * jm, km)),
+            q2d.reshape((im * jm, km)),
+            ter11.reshape((im * jm)),
+            tshall.reshape((im * jm, km)),
+            qshall.reshape((im * jm, km)),
+            p2d.reshape((im * jm, km)),
+            psur.reshape((im * jm)),
+            us.field.reshape((im * jm, km)),
+            vs.field.reshape((im * jm, km)),
+            rhoi.reshape((im * jm, km)),
+            hfx.reshape((im * jm)),
+            qfx.reshape((im * jm)),
+            dx.reshape((im * jm)),
+            mconv.reshape((im * jm)),
+            omeg.reshape((im * jm, km)),
+            cactiv_m.field.reshape((im * jm)),
+            cnvwtm.reshape((im * jm, km)),
+            zum.reshape((im * jm, km)),
+            zdm.reshape((im * jm, km)),
+            zdd.reshape((im * jm, km)),
+            edtm.reshape((im * jm)),
+            edtd.reshape((im * jm)),
+            xmbm.reshape((im * jm)),
+            xmb_dumm.reshape((im * jm)),
+            xmbs.reshape((im * jm)),
+            pretm.reshape((im * jm)),
+            outum.reshape((im * jm, km)),
+            outvm.reshape((im * jm, km)),
+            outtm.reshape((im * jm, km)),
+            outqm.reshape((im * jm, km)),
+            outqcm.reshape((im * jm, km)),
+            kbconm.reshape((im * jm)),
+            ktopm.reshape((im * jm)),
+            cupclwm.reshape((im * jm, km)),
+            frhm.reshape((im * jm)),
+            ierrm.reshape((im * jm)),
+            ierrcm.reshape((im * jm)),
             nchem,
-            fscav.field,
+            fscav,
             chem3d if chem3d is None else chem3d.field,
-            wetdpc_mid,
+            wetdpc_mid.reshape((im * jm)),
             do_smoke_transport,
-            rand_mom,
-            rand_vmas,
-            rand_clos,
+            rand_mom.reshape((im * jm)),
+            rand_vmas.reshape((im * jm)),
+            rand_clos.reshape((im * jm, km)),
             spp_cu_deep,
             do_cap_suppress_here,
-            cap_suppress_j,
-            k22m,
-            jminm,
+            cap_suppress_j.reshape((im * jm)),
+            k22m.reshape((im * jm)),
+            jminm.reshape((im * jm)),
             kdt,
             tropics
         )
@@ -879,13 +930,14 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
         # Update `qcheck` array
         for i in range(its, itf + 1):
-            for k in range(kts, ktf + 1):
-                qcheck[i, k] = qv[i, k] + outqs[i, k] * dt
+            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+                for k in range(kts, ktf + 1):
+                    qcheck[i, j, k] = qv[i, j, k] + outqs[i, j, k] * dt
 
         # Call `neg_check` for middle GF convection
         neg_check(
-            "mid", ipn, dt, qcheck, outqm, outtm, outum, outvm,
-            outqcm, pretm, its, ite, kts, kte, itf, ktf, ktopm
+            "mid", ipn, dt, qcheck.reshape((im * jm, km)), outqm.reshape((im * jm, km)), outtm.reshape((im * jm, km)), outum.reshape((im * jm, km)), outvm.reshape((im * jm, km)),
+            outqcm.reshape((im * jm, km)), pretm.reshape((im * jm)), its, ite, jts, jte, kts, kte, itf, jtf, ktf, ktopm.reshape((im * jm))
         )
 
     if ideep == 1:
@@ -917,69 +969,69 @@ def cu_gf_driver_run(state, errmsg, errflg):
         # print(f"{do_smoke_transport:>10}")
 
         cu_gf_deep_run(
-            itf, ktf, its, ite, kts, kte,
+            itf, jtf, ktf, its, ite, jts, jte, kts, kte,
             dicycle,
             ichoice,
             ipr,
-            ccn_gf,
+            ccn_gf.reshape((im * jm)),
             ccnclean,
             dt,
             0,
-            kpbli,
-            dhdt,
-            xlandi,
-            zo,
-            forcing2,
-            t2d,
-            q2d,
-            ter11,
-            tn,
-            qo,
-            p2d,
-            psur,
-            us.field[:, 0, :],
-            vs.field[:, 0, :],
-            rhoi,
-            hfx,
-            qfx,
-            dx,
-            mconv,
-            omeg,
-            cactiv.field,
-            cnvwt,
-            zu,
-            zd,
-            zdm,
-            edt,
-            edtm,
-            xmb,
-            xmbm,
-            xmbs,
-            pret,
-            outu,
-            outv,
-            outt,
-            outq,
-            outqc,
-            kbcon,
-            ktop,
-            cupclw,
-            frhd,
-            ierr,
-            ierrc,
+            kpbli.reshape((im * jm)),
+            dhdt.reshape((im * jm, km)),
+            xlandi.reshape((im * jm)),
+            zo.reshape((im * jm, km)),
+            forcing2.reshape((im * jm, 10)),
+            t2d.reshape((im * jm, km)),
+            q2d.reshape((im * jm, km)),
+            ter11.reshape((im * jm)),
+            tn.reshape((im * jm, km)),
+            qo.reshape((im * jm, km)),
+            p2d.reshape((im * jm, km)),
+            psur.reshape((im * jm)),
+            us.field.reshape((im * jm, km)),
+            vs.field.reshape((im * jm, km)),
+            rhoi.reshape((im * jm, km)),
+            hfx.reshape((im * jm)),
+            qfx.reshape((im * jm)),
+            dx.reshape((im * jm)),
+            mconv.reshape((im * jm)),
+            omeg.reshape((im * jm, km)),
+            cactiv.field.reshape((im * jm)),
+            cnvwt.reshape((im * jm, km)),
+            zu.reshape((im * jm, km)),
+            zd.reshape((im * jm, km)),
+            zdm.reshape((im * jm, km)),
+            edt.reshape((im * jm)),
+            edtm.reshape((im * jm)),
+            xmb.reshape((im * jm)),
+            xmbm.reshape((im * jm)),
+            xmbs.reshape((im * jm)),
+            pret.reshape((im * jm)),
+            outu.reshape((im * jm, km)),
+            outv.reshape((im * jm, km)),
+            outt.reshape((im * jm, km)),
+            outq.reshape((im * jm, km)),
+            outqc.reshape((im * jm, km)),
+            kbcon.reshape((im * jm)),
+            ktop.reshape((im * jm)),
+            cupclw.reshape((im * jm, km)),
+            frhd.reshape((im * jm)),
+            ierr.reshape((im * jm)),
+            ierrc.reshape((im * jm)),
             nchem,
-            fscav.field,
+            fscav,
             chem3d if chem3d is None else chem3d.field,
-            wetdpc_deep if wetdpc_deep is None else wetdpc_deep.field,
+            wetdpc_deep if wetdpc_deep is None else wetdpc_deep.field.reshape((im * jm)),
             do_smoke_transport,
-            rand_mom,
-            rand_vmas,
-            rand_clos,
+            rand_mom.reshape((im * jm)),
+            rand_vmas.reshape((im * jm)),
+            rand_clos.reshape((im * jm, km)),
             spp_cu_deep,
             do_cap_suppress_here,
-            cap_suppress_j,
-            k22,
-            jmin,
+            cap_suppress_j.reshape((im * jm)),
+            k22.reshape((im * jm)),
+            jmin.reshape((im * jm)),
             kdt,
             tropics
         )
@@ -1015,243 +1067,247 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
         # Update `qcheck` array
         for i in range(its, itf + 1):
-            for k in range(kts, ktf + 1):
-                qcheck[i, k] = qv[i, k] + (outqs[i, k] + outqm[i, k]) * dt
+            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+                for k in range(kts, ktf + 1):
+                    qcheck[i, j, k] = qv[i, j, k] + (outqs[i, j, k] + outqm[i, j, k]) * dt
 
         # Call `neg_check` for deep GF convection
         neg_check(
-            "deep", ipn, dt, qcheck, outq, outt, outu, outv,
-            outqc, pret, its, ite, kts, kte, itf, ktf, ktop
+            "deep", ipn, dt, qcheck.reshape((im * jm, km)), outq.reshape((im * jm, km)), outt.reshape((im * jm, km)), outu.reshape((im * jm, km)), outv.reshape((im * jm, km)),
+            outqc.reshape((im * jm, km)), pret.reshape((im * jm)), its, ite, jts, jte, kts, kte, itf, jtf, ktf, ktop.reshape((im * jm))
         )
 
     # Initialize `kcnv` and update related arrays
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        kcnv.field[i, 0, 0] = 0
-        if pretm[i] > 0.0:
-            kcnv.field[i, 0, 0] = 1  # Previously `jmin(i)` in comments
-            cutenm[i] = 1.0
-        else:
-            kbconm[i] = -1
-            ktopm[i] = -1
-            cutenm[i] = 0.0
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            kcnv.field[i, j, 0] = 0
+            if pretm[i, j] > 0.0:
+                kcnv.field[i, j, 0] = 1  # Previously `jmin(i)` in comments
+                cutenm[i, j] = 1.0
+            else:
+                kbconm[i, j] = -1
+                ktopm[i, j] = -1
+                cutenm[i, j] = 0.0
 
-        if pret[i] > 0.0:
-            cuten[i] = 1.0
-            cutenm[i] = 0.0
-            pretm[i] = 0.0
-            kcnv.field[i, 0, 0] = 1  # Previously `jmin(i)` in comments
-            ktopm[i] = -1
-            kbconm[i] = -1
-        else:
-            kbcon[i] = -1
-            ktop[i] = -1
-            cuten[i] = 0.0
+            if pret[i, j] > 0.0:
+                cuten[i, j] = 1.0
+                cutenm[i, j] = 0.0
+                pretm[i, j] = 0.0
+                kcnv.field[i, j, 0] = 1  # Previously `jmin(i)` in comments
+                ktopm[i, j] = -1
+                kbconm[i, j] = -1
+            else:
+                kbcon[i, j] = -1
+                ktop[i, j] = -1
+                cuten[i, j] = 0.0
 
     # Loop over horizontal grid points
     for i in range(its, itf + 1):
-        massflx[:] = 0.0
-        trcflx_in1[:] = 0.0
-        clw_in1[:] = 0.0
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            massflx[:] = 0.0
+            trcflx_in1[:] = 0.0
+            clw_in1[:] = 0.0
 
-        # Initialize cloud water tendencies
-        for k in range(kts, ktf + 1):
-            clw_ten[i, k] = 0.0
+            # Initialize cloud water tendencies
+            for k in range(kts, ktf + 1):
+                clw_ten[i, j, k] = 0.0
 
-        po_cup[:] = 0.0
-        kstop = kts
+            po_cup[:] = 0.0
+            kstop = kts
 
-        # Determine `kstop` based on convection levels
-        if ktopm[i] > kts or ktop[i] > kts:
-            kstop = max(ktopm[i], ktop[i])
-        if ktops[i] > kts:
-            kstop = max(kstop, ktops[i])
+            # Determine `kstop` based on convection levels
+            if ktopm[i, j] > kts or ktop[i, j] > kts:
+                kstop = max(ktopm[i, j], ktop[i, j])
+            if ktops[i, j] > kts:
+                kstop = max(kstop, ktops[i, j])
 
-        if kstop > 1:
-            htop.field[i, 0, 0] = kstop
-            if kbcon[i] > 1 or kbconm[i] > 1:
-                hbot.field[i, 0, 0] = max(kbconm[i], kbcon[i])
+            if kstop > 1:
+                htop.field[i, j, 0] = kstop
+                if kbcon[i, j] > 1 or kbconm[i, j] > 1:
+                    hbot.field[i, j, 0] = max(kbconm[i, j], kbcon[i, j])
 
-            dtime_max = dt
-            forcing2[i, 2] = 0.0
+                dtime_max = dt
+                forcing2[i, j, 2] = 0.0
 
-            # Loop over vertical levels up to `kstop`
-            for k in range(kts, kstop + 1):
-                cnvc.field[i, 0, k] = (
-                    0.04 * np.log(1.0 + 675.0 * zu[i, k] * xmb[i]) +
-                    0.04 * np.log(1.0 + 675.0 * zum[i, k] * xmbm[i]) +
-                    0.04 * np.log(1.0 + 675.0 * zus[i, k] * xmbs[i])
-                )
-                cnvc.field[i, 0, k] = min(cnvc.field[i, 0, k], 0.6)
-                cnvc.field[i, 0, k] = max(cnvc.field[i, 0, k], 0.0)
-
-                cnvw[i, k] = (
-                    cnvwt[i, k] * xmb[i] * dt +
-                    cnvwts[i, k] * xmbs[i] * dt +
-                    cnvwtm[i, k] * xmbm[i] * dt
-                )
-
-                ud_mf.field[i, 0, k] = cuten[i] * zu[i, k] * xmb[i] * dt
-                dd_mf.field[i, 0, k] = cuten[i] * zd[i, k] * edt[i] * xmb[i] * dt
-
-                t.field[i, 0, k] += dt * (
-                    cutens[i] * outts[i, k] +
-                    cutenm[i] * outtm[i, k] +
-                    outt[i, k] * cuten[i]
-                )
-
-                qv[i, k] = max(
-                    1.0e-16,
-                    qv[i, k] + dt * (
-                        cutens[i] * outqs[i, k] +
-                        cutenm[i] * outqm[i, k] +
-                        outq[i, k] * cuten[i]
+                # Loop over vertical levels up to `kstop`
+                for k in range(kts, kstop + 1):
+                    cnvc.field[i, j, k] = (
+                        0.04 * np.log(1.0 + 675.0 * zu[i, j, k] * xmb[i, j]) +
+                        0.04 * np.log(1.0 + 675.0 * zum[i, j, k] * xmbm[i, j]) +
+                        0.04 * np.log(1.0 + 675.0 * zus[i, j, k] * xmbs[i, j])
                     )
-                )
+                    cnvc.field[i, j, k] = min(cnvc.field[i, j, k], 0.6)
+                    cnvc.field[i, j, k] = max(cnvc.field[i, j, k], 0.0)
 
-                gdc[i, k, 6] = np.sqrt(us.field[i, 0, k]**2 + vs.field[i, 0, k]**2)
-
-                us.field[i, 0, k] += (
-                    outu[i, k] * cuten[i] * dt +
-                    outum[i, k] * cutenm[i] * dt +
-                    outus[i, k] * cutens[i] * dt
-                )
-
-                vs.field[i, 0, k] += (
-                    outv[i, k] * cuten[i] * dt +
-                    outvm[i, k] * cutenm[i] * dt +
-                    outvs[i, k] * cutens[i] * dt
-                )
-
-                gdc[i, k, 0] = max(0.0, tun_rad_shall[i] * cupclws[i, k] * cutens[i])
-                gdc2[i, k, 0] = max(
-                    0.0,
-                    tun_rad_mid[i] * cupclwm[i, k] * cutenm[i] +
-                    frhd[i] * cupclw[i, k] * cuten[i] +
-                    tun_rad_shall[i] * cupclws[i, k] * cutens[i]
-                )
-
-                # Initialize qci_conv
-                qci_conv.field[i, 0, k] = gdc2[i, k, 0]
-
-                # Update gdc array with tendencies and other parameters
-                gdc[i, k, 1] = outt[i, k] * 86400.0
-                gdc[i, k, 2] = outtm[i, k] * 86400.0
-                gdc[i, k, 3] = outts[i, k] * 86400.0
-                gdc[i, k, 6] = -(gdc[i, k, 6] - np.sqrt(us.field[i, 0, k]**2 + vs.field[i, 0, k]**2)) / dt
-                gdc[i, k, 7] = (outqm[i, k] + outqs[i, k] + outq[i, k]) * 86400.0 * xlv / cp
-                gdc[i, k, 8] = gdc[i, k, 1] + gdc[i, k, 2] + gdc[i, k, 3]
-
-                # Treat subsidence effects on cloud ice/water
-                dp = 100.0 * (p2d[i, k] - p2d[i, k + 1])
-                dtime_max = min(dtime_max, 0.5 * dp)
-                po_cup[k] = 0.5 * (p2d[i, k] + p2d[i, k + 1])
-
-                if clcw.field[i, 0, k] > -999.0 and clcw.field[i, 0, k + 1] > -999.0:
-                    clwtot = cliw.field[i, 0, k] + clcw.field[i, 0, k]
-                    if clwtot < 1.0e-32:
-                        clwtot = 0.0
-                    clwtot1 = cliw.field[i, 0, k + 1] + clcw.field[i, 0, k + 1]
-                    if clwtot1 < 1.0e-32:
-                        clwtot1 = 0.0
-
-                    clw_in1[k] = clwtot
-                    massflx[k] = (
-                        -(xmb[i] * (zu[i, k] - edt[i] * zd[i, k])) -
-                        (xmbm[i] * (zdm[i, k] - edtm[i] * zdm[i, k])) -
-                        (xmbs[i] * zus[i, k])
+                    cnvw[i, j, k] = (
+                        cnvwt[i, j, k] * xmb[i, j] * dt +
+                        cnvwts[i, j, k] * xmbs[i, j] * dt +
+                        cnvwtm[i, j, k] * xmbm[i, j] * dt
                     )
-                    trcflx_in1[k] = massflx[k] * 0.5 * (clwtot + clwtot1)
-                    forcing2[i, 2] += clwtot
 
-            # Reset mass flux and tracer flux
-            massflx[0] = 0.0
-            trcflx_in1[0] = 0.0
+                    ud_mf.field[i, j, k] = cuten[i, j] * zu[i, j, k] * xmb[i, j] * dt
+                    dd_mf.field[i, j, k] = cuten[i, j] * zd[i, j, k] * edt[i, j] * xmb[i, j] * dt
 
-            # Call `fct1d3`` subroutine
-            fct1d3(
-                kstop, kte, dtime_max, po_cup,
-                clw_in1, massflx, trcflx_in1, clw_ten[i, :], g
-            )
+                    t.field[i, j, k] += dt * (
+                        cutens[i, j] * outts[i, j, k] +
+                        cutenm[i, j] * outtm[i, j, k] +
+                        outt[i, j, k] * cuten[i, j]
+                    )
 
-            # Update cloud ice and water tendencies
-            for k in range(kstop + 1):  # Python's 0-based indexing
-                tem = dt * (
-                    outqcs[i, k] * cutens[i] +
-                    outqc[i, k] * cuten[i] +
-                    outqcm[i, k] * cutenm[i] +
-                    clw_ten[i, k]
+                    qv[i, j, k] = max(
+                        1.0e-16,
+                        qv[i, j, k] + dt * (
+                            cutens[i, j] * outqs[i, j, k] +
+                            cutenm[i, j] * outqm[i, j, k] +
+                            outq[i, j, k] * cuten[i, j]
+                        )
+                    )
+
+                    gdc[i, j, k, 6] = np.sqrt(us.field[i, j, k]**2 + vs.field[i, j, k]**2)
+
+                    us.field[i, j, k] += (
+                        outu[i, j, k] * cuten[i, j] * dt +
+                        outum[i, j, k] * cutenm[i, j] * dt +
+                        outus[i, j, k] * cutens[i, j] * dt
+                    )
+
+                    vs.field[i, j, k] += (
+                        outv[i, j, k] * cuten[i, j] * dt +
+                        outvm[i, j, k] * cutenm[i, j] * dt +
+                        outvs[i, j, k] * cutens[i, j] * dt
+                    )
+
+                    gdc[i, j, k, 0] = max(0.0, tun_rad_shall[i, j] * cupclws[i, j, k] * cutens[i, j])
+                    gdc2[i, j, k, 0] = max(
+                        0.0,
+                        tun_rad_mid[i, j] * cupclwm[i, j, k] * cutenm[i, j] +
+                        frhd[i, j] * cupclw[i, j, k] * cuten[i, j] +
+                        tun_rad_shall[i, j] * cupclws[i, j, k] * cutens[i, j]
+                    )
+
+                    # Initialize qci_conv
+                    qci_conv.field[i, j, k] = gdc2[i, j, k, 0]
+
+                    # Update gdc array with tendencies and other parameters
+                    gdc[i, j, k, 1] = outt[i, j, k] * 86400.0
+                    gdc[i, j, k, 2] = outtm[i, j, k] * 86400.0
+                    gdc[i, j, k, 3] = outts[i, j, k] * 86400.0
+                    gdc[i, j, k, 6] = -(gdc[i, j, k, 6] - np.sqrt(us.field[i, j, k]**2 + vs.field[i, j, k]**2)) / dt
+                    gdc[i, j, k, 7] = (outqm[i, j, k] + outqs[i, j, k] + outq[i, j, k]) * 86400.0 * xlv / cp
+                    gdc[i, j, k, 8] = gdc[i, j, k, 1] + gdc[i, j, k, 2] + gdc[i, j, k, 3]
+
+                    # Treat subsidence effects on cloud ice/water
+                    dp = 100.0 * (p2d[i, j, k] - p2d[i, j, k + 1])
+                    dtime_max = min(dtime_max, 0.5 * dp)
+                    po_cup[k] = 0.5 * (p2d[i, j, k] + p2d[i, j, k + 1])
+
+                    if clcw.field[i, j, k] > -999.0 and clcw.field[i, j, k + 1] > -999.0:
+                        clwtot = cliw.field[i, j, k] + clcw.field[i, j, k]
+                        if clwtot < 1.0e-32:
+                            clwtot = 0.0
+                        clwtot1 = cliw.field[i, j, k + 1] + clcw.field[i, j, k + 1]
+                        if clwtot1 < 1.0e-32:
+                            clwtot1 = 0.0
+
+                        clw_in1[k] = clwtot
+                        massflx[k] = (
+                            -(xmb[i, j] * (zu[i, j, k] - edt[i, j] * zd[i, j, k])) -
+                            (xmbm[i, j] * (zdm[i, j, k] - edtm[i, j] * zdm[i, j, k])) -
+                            (xmbs[i, j] * zus[i, j, k])
+                        )
+                        trcflx_in1[k] = massflx[k] * 0.5 * (clwtot + clwtot1)
+                        forcing2[i, j, 2] += clwtot
+
+                # Reset mass flux and tracer flux
+                massflx[0] = 0.0
+                trcflx_in1[0] = 0.0
+
+                # Call `fct1d3`` subroutine
+                fct1d3(
+                    kstop, kte, dtime_max, po_cup,
+                    clw_in1, massflx, trcflx_in1, clw_ten[i, j, :], g
                 )
-                tem1 = max(0.0, min(1.0, (tcr - t.field[i, 0, k]) * tcrf))
 
-                if clcw.field[i, 0, k] > -999.0:
-                    cliw.field[i, 0, k] = max(0.0, cliw.field[i, 0, k] + tem * tem1)  # Ice
-                    clcw.field[i, 0, k] = max(0.0, clcw.field[i, 0, k] + tem * (1.0 - tem1))  # Water
-                else:
-                    cliw.field[i, 0, k] = max(0.0, cliw.field[i, 0, k] + tem)
+                # Update cloud ice and water tendencies
+                for k in range(kstop + 1):  # Python's 0-based indexing
+                    tem = dt * (
+                        outqcs[i, j, k] * cutens[i, j] +
+                        outqc[i, j, k] * cuten[i, j] +
+                        outqcm[i, j, k] * cutenm[i, j] +
+                        clw_ten[i, j, k]
+                    )
+                    tem1 = max(0.0, min(1.0, (tcr - t.field[i, j, k]) * tcrf))
 
-            # Update `gdc` array with forcing and other parameters
-            gdc[i, 0, 9] = forcing[i, 0]
-            gdc[i, 1, 9] = forcing[i, 1]
-            gdc[i, 2, 9] = forcing[i, 2]
-            gdc[i, 3, 9] = forcing[i, 3]
-            gdc[i, 4, 9] = forcing[i, 4]
-            gdc[i, 5, 9] = forcing[i, 5]
-            gdc[i, 6, 9] = forcing[i, 6]
-            gdc[i, 7, 9] = forcing[i, 7]
-            gdc[i, 9, 9] = xmb[i]
-            gdc[i, 10, 9] = xmbm[i]
-            gdc[i, 11, 9] = xmbs[i]
-            gdc[i, 12, 9] = hfx[i]
-            gdc[i, 14, 9] = qfx[i]
-            gdc[i, 15, 9] = pret[i] * 3600.0
+                    if clcw.field[i, j, k] > -999.0:
+                        cliw.field[i, j, k] = max(0.0, cliw.field[i, j, k] + tem * tem1)  # Ice
+                        clcw.field[i, j, k] = max(0.0, clcw.field[i, j, k] + tem * (1.0 - tem1))  # Water
+                    else:
+                        cliw.field[i, j, k] = max(0.0, cliw.field[i, j, k] + tem)
 
-            # Calculate maximum upward mass flux
-            maxupmf.field[i, 0, 0] = 0.0
-            if forcing2[i, 5] > 0.0:
-                maxupmf.field[i, 0, 0] = max(xmb[i] * zu[i, kts:ktf + 1] / forcing2[i, 5])
+                # Update `gdc` array with forcing and other parameters
+                gdc[i, j, 0, 9] = forcing[i, j, 0]
+                gdc[i, j, 1, 9] = forcing[i, j, 1]
+                gdc[i, j, 2, 9] = forcing[i, j, 2]
+                gdc[i, j, 3, 9] = forcing[i, j, 3]
+                gdc[i, j, 4, 9] = forcing[i, j, 4]
+                gdc[i, j, 5, 9] = forcing[i, j, 5]
+                gdc[i, j, 6, 9] = forcing[i, j, 6]
+                gdc[i, j, 7, 9] = forcing[i, j, 7]
+                gdc[i, j, 9, 9] = xmb[i, j]
+                gdc[i, j, 10, 9] = xmbm[i, j]
+                gdc[i, j, 11, 9] = xmbs[i, j]
+                gdc[i, j, 12, 9] = hfx[i, j]
+                gdc[i, j, 14, 9] = qfx[i, j]
+                gdc[i, j, 15, 9] = pret[i, j] * 3600.0
 
-            # Update `dt_mf` for deep convection
-            if ktop[i] > 1 and pret[i] > 0.0:
-                dt_mf.field[i, 0, ktop[i] - 1] = ud_mf.field[i, 0, ktop[i]]
+                # Calculate maximum upward mass flux
+                maxupmf.field[i, j, 0] = 0.0
+                if forcing2[i, j, 5] > 0.0:
+                    maxupmf.field[i, j, 0] = max(xmb[i, j] * zu[i, j, kts:ktf + 1] / forcing2[i, j, 5])
+
+                # Update `dt_mf` for deep convection
+                if ktop[i, j] > 1 and pret[i, j] > 0.0:
+                    dt_mf.field[i, j, ktop[i, j] - 1] = ud_mf.field[i, j, ktop[i, j]]
 
     # Loop over horizontal grid points
     for i in range(its, itf + 1):  # Python's 0-based indexing
-        if pret[i] > 0.0:
-            cactiv.field[i] = 1
-            raincv.field[i, 0, 0] = 0.001 * (
-                cutenm[i] * pretm[i] +
-                cutens[i] * prets[i] +
-                cuten[i] * pret[i]
-            ) * dt
-        else:
-            cactiv.field[i] = 0
-            if pretm[i] > 0.0:
-                raincv.field[i, 0, 0] = 0.001 * cutenm[i] * pretm[i] * dt
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            if pret[i, j] > 0.0:
+                cactiv.field[i, j] = 1
+                raincv.field[i, j, 0] = 0.001 * (
+                    cutenm[i, j] * pretm[i, j] +
+                    cutens[i, j] * prets[i, j] +
+                    cuten[i, j] * pret[i, j]
+                ) * dt
+            else:
+                cactiv.field[i, j] = 0
+                if pretm[i, j] > 0.0:
+                    raincv.field[i, j, 0] = 0.001 * cutenm[i, j] * pretm[i, j] * dt
 
-        if pretm[i] > 0.0:
-            cactiv_m.field[i] = 1
-        else:
-            cactiv_m.field[i] = 0
+            if pretm[i, j] > 0.0:
+                cactiv_m.field[i, j] = 1
+            else:
+                cactiv_m.field[i, j] = 0
 
-        # Unify CCN
-        if ccn_m[i] < ccn_gf[i]:
-            ccn_gf[i] = ccn_m[i]
+            # Unify CCN
+            if ccn_m[i, j] < ccn_gf[i, j]:
+                ccn_gf[i, j] = ccn_m[i, j]
 
-        if ccn_gf[i] < 0.0:
-            ccn_gf[i] = 0.0
+            if ccn_gf[i, j] < 0.0:
+                ccn_gf[i, j] = 0.0
 
-        # Convert CCN back to AOD
-        aod_gf.field[i, 0, 0] = 0.0027 * (ccn_gf[i] ** 0.64)
-        if aod_gf.field[i, 0, 0] < 0.007:
-            aod_gf.field[i, 0, 0] = 0.007
-            ccn_gf[i] = (aod_gf.field[i, 0, 0] / 0.0027) ** (1 / 0.64)
-        elif aod_gf.field[i, 0, 0] > aodc0:
-            aod_gf.field[i, 0, 0] = aodc0
-            ccn_gf[i] = (aod_gf.field[i, 0, 0] / 0.0027) ** (1 / 0.64)
+            # Convert CCN back to AOD
+            aod_gf.field[i, j, 0] = 0.0027 * (ccn_gf[i, j] ** 0.64)
+            if aod_gf.field[i, j, 0] < 0.007:
+                aod_gf.field[i, j, 0] = 0.007
+                ccn_gf[i, j] = (aod_gf.field[i, j, 0] / 0.0027) ** (1 / 0.64)
+            elif aod_gf.field[i, j, 0] > aodc0:
+                aod_gf.field[i, j, 0] = aodc0
+                ccn_gf[i, j] = (aod_gf.field[i, j, 0] / 0.0027) ** (1 / 0.64)
 
     # Scale dry mixing ratios for water vapor and cloud water to specific humidity / moist mixing ratios
-    qv_spechum.field[:, 0, :] = qv / (1.0 + qv)
-    cnvw_moist.field[:, 0, :] = cnvw / (1.0 + qv)
+    qv_spechum.field[:, :, :] = qv / (1.0 + qv)
+    cnvw_moist.field[:, :, :] = cnvw / (1.0 + qv)
 
     # Diagnostic tendency updates
     if ldiag3d:
@@ -1264,25 +1320,26 @@ def cu_gf_driver_run(state, errmsg, errflg):
             if uidx >= 0:
                 # Update tendencies for x-wind
                 for k in range(kts, ktf + 1):  # Python's 0-based indexing
-                    dtend.field[:, k, uidx] += cutens[:] * outus[:, k] * dt
+                    dtend.field[:, :, k, uidx] += cutens[:, :] * outus[:, :, k] * dt
 
             if vidx >= 0:
                 # Update tendencies for y-wind
                 for k in range(kts, ktf + 1):
-                    dtend.field[:, k, vidx] += cutens[:] * outvs[:, k] * dt
+                    dtend.field[:, :, k, vidx] += cutens[:, :] * outvs[:, :, k] * dt
 
             if tidx >= 0:
                 # Update tendencies for temperature
                 for k in range(kts, ktf + 1):
-                    dtend.field[:, k, tidx] += cutens[:] * outts[:, k] * dt
+                    dtend.field[:, :, k, tidx] += cutens[:] * outts[:, :, k] * dt
 
             if qidx >= 0:
                 # Update tendencies for specific humidity
                 for k in range(kts, ktf + 1):
                     for i in range(its, itf + 1):
-                        tem = cutens[i] * outqs[i, k] * dt
-                        tem = tem / (1.0 + tem)
-                        dtend.field[i, k, qidx] += tem
+                        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+                            tem = cutens[i, j] * outqs[i, j, k] * dt
+                            tem = tem / (1.0 + tem)
+                            dtend.field[i, j, k, qidx] += tem
 
         if ideep == 1 or imid_gf == 1 and not flag_for_dcnv_generic_tend:
             uidx = dtidx.field[index_of_x_wind, index_of_process_dcnv, 0]
@@ -1292,56 +1349,58 @@ def cu_gf_driver_run(state, errmsg, errflg):
             if uidx >= 0:
                 # Update tendencies for x-wind
                 for k in range(kts, ktf + 1):
-                    dtend.field[:, k, uidx] += (cuten * outu[:, k] + cutenm * outum[:, k]) * dt
+                    dtend.field[:, :, k, uidx] += (cuten * outu[:, :, k] + cutenm * outum[:, :, k]) * dt
 
             if vidx >= 0:
                 # Update tendencies for y-wind
                 for k in range(kts, ktf + 1):
-                    dtend.field[:, k, vidx] += (cuten * outv[:, k] + cutenm * outvm[:, k]) * dt
+                    dtend.field[:, :, k, vidx] += (cuten * outv[:, :, k] + cutenm * outvm[:, :, k]) * dt
 
             if tidx >= 0:
                 # Update tendencies for temperature
                 for k in range(kts, ktf + 1):
-                    dtend.field[:, k, tidx] += (cuten * outt[:, k] + cutenm * outtm[:, k]) * dt
+                    dtend.field[:, :, k, tidx] += (cuten * outt[:, :, k] + cutenm * outtm[:, :, k]) * dt
 
             qidx = dtidx.field[100 + ntqv, index_of_process_dcnv, 0]
             if qidx >= 0:
                 # Update tendencies for specific humidity
                 for k in range(kts, ktf + 1):
                     for i in range(its, itf + 1):
-                        tem = (cuten[i] * outq[i, k] + cutenm[i] * outqm[i, k]) * dt
-                        tem = tem / (1.0 + tem)
-                        dtend.field[i, k, qidx] += tem
+                        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+                            tem = (cuten[i, j] * outq[i, j, k] + cutenm[i, j] * outqm[i, j, k]) * dt
+                            tem = tem / (1.0 + tem)
+                            dtend.field[i, j, k, qidx] += tem
 
     # Check if `clcw_save` is allocated
     if clcw_save is not None:
         # Loop over vertical levels and horizontal grid points
         for k in range(kts, ktf + 1):  # Python's 0-based indexing
             for i in range(its, itf + 1):
-                tem_shal = dt * (outqcs[i, k] * cutens[i] + outqcm[i, k] * cutenm[i])
-                tem_deep = dt * (outqc[i, k] * cuten[i] + clw_ten[i, k])
-                tem = tem_shal + tem_deep
-                tem1 = max(0.0, min(1.0, (tcr - t.field[i, 0, k]) * tcrf))
-                weight_sum = abs(tem_shal) + abs(tem_deep)
+                for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+                    tem_shal = dt * (outqcs[i, j, k] * cutens[i, j] + outqcm[i, j, k] * cutenm[i, j])
+                    tem_deep = dt * (outqc[i, j, k] * cuten[i, j] + clw_ten[i, j, k])
+                    tem = tem_shal + tem_deep
+                    tem1 = max(0.0, min(1.0, (tcr - t.field[i, j, k]) * tcrf))
+                    weight_sum = abs(tem_shal) + abs(tem_deep)
 
-                if weight_sum < 1e-12:
-                    continue
+                    if weight_sum < 1e-12:
+                        continue
 
-                if clcw_save[i, k] > -999.0:
-                    cliw_both = max(0.0, cliw_save[i, k] + tem * tem1) - cliw_save[i, k]
-                    clcw_both = max(0.0, clcw_save[i, k] + tem) - clcw_save[i, k]
-                elif cliw_idx >= 0:
-                    cliw_both = max(0.0, cliw_save[i, k] + tem) - cliw_save[i, k]
-                    clcw_both = 0.0
+                    if clcw_save[i, j, k] > -999.0:
+                        cliw_both = max(0.0, cliw_save[i, j, k] + tem * tem1) - cliw_save[i, j, k]
+                        clcw_both = max(0.0, clcw_save[i, j, k] + tem) - clcw_save[i, j, k]
+                    elif cliw_idx >= 0:
+                        cliw_both = max(0.0, cliw_save[i, j, k] + tem) - cliw_save[i, j, k]
+                        clcw_both = 0.0
 
-                if cliw_deep_idx >= 0:
-                    dtend.field[i, k, cliw_deep_idx] += abs(tem_deep) / weight_sum * cliw_both
-                if clcw_deep_idx >= 0:
-                    dtend.field[i, k, clcw_deep_idx] += abs(tem_deep) / weight_sum * clcw_both
-                if cliw_shal_idx >= 0:
-                    dtend.field[i, k, cliw_shal_idx] += abs(tem_shal) / weight_sum * cliw_both
-                if clcw_shal_idx >= 0:
-                    dtend.field[i, k, clcw_shal_idx] += abs(tem_shal) / weight_sum * clcw_both
+                    if cliw_deep_idx >= 0:
+                        dtend.field[i, j, k, cliw_deep_idx] += abs(tem_deep) / weight_sum * cliw_both
+                    if clcw_deep_idx >= 0:
+                        dtend.field[i, j, k, clcw_deep_idx] += abs(tem_deep) / weight_sum * clcw_both
+                    if cliw_shal_idx >= 0:
+                        dtend.field[i, j, k, cliw_shal_idx] += abs(tem_shal) / weight_sum * cliw_both
+                    if clcw_shal_idx >= 0:
+                        dtend.field[i, j, k, clcw_shal_idx] += abs(tem_shal) / weight_sum * clcw_both
 
     state.ntracer = ntracer  # Number of tracers
     state.garea = garea  # Grid area

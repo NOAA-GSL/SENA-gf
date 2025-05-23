@@ -67,7 +67,7 @@ def my_maxloc1d(A, N):
 
 
 def cu_gf_deep_run(
-    itf, ktf, its, ite, kts, kte,  # Dimensions
+    itf, jtf, ktf, its, ite, jts, jte, kts, kte,  # Dimensions
     dicycle,                      # Diurnal cycle flag
     ichoice,                      # Choice of closure, use "0" for ensemble average
     ipr,                          # Debugging flag
@@ -133,6 +133,9 @@ def cu_gf_deep_run(
     kdt,                          # Time step index
     tropics                       # Tropics flag
 ):
+
+    itf = (itf + 1) * (jtf + 1) - 1
+    ite = itf
 
     # Integer variables
     iloop = 0
@@ -3446,7 +3449,7 @@ def cup_up_aa0(aa0, z, zu, dby, gamma_cup, t_cup, kbcon, ktop, ierr, itf, ktf, i
             if aa0[i] < 0.0:
                 aa0[i] = 0.0
 
-def neg_check(name, j, dt, q, outq, outt, outu, outv, outqc, pret, its, ite, kts, kte, itf, ktf, ktop):
+def neg_check(name, j, dt, q, outq, outt, outu, outv, outqc, pret, its, ite, jts, jte, kts, kte, itf, jtf, ktf, ktop):
     """
     Checks for negative or excessive tendencies and corrects them in a mass-conserving way.
 
@@ -3463,6 +3466,10 @@ def neg_check(name, j, dt, q, outq, outt, outu, outv, outqc, pret, its, ite, kts
     Returns:
         None: The arrays `outq`, `outt`, `outu`, `outv`, `outqc`, and `pret` are modified in place.
     """
+
+    itf = (itf + 1) * (jtf + 1) - 1
+    ite = itf
+
     # Initialize thresholds
     thresh = 300.01
     names = 1.0

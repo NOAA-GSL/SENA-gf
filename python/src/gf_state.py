@@ -278,10 +278,11 @@ class GFState:
         _dataset = Dataset(filename, "w")
 
         # Define the dimensions
-        _dtend_dim3 = self.dtend.shape[2]
+        _dtend_dim3 = self.dtend.shape[3]
         _num_dfi_radar_dim = self.ix_dfi_radar.shape[0]
         _dtidx_dim2 = self.dtidx.shape[1]
-        _imDim = _dataset.createDimension("im", self.im)
+        _imDim = _dataset.createDimension("im", self.im * self.jm)
+        # _jmDim = _dataset.createDimension("jm", self.jm)
         _kmDim = _dataset.createDimension("km", self.km)
         _dtend_dim3Dim = _dataset.createDimension("dtend_dim3", _dtend_dim3)
         _ntracers_p100Dim = _dataset.createDimension("ntracers_p100", self.ntracer + 100)
@@ -684,7 +685,7 @@ class GFState:
         _ntracerVar[:] = np.transpose(self.ntracer)
 
         # Fill the garea variable
-        _gareaVar[:] = np.transpose(self.garea)
+        _gareaVar[:] = np.transpose(self.garea).reshape((self.im * self.jm,))
 
         # Fill the dt variable
         _dtVar[:] = np.transpose(self.dt)
@@ -703,11 +704,11 @@ class GFState:
 
         # Fill the cactiv variable
         if self.cactiv is not None:
-         _cactivVar[:] = np.transpose(self.cactiv)[:]
+         _cactivVar[:] = np.transpose(self.cactiv)[:].reshape((self.im * self.jm,))
 
         # Fill the cactiv_m variable
         if self.cactiv_m is not None:
-            _cactiv_mVar[:] = np.transpose(self.cactiv_m)[:]
+            _cactiv_mVar[:] = np.transpose(self.cactiv_m)[:].reshape((self.im * self.jm,))
 
         # Fill the g variable
         _gVar[:] = np.transpose(self.g)
@@ -723,94 +724,94 @@ class GFState:
 
         # Fill the forcet variable
         if self.forcet is not None:
-            _forcetVar[:,:] = np.transpose(self.forcet)
+            _forcetVar[:,:] = np.transpose(self.forcet).reshape((self.km, self.im * self.jm,))
 
         # Fill the forceqv_spechum variable
         if self.forceqv_spechum is not None:
-            _forceqv_spechumVar[:,:] = np.transpose(self.forceqv_spechum)
+            _forceqv_spechumVar[:,:] = np.transpose(self.forceqv_spechum).reshape((self.km, self.im * self.jm,))
 
         # Fill the phil variable
-        _philVar[:,:] = np.transpose(self.phil)
+        _philVar[:,:] = np.transpose(self.phil).reshape((self.km, self.im * self.jm,))
 
         # Fill the raincv variable
-        _raincvVar[:] = np.transpose(self.raincv)
+        _raincvVar[:] = np.transpose(self.raincv).reshape((self.im * self.jm,))
 
         # Fill the qv_spechum variable
-        _qv_spechumVar[:,:] = np.transpose(self.qv_spechum)
+        _qv_spechumVar[:,:] = np.transpose(self.qv_spechum).reshape((self.km, self.im * self.jm,))
 
         # Fill the t variable
-        _tVar[:,:] = np.transpose(self.t)
+        _tVar[:,:] = np.transpose(self.t).reshape((self.km, self.im * self.jm,))
 
         # Fill the cld1d variable
-        _cld1dVar[:] = np.transpose(self.cld1d)
+        _cld1dVar[:] = np.transpose(self.cld1d).reshape((self.im * self.jm,))
 
         # Fill the us variable
-        _usVar[:,:] = np.transpose(self.us)
+        _usVar[:,:] = np.transpose(self.us).reshape((self.km, self.im * self.jm,))
 
         # Fill the vs variable
-        _vsVar[:,:] = np.transpose(self.vs)
+        _vsVar[:,:] = np.transpose(self.vs).reshape((self.km, self.im * self.jm,))
 
         # Fill the t2di variable
-        _t2diVar[:,:] = np.transpose(self.t2di)
+        _t2diVar[:,:] = np.transpose(self.t2di).reshape((self.km, self.im * self.jm,))
 
         # Fill the w variable
-        _wVar[:,:] = np.transpose(self.w)
+        _wVar[:,:] = np.transpose(self.w).reshape((self.km, self.im * self.jm,))
 
         # Fill the qv2di_spechum variable
-        _qv2di_spechumVar[:,:] = np.transpose(self.qv2di_spechum)
+        _qv2di_spechumVar[:,:] = np.transpose(self.qv2di_spechum).reshape((self.km, self.im * self.jm,))
 
         # Fill the p2di variable
-        _p2diVar[:,:] = np.transpose(self.p2di)
+        _p2diVar[:,:] = np.transpose(self.p2di).reshape((self.km, self.im * self.jm,))
 
         # Fill the psuri variable
-        _psuriVar[:] = np.transpose(self.psuri)
+        _psuriVar[:] = np.transpose(self.psuri).reshape((self.im * self.jm,))
 
         # Fill the hbot variable
-        _hbotVar[:] = np.transpose(self.hbot)[:] + 1
+        _hbotVar[:] = np.transpose(self.hbot).reshape((self.im * self.jm,))[:] + 1
 
         # Fill the htop variable
-        _htopVar[:] = np.transpose(self.htop)[:] + 1
+        _htopVar[:] = np.transpose(self.htop).reshape((self.im * self.jm,))[:] + 1
 
         # Fill the kcnv variable
-        _kcnvVar[:] = np.transpose(self.kcnv)
+        _kcnvVar[:] = np.transpose(self.kcnv).reshape((self.im * self.jm,))
 
         # Fill the xland variable
-        _xlandVar[:] = np.transpose(self.xland)
+        _xlandVar[:] = np.transpose(self.xland).reshape((self.im * self.jm,))
 
         # Fill the hfx2 variable
-        _hfx2Var[:] = np.transpose(self.hfx2)
+        _hfx2Var[:] = np.transpose(self.hfx2).reshape((self.im * self.jm,))
 
         # Fill the qfx2 variable
-        _qfx2Var[:] = np.transpose(self.qfx2)
+        _qfx2Var[:] = np.transpose(self.qfx2).reshape((self.im * self.jm,))
 
         # Fill the aod_gf variable
         if self.aod_gf is not None:
-            _aod_gfVar[:] = np.transpose(self.aod_gf)
+            _aod_gfVar[:] = np.transpose(self.aod_gf).reshape((self.im * self.jm,))
 
         # Fill the cliw variable
-        _cliwVar[:,:] = np.transpose(self.cliw)
+        _cliwVar[:,:] = np.transpose(self.cliw).reshape((self.km, self.im * self.jm,))
 
         # Fill the clcw variable
-        _clcwVar[:,:] = np.transpose(self.clcw)
+        _clcwVar[:,:] = np.transpose(self.clcw).reshape((self.km, self.im * self.jm,))
 
         # Fill the pbl variable
-        _pblVar[:] = np.transpose(self.pbl)
+        _pblVar[:] = np.transpose(self.pbl).reshape((self.im * self.jm,))
 
         # Fill the ud_mf variable
         if self.ud_mf is not None:
-            _ud_mfVar[:,:] = np.transpose(self.ud_mf)
+            _ud_mfVar[:,:] = np.transpose(self.ud_mf).reshape((self.km, self.im * self.jm,))
 
         # Fill the dd_mf variable
-        _dd_mfVar[:,:] = np.transpose(self.dd_mf)
+        _dd_mfVar[:,:] = np.transpose(self.dd_mf).reshape((self.km, self.im * self.jm,))
 
         # Fill the dt_mf variable
-        _dt_mfVar[:,:] = np.transpose(self.dt_mf)
+        _dt_mfVar[:,:] = np.transpose(self.dt_mf).reshape((self.km, self.im * self.jm,))
 
         # Fill the cnvw_moist variable
-        _cnvw_moistVar[:,:] = np.transpose(self.cnvw_moist)
+        _cnvw_moistVar[:,:] = np.transpose(self.cnvw_moist).reshape((self.km, self.im * self.jm,))
 
         # Fill the cnvc variable
-        _cnvcVar[:,:] = np.transpose(self.cnvc)
+        _cnvcVar[:,:] = np.transpose(self.cnvc).reshape((self.km, self.im * self.jm,))
 
         # Fill the imfshalcnv variable
         _imfshalcnvVar[:] = np.transpose(self.imfshalcnv)
@@ -829,7 +830,7 @@ class GFState:
 
         # Fill the dtend variable
         if self.dtend is not None:
-            _dtendVar[:,:,:] = np.transpose(self.dtend)
+            _dtendVar[:,:,:] = np.transpose(self.dtend).reshape((_dtend_dim3, self.km, self.im * self.jm,))
 
         # Fill the dtidx variable
         _dtidxVar[:,:] = np.transpose(self.dtidx) + 1
@@ -882,7 +883,7 @@ class GFState:
 
         # Fill the qci_conv variable
         if self.qci_conv is not None:
-            _qci_convVar[:,:] = np.transpose(self.qci_conv)
+            _qci_convVar[:,:] = np.transpose(self.qci_conv).reshape((self.km, self.im * self.jm,))
 
         # Fill the do_cap_suppress variable
         if self.do_cap_suppress:
@@ -892,11 +893,11 @@ class GFState:
 
         # Fill the maxupmf variable
         if self.maxupmf is not None:
-            _maxupmfVar[:] = np.transpose(self.maxupmf)
+            _maxupmfVar[:] = np.transpose(self.maxupmf).reshape((self.im * self.jm,))
 
         # Fill the maxMF variable
         if self.maxMF is not None:
-            _maxMFVar[:] = np.transpose(self.maxMF)
+            _maxMFVar[:] = np.transpose(self.maxMF).reshape((self.im * self.jm,))
 
         # Fill the do_mynnedmf variable
         if self.do_mynnedmf:
@@ -918,18 +919,18 @@ class GFState:
 
         # Fill the spp_wts_cu_deep variable
         if self.spp_wts_cu_deep is not None:
-            _spp_wts_cu_deepVar[:,:] = np.transpose(self.spp_wts_cu_deep)
+            _spp_wts_cu_deepVar[:,:] = np.transpose(self.spp_wts_cu_deep).reshape((self.km, self.im * self.jm,))
 
         # Fill the chem3d variable
         if self.chem3d is not None:
-            _chem3dVar[:,:,:] = np.transpose(self.chem3d)
+            _chem3dVar[:,:,:] = np.transpose(self.chem3d).reshape((self.nchem, self.km, self.im * self.jm,))
 
         # Fill the fscav variable
         _fscavVar[:] = np.transpose(self.fscav)
 
         # Fill the wetdpc_deep variable
         if self.wetdpc_deep is not None:
-            _wetdpc_deepVar[:,:] = np.transpose(self.wetdpc_deep)
+            _wetdpc_deepVar[:,:] = np.transpose(self.wetdpc_deep).reshape((self.nchem, self.im * self.jm,))
 
         # Fill the do_smoke_transport variable
         if self.do_smoke_transport:
@@ -952,12 +953,25 @@ class GFState:
     def read_state(self, filename):
         from netCDF4 import Dataset
 
+        def factor_im(n):
+            """
+            Returns the largest two integers whose product is equal to n.
+            If n is prime, returns (n, 1).
+            """
+            for i in range(int(n**0.5), 0, -1):
+                if n % i == 0:
+                    return (n // i, i)
+            return (n, 1)
+
         # Open new file for reading
         _dataset = Dataset(filename, "r")
 
         # Get model dimensions
         self.im = len(_dataset.dimensions['im'])
-        self.jm = 1
+        if _dataset.dimensions.get('jm'):
+            self.jm = len(_dataset.dimensions['jm'])
+        else:
+            self.im, self.jm = factor_im(self.im)
         self.km = len(_dataset.dimensions['km'])
         self.dtend_dim3 = len(_dataset.dimensions['dtend_dim3'])
         self.dtidx_dim2 = len(_dataset.dimensions['dtidx_dim2'])
@@ -1284,8 +1298,8 @@ class GFState:
         # Get dtend
         if _dataset.variables.get("dtend"):
             self.dtend = Quantity(
-                data=np.reshape(np.transpose(_dataset.variables["dtend"][:]), (self.im, self.km, self.dtend_dim3)),
-                dims=["I", "J", "K"],
+                data=np.reshape(np.transpose(_dataset.variables["dtend"][:]), (self.im, self.jm, self.km, self.dtend_dim3)),
+                dims=["I", "J", "K", "N"],
                 units="mixed",
                 gt4py_backend=self.backend
             )
