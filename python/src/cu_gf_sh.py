@@ -72,169 +72,169 @@ def cu_gf_sh_run(
     # ktop.fill(0)
     # k22.fill(0)
 
-    itf = (itf + 1) * (jtf + 1) - 1
-    ite = itf
+    # itf = (itf + 1) * (jtf + 1) - 1
+    # ite = itf
 
     # Dimensions based on Fortran variables
-    num_horizontal_points = ite - its + 1  # Number of horizontal grid points
+    # num_horizontal_points = ite - its + 1  # Number of horizontal grid points
     num_vertical_levels = kte - kts + 1  # Number of vertical levels
 
     # Initialize arrays based on Fortran code
-    xmb = np.zeros(num_horizontal_points)  # Base mass flux
+    xmb = np.zeros((ite - its +1, jte - jts + 1))  # Base mass flux
     xff_shal = np.zeros(3)  # Shallow convection closure terms
-    xmbmax = np.zeros(num_horizontal_points)  # Maximum base mass flux
-    # ierrc = np.full(num_horizontal_points, "", dtype=object)  # Error description
-    # pre = np.zeros(num_horizontal_points)  # Precipitation rate
-    dellu = np.zeros((num_horizontal_points, num_vertical_levels))  # Change in x wind
-    dellv = np.zeros((num_horizontal_points, num_vertical_levels))  # Change in y wind
-    dellah = np.zeros((num_horizontal_points, num_vertical_levels))  # Change in moist static energy
-    dellaq = np.zeros((num_horizontal_points, num_vertical_levels))  # Change in water vapor mixing ratio
-    dellaqc = np.zeros((num_horizontal_points, num_vertical_levels))  # Change in cloud water mixing ratio
-    # outt = np.zeros((num_horizontal_points, num_vertical_levels))  # Temperature tendencies
-    # outq = np.zeros((num_horizontal_points, num_vertical_levels))  # Water vapor tendencies
-    # outqc = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud water tendencies
-    # outu = np.zeros((num_horizontal_points, num_vertical_levels))  # X wind tendencies
-    # outv = np.zeros((num_horizontal_points, num_vertical_levels))  # Y wind tendencies
-    po_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Pressure at cloud levels
-    pwo = np.zeros((num_horizontal_points, num_vertical_levels))  # Precipitation rate at cloud levels
-    # us = np.zeros((num_horizontal_points, num_vertical_levels))  # X wind
-    # vs = np.zeros((num_horizontal_points, num_vertical_levels))  # Y wind
-    hc = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud moist static energy
-    hco = np.zeros((num_horizontal_points, num_vertical_levels))  # Environmental moist static energy
-    qco = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud water vapor mixing ratio
-    qrco = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud water mixing ratio
-    dby = np.zeros((num_horizontal_points, num_vertical_levels))  # Buoyancy term
-    dbyo = np.zeros((num_horizontal_points, num_vertical_levels))  # Environmental buoyancy term
-    zu = np.zeros((num_horizontal_points, num_vertical_levels))  # Updraft normalized mass flux
-    # zuo = np.zeros((num_horizontal_points, num_vertical_levels))  # Environmental updraft normalized mass flux
-    xzu = np.zeros((num_horizontal_points, num_vertical_levels))  # Alternative updraft normalized mass flux
-    # cnvwt = np.zeros((num_horizontal_points, num_vertical_levels))  # Convective weight
-    gammao_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Environmental lapse rate
-    z_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud height
-    zo_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Environmental height
-    he_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud moist static energy
-    hes_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Environmental moist static energy
-    qo_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud water vapor mixing ratio
-    qeso_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud saturation mixing ratio
-    up_massentro = np.zeros((num_horizontal_points, num_vertical_levels))  # Mass entrainment rate
-    up_massdetro = np.zeros((num_horizontal_points, num_vertical_levels))  # Mass detrainment rate
-    up_massentr = np.zeros((num_horizontal_points, num_vertical_levels))  # Updraft mass entrainment
-    up_massdetr = np.zeros((num_horizontal_points, num_vertical_levels))  # Updraft mass detrainment
-    entr_rate_2d = np.zeros((num_horizontal_points, num_vertical_levels))  # Entrainment rate
-    c1d = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud liquid water detrainment coefficient
-    # cupclw = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud liquid water mixing ratio
+    xmbmax = np.zeros((ite - its +1, jte - jts + 1))  # Maximum base mass flux
+    # ierrc = np.full(ite - its +1, jte - jts + 1, "", dtype=object)  # Error description
+    # pre = np.zeros((ite - its +1, jte - jts + 1))  # Precipitation rate
+    dellu = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Change in x wind
+    dellv = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Change in y wind
+    dellah = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Change in moist static energy
+    dellaq = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Change in water vapor mixing ratio
+    dellaqc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Change in cloud water mixing ratio
+    # outt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Temperature tendencies
+    # outq = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Water vapor tendencies
+    # outqc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud water tendencies
+    # outu = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # X wind tendencies
+    # outv = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Y wind tendencies
+    po_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Pressure at cloud levels
+    pwo = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Precipitation rate at cloud levels
+    # us = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # X wind
+    # vs = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Y wind
+    hc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud moist static energy
+    hco = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Environmental moist static energy
+    qco = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud water vapor mixing ratio
+    qrco = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud water mixing ratio
+    dby = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Buoyancy term
+    dbyo = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Environmental buoyancy term
+    zu = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Updraft normalized mass flux
+    # zuo = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Environmental updraft normalized mass flux
+    xzu = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Alternative updraft normalized mass flux
+    # cnvwt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Convective weight
+    gammao_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Environmental lapse rate
+    z_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud height
+    zo_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Environmental height
+    he_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud moist static energy
+    hes_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Environmental moist static energy
+    qo_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud water vapor mixing ratio
+    qeso_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud saturation mixing ratio
+    up_massentro = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Mass entrainment rate
+    up_massdetro = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Mass detrainment rate
+    up_massentr = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Updraft mass entrainment
+    up_massdetr = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Updraft mass detrainment
+    entr_rate_2d = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Entrainment rate
+    c1d = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud liquid water detrainment coefficient
+    # cupclw = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud liquid water mixing ratio
 
     # Initialize arrays based on their usage in the code
-    u_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud x wind
-    v_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud y wind
-    kbmax = np.zeros(num_horizontal_points, dtype=int)  # Maximum cloud base level
-    hkb = np.zeros(num_horizontal_points)  # Cloud base moist static energy
-    hkbo = np.zeros(num_horizontal_points)  # Environmental cloud base moist static energy
-    dbyt = np.zeros((num_horizontal_points, num_vertical_levels))  # Buoyancy tendency
-    k_inv_layers = np.full((num_horizontal_points, num_vertical_levels), -1, dtype=int)  # Inversion layers (10 is an assumed max number of layers)
-    xt = np.zeros((num_horizontal_points, num_vertical_levels))  # Temperature tendency
-    xhe = np.zeros((num_horizontal_points, num_vertical_levels))  # Moist static energy
-    xq = np.zeros((num_horizontal_points, num_vertical_levels))  # Water vapor mixing ratio
+    u_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud x wind
+    v_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud y wind
+    kbmax = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Maximum cloud base level
+    hkb = np.zeros((ite - its +1, jte - jts + 1))  # Cloud base moist static energy
+    hkbo = np.zeros((ite - its +1, jte - jts + 1))  # Environmental cloud base moist static energy
+    dbyt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Buoyancy tendency
+    k_inv_layers = np.full((ite - its +1, jte - jts + 1, num_vertical_levels), -1, dtype=int)  # Inversion layers (10 is an assumed max number of layers)
+    xt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Temperature tendency
+    xhe = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Moist static energy
+    xq = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Water vapor mixing ratio
 
     # Initialize scalar variables
     qaver = 0.0  # Average cloud water vapor mixing ratio
     fp = 0.0  # Fractional potential energy
 
     # Translate Fortran array allocations to Python
-    start_level = np.zeros(num_horizontal_points, dtype=int)  # Equivalent to "start_level(:)=0"
-    rand_vmas = np.zeros(num_horizontal_points)  # Equivalent to "rand_vmas(:)=0."
-    flux_tun = np.full(num_horizontal_points, FLUXTUNE)  # Equivalent to "flux_tun(:)=fluxtune"
-    lambau = np.full(num_horizontal_points, 2.0)  # Equivalent to "lambau(:)=2."
+    start_level = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "start_level(:)=0"
+    rand_vmas = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "rand_vmas(:)=0."
+    flux_tun = np.full((ite - its +1, jte - jts + 1), FLUXTUNE)  # Equivalent to "flux_tun(:)=fluxtune"
+    lambau = np.full((ite - its +1, jte - jts + 1), 2.0)  # Equivalent to "lambau(:)=2."
     # c1d = np.zeros((ite - its + 1, kte - kts + 1))  # Equivalent to "c1d(:,:)=0."
 
     # Initialize arrays based on their usage in the code
-    uc = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud x wind
-    vc = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud y wind
-    xhkb = np.zeros(num_horizontal_points)  # Cloud base moist static energy (alternative)
-    xhco = np.zeros(num_horizontal_points)  # Environmental cloud base moist static energy (alternative)
-    kstabi = np.zeros(num_horizontal_points, dtype=int)  # Stability index
-    dtempdz = np.zeros((num_horizontal_points, num_vertical_levels))  # Temperature gradient with height
+    uc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud x wind
+    vc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud y wind
+    xhkb = np.zeros((ite - its +1, jte - jts + 1))  # Cloud base moist static energy (alternative)
+    xhco = np.zeros((ite - its +1, jte - jts + 1))  # Environmental cloud base moist static energy (alternative)
+    kstabi = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Stability index
+    dtempdz = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Temperature gradient with height
 
     # Initialize scalar variables
     frh = 0.0  # Fractional relative humidity
-    pmin_lev = np.zeros(num_horizontal_points, dtype=int)  # Equivalent to "xland1(its:ite)"
+    pmin_lev = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "xland1(its:ite)"
 
 
     # Initialize arrays based on Fortran ranges
-    xland1 = np.zeros(num_horizontal_points, dtype=int)  # Equivalent to "xland1(its:ite)"
-    ktopx = np.zeros(num_horizontal_points, dtype=int)  # Equivalent to "ktopx(its:ite)"
-    cap_max_increment = np.zeros(num_horizontal_points)  # Equivalent to "cap_max_increment(its:ite)"
-    entr_rate = np.zeros(num_horizontal_points)  # Equivalent to "entr_rate(its:ite)"
-    # pre = np.zeros(num_horizontal_points)  # Equivalent to "pre(its:ite)"
-    up_massentro = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "up_massentro(its:ite, kts:kte)"
-    up_massdetro = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "up_massdetro(its:ite, kts:kte)"
-    up_massentru = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "up_massentru(its:ite, kts:kte)"
-    up_massdetru = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "up_massdetru(its:ite, kts:kte)"
-    z = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "z(its:ite, kts:kte)"
-    xz = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "xz(its:ite, kts:kte)"
-    qrco = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "qrco(its:ite, kts:kte)"
-    pwo = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "pwo(its:ite, kts:kte)"
-    cd = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "cd(its:ite, kts:kte)"
-    dellaqc = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "dellaqc(its:ite, kts:kte)"
-    # cupclw = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "cupclw(its:ite, kts:kte)"
-    kbmax = np.zeros(num_horizontal_points, dtype=int)  # Equivalent to "kbmax(its:ite)"
-    aa0 = np.zeros(num_horizontal_points)  # Equivalent to "aa0(its:ite)"
-    aa1 = np.zeros(num_horizontal_points)  # Equivalent to "aa1(its:ite)"
-    cap_max = np.zeros(num_horizontal_points)  # Equivalent to "cap_max(its:ite)"
-    ztexec = np.zeros(num_horizontal_points)  # Equivalent to "ztexec(its:ite)"
-    zqexec = np.zeros(num_horizontal_points)  # Equivalent to "zqexec(its:ite)"
-    zws = np.zeros(num_horizontal_points)  # Equivalent to "zws(its:ite)"
-    qes = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "qes(its:ite, kts:kte)"
-    he = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "he(its:ite, kts:kte)"
-    hes = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "hes(its:ite, kts:kte)"
-    qeso = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "qeso(its:ite, kts:kte)"
-    heo = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "heo(its:ite, kts:kte)"
-    heso = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "heso(its:ite, kts:kte)"
-    qes_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "qes_cup(its:ite, kts:kte)"
-    q_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "q_cup(its:ite, kts:kte)"
-    he_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "he_cup(its:ite, kts:kte)"
-    hes_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "hes_cup(its:ite, kts:kte)"
-    z_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "z_cup(its:ite, kts:kte)"
-    p_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "p_cup(its:ite, kts:kte)"
-    gamma_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "gamma_cup(its:ite, kts:kte)"
-    t_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "t_cup(its:ite, kts:kte)"
-    qeso_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "qeso_cup(its:ite, kts:kte)"
-    qo_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "qo_cup(its:ite, kts:kte)"
-    heo_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "heo_cup(its:ite, kts:kte)"
-    heso_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "heso_cup(its:ite, kts:kte)"
-    zo_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "zo_cup(its:ite, kts:kte)"
-    po_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "po_cup(its:ite, kts:kte)"
-    gammao_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "gammao_cup(its:ite, kts:kte)"
-    tn_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "tn_cup(its:ite, kts:kte)"
+    xland1 = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "xland1(its:ite)"
+    ktopx = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "ktopx(its:ite)"
+    cap_max_increment = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "cap_max_increment(its:ite)"
+    entr_rate = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "entr_rate(its:ite)"
+    # pre = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "pre(its:ite)"
+    up_massentro = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "up_massentro(its:ite, kts:kte)"
+    up_massdetro = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "up_massdetro(its:ite, kts:kte)"
+    up_massentru = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "up_massentru(its:ite, kts:kte)"
+    up_massdetru = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "up_massdetru(its:ite, kts:kte)"
+    z = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "z(its:ite, kts:kte)"
+    xz = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xz(its:ite, kts:kte)"
+    qrco = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "qrco(its:ite, kts:kte)"
+    pwo = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "pwo(its:ite, kts:kte)"
+    cd = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "cd(its:ite, kts:kte)"
+    dellaqc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "dellaqc(its:ite, kts:kte)"
+    # cupclw = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "cupclw(its:ite, kts:kte)"
+    kbmax = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "kbmax(its:ite)"
+    aa0 = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "aa0(its:ite)"
+    aa1 = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "aa1(its:ite)"
+    cap_max = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "cap_max(its:ite)"
+    ztexec = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "ztexec(its:ite)"
+    zqexec = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "zqexec(its:ite)"
+    zws = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "zws(its:ite)"
+    qes = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "qes(its:ite, kts:kte)"
+    he = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "he(its:ite, kts:kte)"
+    hes = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "hes(its:ite, kts:kte)"
+    qeso = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "qeso(its:ite, kts:kte)"
+    heo = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "heo(its:ite, kts:kte)"
+    heso = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "heso(its:ite, kts:kte)"
+    qes_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "qes_cup(its:ite, kts:kte)"
+    q_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "q_cup(its:ite, kts:kte)"
+    he_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "he_cup(its:ite, kts:kte)"
+    hes_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "hes_cup(its:ite, kts:kte)"
+    z_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "z_cup(its:ite, kts:kte)"
+    p_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "p_cup(its:ite, kts:kte)"
+    gamma_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "gamma_cup(its:ite, kts:kte)"
+    t_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "t_cup(its:ite, kts:kte)"
+    qeso_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "qeso_cup(its:ite, kts:kte)"
+    qo_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "qo_cup(its:ite, kts:kte)"
+    heo_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "heo_cup(its:ite, kts:kte)"
+    heso_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "heso_cup(its:ite, kts:kte)"
+    zo_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "zo_cup(its:ite, kts:kte)"
+    po_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "po_cup(its:ite, kts:kte)"
+    gammao_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "gammao_cup(its:ite, kts:kte)"
+    tn_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "tn_cup(its:ite, kts:kte)"
 
     # Initialize arrays based on their usage in the code
-    xaa0 = np.zeros(num_horizontal_points)  # Cloud work function for updraft
-    xaa1 = np.zeros(num_horizontal_points)  # Cloud work function for environment
-    xhc = np.zeros((num_horizontal_points, num_vertical_levels))  # Cloud moist static energy
-    xdby = np.zeros((num_horizontal_points, num_vertical_levels))  # Buoyancy term
-    dellat = np.zeros((num_horizontal_points, num_vertical_levels))  # Temperature tendency
-    # cnvwt = np.zeros((num_horizontal_points, num_vertical_levels))  # Convective weight
+    xaa0 = np.zeros((ite - its +1, jte - jts + 1))  # Cloud work function for updraft
+    xaa1 = np.zeros((ite - its +1, jte - jts + 1))  # Cloud work function for environment
+    xhc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud moist static energy
+    xdby = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Buoyancy term
+    dellat = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Temperature tendency
+    # cnvwt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Convective weight
 
     # Initialize arrays based on their usage in the code
-    xqes = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "xqes(its:ite, kts:kte)"
-    xqes_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "xqes_cup(its:ite, kts:kte)"
-    xq_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "xq_cup(its:ite, kts:kte)"
-    xhe_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "xhe_cup(its:ite, kts:kte)"
-    xhes_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "xhes_cup(its:ite, kts:kte)"
-    xz_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "xz_cup(its:ite, kts:kte)"
-    xt_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "xt_cup(its:ite, kts:kte)"
-    gamma_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "gamma_cup(its:ite, kts:kte)"
+    xqes = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xqes(its:ite, kts:kte)"
+    xqes_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xqes_cup(its:ite, kts:kte)"
+    xq_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xq_cup(its:ite, kts:kte)"
+    xhe_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xhe_cup(its:ite, kts:kte)"
+    xhes_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xhes_cup(its:ite, kts:kte)"
+    xz_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xz_cup(its:ite, kts:kte)"
+    xt_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xt_cup(its:ite, kts:kte)"
+    gamma_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "gamma_cup(its:ite, kts:kte)"
 
     # Initialize arrays based on their usage in the code
-    tn_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "tn_cup(its:ite, kts:kte)"
-    heo_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "heo_cup(its:ite, kts:kte)"
-    heso_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "heso_cup(its:ite, kts:kte)"
-    p_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "p_cup(its:ite, kts:kte)"
-    gammao_cup = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "gammao_cup(its:ite, kts:kte)"
-    dbyt = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "dbyt(its:ite, kts:kte)"
-    # c1d = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "c1d(its:ite, kts:kte)"
+    tn_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "tn_cup(its:ite, kts:kte)"
+    heo_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "heo_cup(its:ite, kts:kte)"
+    heso_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "heso_cup(its:ite, kts:kte)"
+    p_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "p_cup(its:ite, kts:kte)"
+    gammao_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "gammao_cup(its:ite, kts:kte)"
+    dbyt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "dbyt(its:ite, kts:kte)"
+    # c1d = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "c1d(its:ite, kts:kte)"
     # Initialize xhes based on its usage in the code
-    xhes = np.zeros((num_horizontal_points, num_vertical_levels))  # Equivalent to "xhes(its:ite, kts:kte)"
+    xhes = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xhes(its:ite, kts:kte)"
 
     # Initialize scalar variables
     dts = 0.0  # Total kinetic energy dissipation
@@ -244,10 +244,10 @@ def cu_gf_sh_run(
     xkshal = 0.0  # Stabilization closure variable
 
     # Initialize arrays based on their usage in the code
-    ztexec = np.zeros(num_horizontal_points)  # Temperature excess
-    zqexec = np.zeros(num_horizontal_points)  # Moisture excess
-    flux_tun = np.full(num_horizontal_points, FLUXTUNE)  # Flux tuning parameter
-    rand_vmas = np.zeros(num_horizontal_points)  # Random mass flux profile
+    ztexec = np.zeros((ite - its +1, jte - jts + 1))  # Temperature excess
+    zqexec = np.zeros((ite - its +1, jte - jts + 1))  # Moisture excess
+    flux_tun = np.full((ite - its +1, jte - jts + 1), FLUXTUNE)  # Flux tuning parameter
+    rand_vmas = np.zeros((ite - its +1, jte - jts + 1))  # Random mass flux profile
 
     # Initialize scalar variables
     dts = 0.0  # Total kinetic energy dissipation
@@ -257,10 +257,10 @@ def cu_gf_sh_run(
     xkshal = 0.0  # Stabilization closure variable
 
     # Initialize arrays based on their usage in the code
-    ztexec = np.zeros(num_horizontal_points)  # Temperature excess
-    zqexec = np.zeros(num_horizontal_points)  # Moisture excess
-    flux_tun = np.full(num_horizontal_points, FLUXTUNE)  # Flux tuning parameter
-    rand_vmas = np.zeros(num_horizontal_points)  # Random mass flux profile
+    ztexec = np.zeros((ite - its +1, jte - jts + 1))  # Temperature excess
+    zqexec = np.zeros((ite - its +1, jte - jts + 1))  # Moisture excess
+    flux_tun = np.full((ite - its +1, jte - jts + 1), FLUXTUNE)  # Flux tuning parameter
+    rand_vmas = np.zeros((ite - its +1, jte - jts + 1))  # Random mass flux profile
 
     # Initialize scalar variables
     totmas = 0.0  # Total mass flux adjustment
@@ -297,63 +297,68 @@ def cu_gf_sh_run(
 
     # Initialize surface variables
     for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-        xland1[i] = int(xland[i] + 0.001)  # Convert to integer
-        ktopx[i] = -1
-        if xland[i] > 1.5 or xland[i] < 0.5:
-            xland1[i] = 0
-        pre[i] = 0.0
-        xmb_out[i] = 0.0
-        cap_max_increment[i] = 25.0
-        entr_rate[i] = 1.0e-3  # Initial entrainment rate
-        ierrc[i] = " "  # Set error description to an empty string
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            xland1[i, j] = int(xland[i, j] + 0.001)  # Convert to integer
+            ktopx[i, j] = -1
+            if xland[i, j] > 1.5 or xland[i, j] < 0.5:
+                xland1[i, j] = 0
+            pre[i, j] = 0.0
+            xmb_out[i, j] = 0.0
+            cap_max_increment[i, j] = 25.0
+            entr_rate[i, j] = 1.0e-3  # Initial entrainment rate
+            ierrc[i, j] = " "  # Set error description to an empty string
 
     for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-            up_massentro[i, k] = 0.0
-            up_massdetro[i, k] = 0.0
-            up_massentru[i, k] = 0.0
-            up_massdetru[i, k] = 0.0
-            z[i, k] = zo[i, k]
-            xz[i, k] = zo[i, k]
-            qrco[i, k] = 0.0
-            pwo[i, k] = 0.0
-            cd[i, k] = 0.75 * entr_rate[i]
-            dellaqc[i, k] = 0.0
-            cupclw[i, k] = 0.0
+            for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+                up_massentro[i, j, k] = 0.0
+                up_massdetro[i, j, k] = 0.0
+                up_massentru[i, j, k] = 0.0
+                up_massdetru[i, j, k] = 0.0
+                z[i, j, k] = zo[i, j, k]
+                xz[i, j, k] = zo[i, j, k]
+                qrco[i, j, k] = 0.0
+                pwo[i, j, k] = 0.0
+                cd[i, j, k] = 0.75 * entr_rate[i, j]
+                dellaqc[i, j, k] = 0.0
+                cupclw[i, j, k] = 0.0
 
     cap_maxs = 175.0  # Equivalent to "cap_maxs=175."
 
     # Loop to initialize kbmax, aa0, and aa1
     for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-        kbmax[i] = 0
-        aa0[i] = 0.0
-        aa1[i] = 0.0
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            kbmax[i, j] = 0
+            aa0[i, j] = 0.0
+            aa1[i, j] = 0.0
 
     # Loop to initialize cap_max, ztexec, zqexec, and zws
     for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-        cap_max[i] = cap_maxs
-        ztexec[i] = 0.0
-        zqexec[i] = 0.0
-        zws[i] = 0.0
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            cap_max[i, j] = cap_maxs
+            ztexec[i, j] = 0.0
+            zqexec[i, j] = 0.0
+            zws[i, j] = 0.0
 
     for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-        # Buoyancy flux (h + le)
-        buo_flux = (hfx[i] / CP + 0.608 * t[i, 0] * qfx[i] / XLV) / rho[i, 0]
-        pgeoh = zo[i, 1] * G
-        # Convective-scale velocity w*
-        zws[i] = max(0.0, flux_tun[i] * 0.41 * buo_flux * zo[i, 1] * G / t[i, 0])
-        if zws[i] > np.finfo(float).tiny * pgeoh:  # Equivalent to "tiny(pgeoh)"
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            # Buoyancy flux (h + le)
+            buo_flux = (hfx[i, j] / CP + 0.608 * t[i, j, 0] * qfx[i, j] / XLV) / rho[i, j, 0]
+            pgeoh = zo[i, j, 1] * G
             # Convective-scale velocity w*
-            zws[i] = 1.2 * zws[i] ** 0.3333
-            # Temperature excess
-            ztexec[i] = max(flux_tun[i] * hfx[i] / (rho[i, 0] * zws[i] * CP), 0.0)
-            # Moisture excess
-            zqexec[i] = max(flux_tun[i] * qfx[i] / (XLV * rho[i, 0] * zws[i]), 0.0)
-        # Calculate zws for shallow convection closure (Grant 2001)
-        # Height of the PBL
-        zws[i] = max(0.0, flux_tun[i] * 0.41 * buo_flux * zo[i, kpbl[i]] * G / t[i, kpbl[i]])
-        zws[i] = 1.2 * zws[i] ** 0.3333
-        zws[i] = zws[i] * rho[i, kpbl[i]]  # Check if zrho is correct
+            zws[i, j] = max(0.0, flux_tun[i, j] * 0.41 * buo_flux * zo[i, j, 1] * G / t[i, j, 0])
+            if zws[i, j] > np.finfo(float).tiny * pgeoh:  # Equivalent to "tiny(pgeoh)"
+                # Convective-scale velocity w*
+                zws[i, j] = 1.2 * zws[i, j] ** 0.3333
+                # Temperature excess
+                ztexec[i, j] = max(flux_tun[i, j] * hfx[i, j] / (rho[i, j, 0] * zws[i, j] * CP), 0.0)
+                # Moisture excess
+                zqexec[i, j] = max(flux_tun[i, j] * qfx[i, j] / (XLV * rho[i, j, 0] * zws[i, j]), 0.0)
+            # Calculate zws for shallow convection closure (Grant 2001)
+            # Height of the PBL
+            zws[i, j] = max(0.0, flux_tun[i, j] * 0.41 * buo_flux * zo[i, j, kpbl[i, j]] * G / t[i, j, kpbl[i, j]])
+            zws[i, j] = 1.2 * zws[i, j] ** 0.3333
+            zws[i, j] = zws[i, j] * rho[i, j, kpbl[i, j]]  # Check if zrho is correct
 
     zkbmax = 3000.0  # Equivalent to "zkbmax=3000."
 
@@ -370,8 +375,8 @@ def cu_gf_sh_run(
     cup_env(
         z, qes, he, hes, t, q, po, z1,
         psur, ierr, tcrit, -1,
-        itf, ktf,
-        its, ite, kts, kte
+        itf, jtf, ktf,
+        its, ite, jts, jte, kts, kte
     )
 
     # Output variables match
@@ -390,8 +395,8 @@ def cu_gf_sh_run(
     cup_env(
         zo, qeso, heo, heso, tn, qo, po, z1,
         psur, ierr, tcrit, -1,
-        itf, ktf,
-        its, ite, kts, kte
+        itf, jtf, ktf,
+        its, ite, jts, jte, kts, kte
     )
 
     # Output variables match
@@ -417,8 +422,8 @@ def cu_gf_sh_run(
         t, qes, q, he, hes, z, po, qes_cup, q_cup, he_cup,
         hes_cup, z_cup, p_cup, gamma_cup, t_cup, psur,
         ierr, z1,
-        itf, ktf,
-        its, ite, kts, kte
+        itf, jtf, ktf,
+        its, ite, jts, jte, kts, kte
     )
 
     # Output variables match
@@ -446,8 +451,8 @@ def cu_gf_sh_run(
         tn, qeso, qo, heo, heso, zo, po, qeso_cup, qo_cup,
         heo_cup, heso_cup, zo_cup, po_cup, gammao_cup, tn_cup, psur,
         ierr, z1,
-        itf, ktf,
-        its, ite, kts, kte
+        itf, jtf, ktf,
+        its, ite, jts, jte, kts, kte
     )
 
     # # Output variables match
@@ -463,65 +468,70 @@ def cu_gf_sh_run(
 
 
     for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-        if ierr[i] == 0:  # Equivalent to "if(ierr(i).eq.0)"
-            u_cup[i, kts] = us[i, kts]  # kts corresponds to index 0 in Python
-            v_cup[i, kts] = vs[i, kts]  # kts corresponds to index 0 in Python
-            for k in range(kts + 1, ktf + 1):  # Adjusted to retain the same number of iterations
-                u_cup[i, k] = 0.5 * (us[i, k - 1] + us[i, k])
-                v_cup[i, k] = 0.5 * (vs[i, k - 1] + vs[i, k])
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            if ierr[i, j] == 0:  # Equivalent to "if(ierr(i).eq.0)"
+                u_cup[i, j, kts] = us[i, j, kts]  # kts corresponds to index 0 in Python
+                v_cup[i, j, kts] = vs[i, j, kts]  # kts corresponds to index 0 in Python
+                for k in range(kts + 1, ktf + 1):  # Adjusted to retain the same number of iterations
+                    u_cup[i, j, k] = 0.5 * (us[i, j, k - 1] + us[i, j, k])
+                    v_cup[i, j, k] = 0.5 * (vs[i, j, k - 1] + vs[i, j, k])
 
     for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-        if ierr[i] == 0:  # Equivalent to "if(ierr(i).eq.0)"
-            for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
-                if zo_cup[i, k] > zkbmax + z1[i]:  # Check if height exceeds zkbmax + surface height
-                    kbmax[i] = k
-                    break  # Equivalent to "go to 25"
-            kbmax[i] = min(kbmax[i], ktf // 2)  # Equivalent to "kbmax(i)=min(kbmax(i),ktf/2)"
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            if ierr[i, j] == 0:  # Equivalent to "if(ierr(i).eq.0)"
+                for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
+                    if zo_cup[i, j, k] > zkbmax + z1[i, j]:  # Check if height exceeds zkbmax + surface height
+                        kbmax[i, j] = k
+                        break  # Equivalent to "go to 25"
+                kbmax[i, j] = min(kbmax[i, j], ktf // 2)  # Equivalent to "kbmax(i)=min(kbmax(i),ktf/2)"
 
     for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-        if kpbl[i] > 2:  # Equivalent to "if(kpbl(i).gt.3)"
-            cap_max[i] = po_cup[i, kpbl[i]]  # Adjust kpbl index for 0-based indexing
-        if ierr[i] == 0:  # Equivalent to "if(ierr(i) == 0)"
-            k22[i] = np.argmax(heo_cup[i, 1:kbmax[i]] + 1)  # Equivalent to "maxloc(heo_cup(i,2:kbmax(i)),1)"
-            k22[i] = max(1, k22[i])  # Ensure k22 is at least 1
-            if k22[i] > kbmax[i]:  # Check if k22 exceeds kbmax
-                ierr[i] = 2
-                # Equivalent to setting error description in Fortran
-                ierrc[i] = "could not find k22"
-                ktop[i] = -1
-                k22[i] = -1
-                kbcon[i] = -1
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            if kpbl[i, j] > 2:  # Equivalent to "if(kpbl(i).gt.3)"
+                cap_max[i, j] = po_cup[i, j, kpbl[i, j]]  # Adjust kpbl index for 0-based indexing
+            if ierr[i, j] == 0:  # Equivalent to "if(ierr(i) == 0)"
+                k22[i, j] = np.argmax(heo_cup[i, j, 1:kbmax[i, j]] + 1)  # Equivalent to "maxloc(heo_cup(i,2:kbmax(i)),1)"
+                k22[i, j] = max(1, k22[i, j])  # Ensure k22 is at least 1
+                if k22[i, j] > kbmax[i, j]:  # Check if k22 exceeds kbmax
+                    ierr[i, j] = 2
+                    # Equivalent to setting error description in Fortran
+                    ierrc[i, j] = "could not find k22"
+                    ktop[i, j] = -1
+                    k22[i, j] = -1
+                    kbcon[i, j] = -1
 
     for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-        if ierr[i] == 0:  # Equivalent to "if(ierr(i).eq.0)"
-            x_add = XLV * zqexec[i] + CP * ztexec[i]  # Compute x_add
-            # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{k22[i]:>4}")
-            # print(f"{hkb[i]:>20.12E}{hkbo[i]:>20.12E}{x_add:>20.12E}")
-            # for k in range(kte+1):
-            #     print(f"{he_cup[i,k]:>20.12E}{heo_cup[i,k]:>20.12E}")
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            if ierr[i, j] == 0:  # Equivalent to "if(ierr(i).eq.0)"
+                x_add = XLV * zqexec[i, j] + CP * ztexec[i, j]  # Compute x_add
+                # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+                # print(f"{k22[i, j]:>4}")
+                # print(f"{hkb[i, j]:>20.12E}{hkbo[i, j]:>20.12E}{x_add:>20.12E}")
+                # for k in range(kte+1):
+                #     print(f"{he_cup[i,k]:>20.12E}{heo_cup[i,k]:>20.12E}")
 
-            # Call get_cloud_bc() for he_cup
-            hkb[i] = get_cloud_bc(kte, he_cup[i, :kte + 1], hkb[i], k22[i], x_add)
-            # Call get_cloud_bc() for heo_cup
-            hkbo[i] = get_cloud_bc(kte, heo_cup[i, :kte + 1], hkbo[i], k22[i], x_add)
+                # Call get_cloud_bc() for he_cup
+                hkb[i, j] = get_cloud_bc(kte, he_cup[i, j, :kte + 1], hkb[i, j], k22[i, j], x_add)
+                # Call get_cloud_bc() for heo_cup
+                hkbo[i, j] = get_cloud_bc(kte, heo_cup[i, j, :kte + 1], hkbo[i, j], k22[i, j], x_add)
 
-            # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{k22[i]:>4}")
-            # print(f"{hkb[i]:>20.12E}{hkbo[i]:>20.12E}{x_add:>20.12E}")
-            # for k in range(kte+1):
-            #     print(f"{he_cup[i,k]:>20.12E}{heo_cup[i,k]:>20.12E}")
+                # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
+                # print(f"{k22[i, j]:>4}")
+                # print(f"{hkb[i, j]:>20.12E}{hkbo[i, j]:>20.12E}{x_add:>20.12E}")
+                # for k in range(kte+1):
+                #     print(f"{he_cup[i,k]:>20.12E}{heo_cup[i,k]:>20.12E}")
 
     for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-            dbyo[i, k] = 0.0  # Equivalent to "dbyo(i,k)= 0. !hkbo(i)-heso_cup(i,k)"
+            for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+                dbyo[i, j, k] = 0.0  # Equivalent to "dbyo(i,k)= 0. !hkbo(i)-heso_cup(i,k)"
 
 
     # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
     # for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-    #     print(f"{k22[i]:>4}{kbcon[i]:>4}{kbmax[i]:>4}")
+    #     print(f"{k22[i, j]:>4}{kbcon[i, j]:>4}{kbmax[i, j]:>4}")
     # for i in range(its, itf + 1):
-    #     print(f"{cap_max_increment[i]:>20.12E}{hkbo[i]:>20.12E}{cap_max[i]:>20.12E}{ztexec[i]:>20.12E}{zqexec[i]:>20.12E}{entr_rate[i]:>20.12E}")
+    #     print(f"{cap_max_increment[i, j]:>20.12E}{hkbo[i, j]:>20.12E}{cap_max[i, j]:>20.12E}{ztexec[i, j]:>20.12E}{zqexec[i, j]:>20.12E}{entr_rate[i, j]:>20.12E}")
     # for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
     #     for k in range(kte+1):
     #         print(f"{heo_cup[i,k]:>20.12E}{heso_cup[i,k]:>20.12E}{po_cup[i,k]:>20.12E}{z_cup[i,k]:>20.12E}{heo[i,k]:>20.12E}")
@@ -531,17 +541,17 @@ def cu_gf_sh_run(
         ierrc, cap_max_increment, 5, k22, kbcon, heo_cup, heso_cup,
         hkbo, ierr, kbmax, po_cup, cap_max,
         ztexec, zqexec,
-        0, itf, ktf,
-        its, ite, kts, kte,
+        0, itf, jtf, ktf,
+        its, ite, jts, jte, kts, kte,
         z_cup, entr_rate, heo, 0
     )
 
     # Output variables match
     # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
     # for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-    #     print(f"{k22[i]:>4}{kbcon[i]:>4}{kbmax[i]:>4}")
+    #     print(f"{k22[i, j]:>4}{kbcon[i, j]:>4}{kbmax[i, j]:>4}")
     # for i in range(its, itf + 1):
-    #     print(f"{cap_max_increment[i]:>20.12E}{hkbo[i]:>20.12E}{cap_max[i]:>20.12E}{ztexec[i]:>20.12E}{zqexec[i]:>20.12E}{entr_rate[i]:>20.12E}")
+    #     print(f"{cap_max_increment[i, j]:>20.12E}{hkbo[i, j]:>20.12E}{cap_max[i, j]:>20.12E}{ztexec[i, j]:>20.12E}{zqexec[i, j]:>20.12E}{entr_rate[i, j]:>20.12E}")
     # for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
     #     for k in range(kte+1):
     #         print(f"{heo_cup[i,k]:>20.12E}{heso_cup[i,k]:>20.12E}{po_cup[i,k]:>20.12E}{z_cup[i,k]:>20.12E}{heo[i,k]:>20.12E}")
@@ -555,8 +565,8 @@ def cu_gf_sh_run(
     # Call cup_minimi() to get inversion layers for cloud tops
     cup_minimi(
         heso_cup, kbcon, kbmax, kstabi, ierr,
-        itf, ktf,
-        its, ite, kts, kte
+        itf, jtf, ktf,
+        its, ite, jts, jte, kts, kte
     )
 
     # Output variables match
@@ -578,7 +588,7 @@ def cu_gf_sh_run(
 
     get_inversion_layers(
         ierr, p_cup, t_cup, z_cup, q_cup, qes_cup, k_inv_layers,
-        kbcon, kstabi, dtempdz, itf, ktf, its, ite, kts, kte
+        kbcon, kstabi, dtempdz, itf, jtf, ktf, its, ite, jts, jte, kts, kte
     )
 
     # Output variables match
@@ -591,83 +601,85 @@ def cu_gf_sh_run(
     #     print(f"{p_cup[0,k]:>20.12E}{t_cup[0,k]:>20.12E}{z_cup[0,k]:>20.12E}{q_cup[0,k]:>20.12E}{qes_cup[0,k]:>20.12E}{dtempdz[0,k]:>20.12E}")
 
     for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-        entr_rate_2d[i, :] = entr_rate[i]  # Copy entr_rate to entr_rate_2d
-        if ierr[i] == 0:  # Equivalent to "if(ierr(i) == 0)"
-            start_level[i] = k22[i]  # Set start_level to k22
-            x_add = XLV * zqexec[i] + CP * ztexec[i]  # Compute x_add
-            # Call get_cloud_bc() for he_cup
-            hkb[i] = get_cloud_bc(kte, he_cup[i, :kte + 1], hkb[i], k22[i], x_add)
-            if kbcon[i] > ktf - 4:  # Check if kbcon exceeds ktf - 4
-                ierr[i] = 231
-            for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
-                frh = 2.0 * min(qo_cup[i, k] / qeso_cup[i, k], 1.0)  # Compute frh
-                entr_rate_2d[i, k] = entr_rate[i]  # Copy entr_rate to entr_rate_2d
-                cd[i, k] = 0.75 * entr_rate_2d[i, k]  # Compute cd
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            entr_rate_2d[i, j, :] = entr_rate[i, j]  # Copy entr_rate to entr_rate_2d
+            if ierr[i, j] == 0:  # Equivalent to "if(ierr(i) == 0)"
+                start_level[i, j] = k22[i, j]  # Set start_level to k22
+                x_add = XLV * zqexec[i, j] + CP * ztexec[i, j]  # Compute x_add
+                # Call get_cloud_bc() for he_cup
+                hkb[i, j] = get_cloud_bc(kte, he_cup[i, j, :kte + 1], hkb[i, j], k22[i, j], x_add)
+                if kbcon[i, j] > ktf - 4:  # Check if kbcon exceeds ktf - 4
+                    ierr[i, j] = 231
+                for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
+                    frh = 2.0 * min(qo_cup[i, j, k] / qeso_cup[i, j, k], 1.0)  # Compute frh
+                    entr_rate_2d[i, j, k] = entr_rate[i, j]  # Copy entr_rate to entr_rate_2d
+                    cd[i, j, k] = 0.75 * entr_rate_2d[i, j, k]  # Compute cd
 
-            # First estimate for shallow convection
-            ktop[i] = 0
-            kstart = kpbl[i]
-            if kpbl[i] < 4:  # Check if kpbl is less than 4
-                kstart = kbcon[i]
-            if k_inv_layers[i, 0] > -1 and (po_cup[i, kstart] - po_cup[i, k_inv_layers[i, 0]]) < 200.0:
-                ktop[i] = k_inv_layers[i, 0]
-            else:
-                for k in range(kbcon[i] + 1, ktf + 1):  # Adjusted loop range
-                    if (po_cup[i, kstart] - po_cup[i, k]) > 200.0:
-                        ktop[i] = k
-                        break  # Exit the loop
+                # First estimate for shallow convection
+                ktop[i, j] = 0
+                kstart = kpbl[i, j]
+                if kpbl[i, j] < 4:  # Check if kpbl is less than 4
+                    kstart = kbcon[i, j]
+                if k_inv_layers[i, j, 0] > -1 and (po_cup[i, j, kstart] - po_cup[i, j, k_inv_layers[i, j, 0]]) < 200.0:
+                    ktop[i, j] = k_inv_layers[i, j, 0]
+                else:
+                    for k in range(kbcon[i, j] + 1, ktf + 1):  # Adjusted loop range
+                        if (po_cup[i, j, kstart] - po_cup[i, j, k]) > 200.0:
+                            ktop[i, j] = k
+                            break  # Exit the loop
 
     # Call rates_up_pdf() to get normalized mass flux profile
  
     # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
     # print(f"{ipr:>4}")
     # for i in range(its, itf + 1):
-    #     print(f"{ktop[i]:>4}{xland1[i]:>4}{kstabi[i]:>4}{k22[i]:>4}{kbcon[i]:>4}{kpbl[i]:>4}{ktopx[i]:>4}{pmin_lev[i]:>4}")
+    #     print(f"{ktop[i, j]:>4}{xland1[i, j]:>4}{kstabi[i, j]:>4}{k22[i, j]:>4}{kbcon[i, j]:>4}{kpbl[i, j]:>4}{ktopx[i, j]:>4}{pmin_lev[i, j]:>4}")
     # for i in range(its, itf + 1):
-    #     print(f"{rand_vmas[i]:>20.12E}{hkbo[i]:>20.12E}")
+    #     print(f"{rand_vmas[i, j]:>20.12E}{hkbo[i, j]:>20.12E}")
     # for i in range(its, itf + 1):
     #     for k in range(kte+1):
     #         print(f"{po_cup[i,k]:>20.12E}{entr_rate_2d[i,k]:>20.12E}{heo[i,k]:>20.12E}{heso_cup[i,k]:>20.12E}{zo_cup[i,k]:>20.12E}{zuo[i,k]:>20.12E}")
 
     rates_up_pdf(
         rand_vmas, ipr, 'shallow', ktop, ierr, po_cup, entr_rate_2d, hkbo, heo, heso_cup, zo_cup,
-        xland1, kstabi, k22, kbcon, its, ite, itf, kts, kte, ktf, zuo, kpbl, ktopx, kbcon, pmin_lev
+        xland1, kstabi, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kpbl, ktopx, kbcon, pmin_lev
     )
  
     # # Output variables match
     # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
     # print(f"{ipr:>4}")
     # for i in range(its, itf + 1):
-    #     print(f"{ktop[i]:>4}{xland1[i]:>4}{kstabi[i]:>4}{k22[i]:>4}{kbcon[i]:>4}{kpbl[i]:>4}{ktopx[i]:>4}{pmin_lev[i]:>4}")
+    #     print(f"{ktop[i, j]:>4}{xland1[i, j]:>4}{kstabi[i, j]:>4}{k22[i, j]:>4}{kbcon[i, j]:>4}{kpbl[i, j]:>4}{ktopx[i, j]:>4}{pmin_lev[i, j]:>4}")
     # for i in range(its, itf + 1):
-    #     print(f"{rand_vmas[i]:>20.12E}{hkbo[i]:>20.12E}")
+    #     print(f"{rand_vmas[i, j]:>20.12E}{hkbo[i, j]:>20.12E}")
     # for i in range(its, itf + 1):
     #     for k in range(kte+1):
     #         print(f"{po_cup[i,k]:>20.12E}{entr_rate_2d[i,k]:>20.12E}{heo[i,k]:>20.12E}{heso_cup[i,k]:>20.12E}{zo_cup[i,k]:>20.12E}{zuo[i,k]:>20.12E}")
 
     for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-        if ierr[i] == 0:  # Equivalent to "if(ierr(i).eq.0)"
-            if k22[i] > 0:  # Check if k22 is greater than 0
-                for k in range(k22[i]):  # Loop from 1 to k22(i)-1
-                    zuo[i, k] = 0.0
-                    zu[i, k] = 0.0
-                    xzu[i, k] = 0.0
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            if ierr[i, j] == 0:  # Equivalent to "if(ierr(i).eq.0)"
+                if k22[i, j] > 0:  # Check if k22 is greater than 0
+                    for k in range(k22[i, j]):  # Loop from 1 to k22(i)-1
+                        zuo[i, j, k] = 0.0
+                        zu[i, j, k] = 0.0
+                        xzu[i, j, k] = 0.0
 
-            for k in range(np.argmax(zuo[i, :]), ktop[i] + 1):  # Loop from maxloc(zuo(i,:)) to ktop(i)
-                if zuo[i, k] < 1.0e-6:  # Check if zuo(i,k) is less than 1.e-6
-                    ktop[i] = k - 1
-                    break  # Exit the loop
+                for k in range(np.argmax(zuo[i, j, :]), ktop[i, j] + 1):  # Loop from maxloc(zuo(i,:)) to ktop(i)
+                    if zuo[i, j, k] < 1.0e-6:  # Check if zuo(i,k) is less than 1.e-6
+                        ktop[i, j] = k - 1
+                        break  # Exit the loop
 
-            for k in range(k22[i], ktop[i] + 1):  # Loop from k22(i) to ktop(i)
-                xzu[i, k] = zuo[i, k]
-                zu[i, k] = zuo[i, k]
+                for k in range(k22[i, j], ktop[i, j] + 1):  # Loop from k22(i) to ktop(i)
+                    xzu[i, j, k] = zuo[i, j, k]
+                    zu[i, j, k] = zuo[i, j, k]
 
-            for k in range(ktop[i] + 1, ktf + 1):  # Loop from ktop(i)+1 to ktf
-                zuo[i, k] = 0.0
-                zu[i, k] = 0.0
-                xzu[i, k] = 0.0
+                for k in range(ktop[i, j] + 1, ktf + 1):  # Loop from ktop(i)+1 to ktf
+                    zuo[i, j, k] = 0.0
+                    zu[i, j, k] = 0.0
+                    xzu[i, j, k] = 0.0
 
-            k22[i] = max(1, k22[i])  # Ensure k22 is at least 1
+                k22[i, j] = max(1, k22[i, j])  # Ensure k22 is at least 1
 
     # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
     # print(f"{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}")
@@ -679,7 +691,7 @@ def cu_gf_sh_run(
 
     # Call get_lateral_massflux() to calculate mass entrainment and detrainment
     get_lateral_massflux(
-        itf, ktf, its, ite, kts, kte,
+        itf, jtf, ktf, its, ite, jts, jte, kts, kte,
         ierr, ktop, zo_cup, zuo, cd, entr_rate_2d,
         up_massentro, up_massdetro, up_massentr, up_massdetr,
         2, kbcon, k22, up_massentru, up_massdetru, lambau
@@ -696,127 +708,130 @@ def cu_gf_sh_run(
 
 
     for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
-        for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-            hc[i, k] = 0.0
-            qco[i, k] = 0.0
-            qrco[i, k] = 0.0
-            dby[i, k] = 0.0
-            hco[i, k] = 0.0
-            dbyo[i, k] = 0.0
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
+                hc[i, j, k] = 0.0
+                qco[i, j, k] = 0.0
+                qrco[i, j, k] = 0.0
+                dby[i, j, k] = 0.0
+                hco[i, j, k] = 0.0
+                dbyo[i, j, k] = 0.0
 
     for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-        if ierr[i] != 0:  # Equivalent to "if(ierr(i) /= 0)"
-            continue  # Skip to the next iteration if ierr[i] is not zero
-        for k in range(start_level[i] + 1):  # Loop from 1 to start_level(i)
-            uc[i, k] = u_cup[i, k]
-            vc[i, k] = v_cup[i, k]
-        for k in range(start_level[i]):  # Loop from 1 to start_level(i)-1
-            hc[i, k] = he_cup[i, k]
-            hco[i, k] = heo_cup[i, k]
-        k = start_level[i]  # Set k to start_level(i)
-        hc[i, k] = hkb[i]
-        hco[i, k] = hkbo[i]
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            if ierr[i, j] != 0:  # Equivalent to "if(ierr(i) /= 0)"
+                continue  # Skip to the next iteration if ierr[i, j] is not zero
+            for k in range(start_level[i, j] + 1):  # Loop from 1 to start_level(i)
+                uc[i, j, k] = u_cup[i, j, k]
+                vc[i, j, k] = v_cup[i, j, k]
+            for k in range(start_level[i, j]):  # Loop from 1 to start_level(i)-1
+                hc[i, j, k] = he_cup[i, j, k]
+                hco[i, j, k] = heo_cup[i, j, k]
+            k = start_level[i, j]  # Set k to start_level(i)
+            hc[i, j, k] = hkb[i, j]
+            hco[i, j, k] = hkbo[i, j]
 
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        dbyt[i, :] = 0.0  # Initialize dbyt for this grid point
-        if ierr[i] != 0:  # Skip if there is an error
-            continue
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            dbyt[i, j, :] = 0.0  # Initialize dbyt for this grid point
+            if ierr[i, j] != 0:  # Skip if there is an error
+                continue
 
-        # Sequential loop for levels from start_level(i)+1 to ktop(i)
-        for k in range(start_level[i] + 1, ktop[i] + 1):
-            hc[i, k] = (hc[i, k - 1] * zu[i, k - 1] - 0.5 * up_massdetr[i, k - 1] * hc[i, k - 1] +
-                        up_massentr[i, k - 1] * he[i, k - 1]) / \
-                       (zu[i, k - 1] - 0.5 * up_massdetr[i, k - 1] + up_massentr[i, k - 1])
-            uc[i, k] = (uc[i, k - 1] * zu[i, k - 1] - 0.5 * up_massdetr[i, k - 1] * uc[i, k - 1] +
-                        up_massentr[i, k - 1] * us[i, k - 1]) / \
-                       (zu[i, k - 1] - 0.5 * up_massdetr[i, k - 1] + up_massentr[i, k - 1])
-            vc[i, k] = (vc[i, k - 1] * zu[i, k - 1] - 0.5 * up_massdetr[i, k - 1] * vc[i, k - 1] +
-                        up_massentr[i, k - 1] * vs[i, k - 1]) / \
-                       (zu[i, k - 1] - 0.5 * up_massdetr[i, k - 1] + up_massentr[i, k - 1])
-            dby[i, k] = max(0.0, hc[i, k] - hes_cup[i, k])
-            hco[i, k] = (hco[i, k - 1] * zuo[i, k - 1] - 0.5 * up_massdetro[i, k - 1] * hco[i, k - 1] +
-                         up_massentro[i, k - 1] * heo[i, k - 1]) / \
-                        (zuo[i, k - 1] - 0.5 * up_massdetro[i, k - 1] + up_massentro[i, k - 1])
-            dbyo[i, k] = hco[i, k] - heso_cup[i, k]
-            dz = zo_cup[i, k + 1] - zo_cup[i, k]
-            if k >= kbcon[i]:
-                dbyt[i, k] = dbyt[i, k - 1] + dbyo[i, k] * dz
+            # Sequential loop for levels from start_level(i)+1 to ktop(i)
+            for k in range(start_level[i, j] + 1, ktop[i, j] + 1):
+                hc[i, j, k] = (hc[i, j, k - 1] * zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] * hc[i, j, k - 1] +
+                            up_massentr[i, j, k - 1] * he[i, j, k - 1]) / \
+                        (zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
+                uc[i, j, k] = (uc[i, j, k - 1] * zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] * uc[i, j, k - 1] +
+                            up_massentr[i, j, k - 1] * us[i, j, k - 1]) / \
+                        (zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
+                vc[i, j, k] = (vc[i, j, k - 1] * zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] * vc[i, j, k - 1] +
+                            up_massentr[i, j, k - 1] * vs[i, j, k - 1]) / \
+                        (zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
+                dby[i, j, k] = max(0.0, hc[i, j, k] - hes_cup[i, j, k])
+                hco[i, j, k] = (hco[i, j, k - 1] * zuo[i, j, k - 1] - 0.5 * up_massdetro[i, j, k - 1] * hco[i, j, k - 1] +
+                            up_massentro[i, j, k - 1] * heo[i, j, k - 1]) / \
+                            (zuo[i, j, k - 1] - 0.5 * up_massdetro[i, j, k - 1] + up_massentro[i, j, k - 1])
+                dbyo[i, j, k] = hco[i, j, k] - heso_cup[i, j, k]
+                dz = zo_cup[i, j, k + 1] - zo_cup[i, j, k]
+                if k >= kbcon[i, j]:
+                    dbyt[i, j, k] = dbyt[i, j, k - 1] + dbyo[i, j, k] * dz
 
-        ki = np.argmax(dbyt[i, :])  # Find the index of the maximum value in dbyt
-        if ktop[i] > ki + 1:
-            ktop[i] = ki + 1
-            zuo[i, ktop[i] + 1:ktf + 1] = 0.0
-            zu[i, ktop[i] + 1:ktf + 1] = 0.0
-            cd[i, ktop[i] + 1:ktf + 1] = 0.0
-            up_massdetro[i, ktop[i]] = zuo[i, ktop[i]]
-            up_massentro[i, ktop[i]:ktf + 1] = 0.0
-            up_massdetro[i, ktop[i] + 1:ktf + 1] = 0.0
-            entr_rate_2d[i, ktop[i] + 1:ktf + 1] = 0.0
+            ki = np.argmax(dbyt[i, j, :])  # Find the index of the maximum value in dbyt
+            if ktop[i, j] > ki + 1:
+                ktop[i, j] = ki + 1
+                zuo[i, j, ktop[i, j] + 1:ktf + 1] = 0.0
+                zu[i, j, ktop[i, j] + 1:ktf + 1] = 0.0
+                cd[i, j, ktop[i, j] + 1:ktf + 1] = 0.0
+                up_massdetro[i, j, ktop[i, j]] = zuo[i, j, ktop[i, j]]
+                up_massentro[i, j, ktop[i, j]:ktf + 1] = 0.0
+                up_massdetro[i, j, ktop[i, j] + 1:ktf + 1] = 0.0
+                entr_rate_2d[i, j, ktop[i, j] + 1:ktf + 1] = 0.0
 
-        if ktop[i] < kbcon[i] + 1:
-            ierr[i] = 5
-            continue
-        if ktop[i] > ktf - 2:
-            ierr[i] = 5
-            ierrc[i] = "ktop is larger than ktf-2"
-            continue
+            if ktop[i, j] < kbcon[i, j] + 1:
+                ierr[i, j] = 5
+                continue
+            if ktop[i, j] > ktf - 2:
+                ierr[i, j] = 5
+                ierrc[i, j] = "ktop is larger than ktf-2"
+                continue
 
-        # Call get_cloud_bc() to calculate cloud properties
-        qaver = get_cloud_bc(kte, qo_cup[i, :kte + 1], qaver, k22[i], ZERO)
-        qaver += zqexec[i]
-        for k in range(start_level[i]):
-            qco[i, k] = qo_cup[i, k]
-        k = start_level[i]
-        qco[i, k] = qaver
+            # Call get_cloud_bc() to calculate cloud properties
+            qaver = get_cloud_bc(kte, qo_cup[i, j, :kte + 1], qaver, k22[i, j], ZERO)
+            qaver += zqexec[i, j]
+            for k in range(start_level[i, j]):
+                qco[i, j, k] = qo_cup[i, j, k]
+            k = start_level[i, j]
+            qco[i, j, k] = qaver
 
-        # Sequential loop for levels from start_level(i)+1 to ktop(i)
-        for k in range(start_level[i] + 1, ktop[i] + 1):
-            trash = qeso_cup[i, k] + (1.0 / XLV) * (gammao_cup[i, k] / (1.0 + gammao_cup[i, k])) * dbyo[i, k]
-            trash2 = qco[i, k - 1]
-            qco[i, k] = (trash2 * (zuo[i, k - 1] - 0.5 * up_massdetr[i, k - 1]) +
-                         up_massentr[i, k - 1] * qo[i, k - 1]) / \
-                        (zuo[i, k - 1] - 0.5 * up_massdetr[i, k - 1] + up_massentr[i, k - 1])
+            # Sequential loop for levels from start_level(i)+1 to ktop(i)
+            for k in range(start_level[i, j] + 1, ktop[i, j] + 1):
+                trash = qeso_cup[i, j, k] + (1.0 / XLV) * (gammao_cup[i, j, k] / (1.0 + gammao_cup[i, j, k])) * dbyo[i, j, k]
+                trash2 = qco[i, j, k - 1]
+                qco[i, j, k] = (trash2 * (zuo[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1]) +
+                            up_massentr[i, j, k - 1] * qo[i, j, k - 1]) / \
+                            (zuo[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
 
-            if qco[i, k] >= trash:
-                dz = z_cup[i, k] - z_cup[i, k - 1]
-                c1d[i, k] = 0.02 * up_massdetr[i, k - 1]
-                qrco[i, k] = (qco[i, k] - trash) / (1.0 + (C0_SHAL + c1d[i, k]) * dz)
-                if qrco[i, k] < 0.0:
-                    qrco[i, k] = 0.0
-                    c1d[i, k] = 0.0
-                pwo[i, k] = C0_SHAL * dz * qrco[i, k] * zuo[i, k]
-                qco[i, k] = trash + qrco[i, k]
-            else:
-                qrco[i, k] = 0.0
-            cupclw[i, k] = qrco[i, k]
+                if qco[i, j, k] >= trash:
+                    dz = z_cup[i, j, k] - z_cup[i, j, k - 1]
+                    c1d[i, j, k] = 0.02 * up_massdetr[i, j, k - 1]
+                    qrco[i, j, k] = (qco[i, j, k] - trash) / (1.0 + (C0_SHAL + c1d[i, j, k]) * dz)
+                    if qrco[i, j, k] < 0.0:
+                        qrco[i, j, k] = 0.0
+                        c1d[i, j, k] = 0.0
+                    pwo[i, j, k] = C0_SHAL * dz * qrco[i, j, k] * zuo[i, j, k]
+                    qco[i, j, k] = trash + qrco[i, j, k]
+                else:
+                    qrco[i, j, k] = 0.0
+                cupclw[i, j, k] = qrco[i, j, k]
 
-        trash = 0.0
-        trash2 = 0.0
+            trash = 0.0
+            trash2 = 0.0
 
-        # Loop from k22(i)+1 to ktop(i)
-        for k in range(k22[i] + 1, ktop[i] + 1):  # Adjusted for Python indexing
-            dp = 100.0 * (po_cup[i, k] - po_cup[i, k + 1])  # Compute pressure difference
-            cnvwt[i, k] = zuo[i, k] * cupclw[i, k] * G / dp  # Compute convective weight
-            trash2 += entr_rate_2d[i, k]  # Accumulate entrainment rate
-            qco[i, k] = qco[i, k] - qrco[i, k]  # Adjust cloud water vapor mixing ratio
+            # Loop from k22(i)+1 to ktop(i)
+            for k in range(k22[i, j] + 1, ktop[i, j] + 1):  # Adjusted for Python indexing
+                dp = 100.0 * (po_cup[i, j, k] - po_cup[i, j, k + 1])  # Compute pressure difference
+                cnvwt[i, j, k] = zuo[i, j, k] * cupclw[i, j, k] * G / dp  # Compute convective weight
+                trash2 += entr_rate_2d[i, j, k]  # Accumulate entrainment rate
+                qco[i, j, k] = qco[i, j, k] - qrco[i, j, k]  # Adjust cloud water vapor mixing ratio
 
-        # Loop from k22(i)+1 to max(kbcon(i), k22(i)+1)
-        for k in range(k22[i] + 1, max(kbcon[i], k22[i] + 1) + 1):  # Adjusted for Python indexing
-            trash += entr_rate_2d[i, k]  # Accumulate entrainment rate
+            # Loop from k22(i)+1 to max(kbcon(i), k22(i)+1)
+            for k in range(k22[i, j] + 1, max(kbcon[i, j], k22[i, j] + 1) + 1):  # Adjusted for Python indexing
+                trash += entr_rate_2d[i, j, k]  # Accumulate entrainment rate
 
-        # Loop from ktop(i)+1 to ktf-1
-        for k in range(ktop[i] + 1, ktf):  # Adjusted for Python indexing
-            hc[i, k] = hes_cup[i, k]  # Set cloud moist static energy
-            hco[i, k] = heso_cup[i, k]  # Set cloud moist static energy for environment
-            qco[i, k] = qeso_cup[i, k]  # Set cloud water vapor mixing ratio
-            uc[i, k] = u_cup[i, k]  # Set x wind
-            vc[i, k] = v_cup[i, k]  # Set y wind
-            qrco[i, k] = 0.0  # Reset cloud water mixing ratio
-            dby[i, k] = 0.0  # Reset buoyancy term
-            dbyo[i, k] = 0.0  # Reset buoyancy term for environment
-            zu[i, k] = 0.0  # Reset updraft normalized mass flux
-            xzu[i, k] = 0.0  # Reset updraft normalized mass flux (alternative)
-            zuo[i, k] = 0.0  # Reset updraft normalized mass flux for environment
+            # Loop from ktop(i)+1 to ktf-1
+            for k in range(ktop[i, j] + 1, ktf):  # Adjusted for Python indexing
+                hc[i, j, k] = hes_cup[i, j, k]  # Set cloud moist static energy
+                hco[i, j, k] = heso_cup[i, j, k]  # Set cloud moist static energy for environment
+                qco[i, j, k] = qeso_cup[i, j, k]  # Set cloud water vapor mixing ratio
+                uc[i, j, k] = u_cup[i, j, k]  # Set x wind
+                vc[i, j, k] = v_cup[i, j, k]  # Set y wind
+                qrco[i, j, k] = 0.0  # Reset cloud water mixing ratio
+                dby[i, j, k] = 0.0  # Reset buoyancy term
+                dbyo[i, j, k] = 0.0  # Reset buoyancy term for environment
+                zu[i, j, k] = 0.0  # Reset updraft normalized mass flux
+                xzu[i, j, k] = 0.0  # Reset updraft normalized mass flux (alternative)
+                zuo[i, j, k] = 0.0  # Reset updraft normalized mass flux for environment
 
     if make_calc_for_xk:  # Check if calculations for xk are enabled
         # Call cup_up_aa0() to calculate cloud work functions
@@ -831,10 +846,10 @@ def cu_gf_sh_run(
 
         cup_up_aa0(aa0, z, zu, dby, gamma_cup, t_cup,
                    kbcon, ktop, ierr,
-                   itf, ktf, its, ite, kts, kte)
+                   itf, jtf, ktf, its, ite, jts, jte, kts, kte)
         cup_up_aa0(aa1, zo, zuo, dbyo, gammao_cup, tn_cup,
                    kbcon, ktop, ierr,
-                   itf, ktf, its, ite, kts, kte)
+                   itf, jtf, ktf, its, ite, jts, jte, kts, kte)
 
         # Output variables match
         # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
@@ -846,59 +861,61 @@ def cu_gf_sh_run(
         #     print(f"{zo[0,k]:>20.12E}{zuo[0,k]:>20.12E}{dbyo[0,k]:>20.12E}{tn_cup[0,k]:>20.12E}")
 
         for i in range(its, itf + 1):  # Loop over horizontal grid points
-            if ierr[i] == 0:  # Check if there is no error
-                if aa1[i] <= 0.0:  # Check if cloud work function is zero or negative
-                    ierr[i] = 17
-                    # Equivalent to setting error description in Fortran
-                    ierrc[i] = "cloud work function zero"
+            for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+                if ierr[i, j] == 0:  # Check if there is no error
+                    if aa1[i, j] <= 0.0:  # Check if cloud work function is zero or negative
+                        ierr[i, j] = 17
+                        # Equivalent to setting error description in Fortran
+                        ierrc[i, j] = "cloud work function zero"
 
     for k in range(kts, ktf + 1):  # Loop over vertical levels
         for i in range(its, itf + 1):  # Loop over horizontal grid points
-            dellah[i, k] = 0.0  # Reset change in moist static energy
-            dellaq[i, k] = 0.0  # Reset change in water vapor mixing ratio
-            dellaqc[i, k] = 0.0  # Reset change in cloud water mixing ratio
-            dellu[i, k] = 0.0  # Reset change in x wind
-            dellv[i, k] = 0.0  # Reset change in y wind
+            for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+                dellah[i, j, k] = 0.0  # Reset change in moist static energy
+                dellaq[i, j, k] = 0.0  # Reset change in water vapor mixing ratio
+                dellaqc[i, j, k] = 0.0  # Reset change in cloud water mixing ratio
+                dellu[i, j, k] = 0.0  # Reset change in x wind
+                dellv[i, j, k] = 0.0  # Reset change in y wind
 
     trash2 = 0.0
 
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        if ierr[i] == 0:  # Check if there is no error
-            dp = 100.0 * (po_cup[i, 0] - po_cup[i, 1])  # Compute pressure difference
-            dellu[i, 0] = -zuo[i, 1] * (uc[i, 1] - u_cup[i, 1]) * G / dp
-            dellv[i, 0] = -zuo[i, 1] * (vc[i, 1] - v_cup[i, 1]) * G / dp
-            dellah[i, 0] = -zuo[i, 1] * (hco[i, 1] - heo_cup[i, 1]) * G / dp
-            dellaq[i, 0] = -zuo[i, 1] * (qco[i, 1] - qo_cup[i, 1]) * G / dp
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            if ierr[i, j] == 0:  # Check if there is no error
+                dp = 100.0 * (po_cup[i, j, 0] - po_cup[i, j, 1])  # Compute pressure difference
+                dellu[i, j, 0] = -zuo[i, j, 1] * (uc[i, j, 1] - u_cup[i, j, 1]) * G / dp
+                dellv[i, j, 0] = -zuo[i, j, 1] * (vc[i, j, 1] - v_cup[i, j, 1]) * G / dp
+                dellah[i, j, 0] = -zuo[i, j, 1] * (hco[i, j, 1] - heo_cup[i, j, 1]) * G / dp
+                dellaq[i, j, 0] = -zuo[i, j, 1] * (qco[i, j, 1] - qo_cup[i, j, 1]) * G / dp
 
-            for k in range(k22[i], ktop[i] + 1):  # Loop over vertical levels
-                entup = up_massentro[i, k]
-                detup = up_massdetro[i, k]
-                totmas = detup - entup + zuo[i, k + 1] - zuo[i, k]
+                for k in range(k22[i, j], ktop[i, j] + 1):  # Loop over vertical levels
+                    entup = up_massentro[i, j, k]
+                    detup = up_massdetro[i, j, k]
+                    totmas = detup - entup + zuo[i, j, k + 1] - zuo[i, j, k]
 
-                dp = 100.0 * (po_cup[i, k] - po_cup[i, k + 1])  # Compute pressure difference
-                dellah[i, k] = -(zuo[i, k + 1] * (hco[i, k + 1] - heo_cup[i, k + 1]) -
-                                 zuo[i, k] * (hco[i, k] - heo_cup[i, k])) * G / dp
+                    dp = 100.0 * (po_cup[i, j, k] - po_cup[i, j, k + 1])  # Compute pressure difference
+                    dellah[i, j, k] = -(zuo[i, j, k + 1] * (hco[i, j, k + 1] - heo_cup[i, j, k + 1]) -
+                                    zuo[i, j, k] * (hco[i, j, k] - heo_cup[i, j, k])) * G / dp
 
-                dz = zo_cup[i, k + 1] - zo_cup[i, k]  # Compute height difference
-                if k < ktop[i] and c1d[i, k] > 0:
-                    dellaqc[i, k] = zuo[i, k] * c1d[i, k] * qrco[i, k] * dz / dp * G
-                else:
-                    dellaqc[i, k] = detup * 0.5 * (qrco[i, k + 1] + qrco[i, k]) * G / dp
+                    dz = zo_cup[i, j, k + 1] - zo_cup[i, j, k]  # Compute height difference
+                    if k < ktop[i, j] and c1d[i, j, k] > 0:
+                        dellaqc[i, j, k] = zuo[i, j, k] * c1d[i, j, k] * qrco[i, j, k] * dz / dp * G
+                    else:
+                        dellaqc[i, j, k] = detup * 0.5 * (qrco[i, j, k + 1] + qrco[i, j, k]) * G / dp
 
-                c_up = dellaqc[i, k] + (zuo[i, k + 1] * qrco[i, k + 1] -
-                                        zuo[i, k] * qrco[i, k]) * G / dp
+                    c_up = dellaqc[i, j, k] + (zuo[i, j, k + 1] * qrco[i, j, k + 1] -
+                                            zuo[i, j, k] * qrco[i, j, k]) * G / dp
 
-                dellaq[i, k] = -(zuo[i, k + 1] * (qco[i, k + 1] - qo_cup[i, k + 1]) -
-                                 zuo[i, k] * (qco[i, k] - qo_cup[i, k])) * G / dp - \
-                                c_up - 0.5 * (pwo[i, k] + pwo[i, k + 1]) * G / dp
+                    dellaq[i, j, k] = -(zuo[i, j, k + 1] * (qco[i, j, k + 1] - qo_cup[i, j, k + 1]) -
+                                    zuo[i, j, k] * (qco[i, j, k] - qo_cup[i, j, k])) * G / dp - \
+                                    c_up - 0.5 * (pwo[i, j, k] + pwo[i, j, k + 1]) * G / dp
 
-                dellu[i, k] = -(zuo[i, k + 1] * (uc[i, k + 1] - u_cup[i, k + 1]) -
-                                zuo[i, k] * (uc[i, k] - u_cup[i, k])) * G / dp
+                    dellu[i, j, k] = -(zuo[i, j, k + 1] * (uc[i, j, k + 1] - u_cup[i, j, k + 1]) -
+                                    zuo[i, j, k] * (uc[i, j, k] - u_cup[i, j, k])) * G / dp
 
-                dellv[i, k] = -(zuo[i, k + 1] * (vc[i, k + 1] - v_cup[i, k + 1]) -
-                                zuo[i, k] * (vc[i, k] - v_cup[i, k])) * G / dp
+                    dellv[i, j, k] = -(zuo[i, j, k + 1] * (vc[i, j, k + 1] - v_cup[i, j, k + 1]) -
+                                    zuo[i, j, k] * (vc[i, j, k] - v_cup[i, j, k])) * G / dp
 
-    # BAD here
     # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}{ipr:>4}")
     # print(f"{kpbl[0]:>4}{ichoice:>4}{kbcon[0]:>4}{ktop[0]:>4}{k22[0]:>4}")
     # print(f"{psur[0]:>20.12E}{hfx[0]:>20.12E}{qfx[0]:>20.12E}{xland[0]:>20.12E}{tcrit:>20.12E}{dtime:>20.12E}{xmb_out[0]:>20.12E}")
@@ -910,155 +927,162 @@ def cu_gf_sh_run(
 
     for k in range(kts,ktf + 1):  # Loop over vertical levels
         for i in range(its, itf + 1):  # Loop over horizontal grid points
-            dellat[i, k] = 0.0  # Reset temperature tendency
-            if ierr[i] != 0:  # Skip if there is an error
-                continue
-            xhe[i, k] = dellah[i, k] * mbdt + heo[i, k]  # Update moist static energy
-            xq[i, k] = max(1.0e-16, (dellaq[i, k] + dellaqc[i, k]) * mbdt + qo[i, k])  # Update water vapor mixing ratio
-            dellat[i, k] = (1.0 / CP) * (dellah[i, k] - XLV * dellaq[i, k])  # Update temperature tendency
-            xt[i, k] = (-dellaqc[i, k] * XLV / CP + dellat[i, k]) * mbdt + tn[i, k]  # Update temperature
-            xt[i, k] = max(190.0, xt[i, k])  # Ensure temperature is above a minimum threshold
+            for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+                dellat[i, j, k] = 0.0  # Reset temperature tendency
+                if ierr[i, j] != 0:  # Skip if there is an error
+                    continue
+                xhe[i, j, k] = dellah[i, j, k] * mbdt + heo[i, j, k]  # Update moist static energy
+                xq[i, j, k] = max(1.0e-16, (dellaq[i, j, k] + dellaqc[i, j, k]) * mbdt + qo[i, j, k])  # Update water vapor mixing ratio
+                dellat[i, j, k] = (1.0 / CP) * (dellah[i, j, k] - XLV * dellaq[i, j, k])  # Update temperature tendency
+                xt[i, j, k] = (-dellaqc[i, j, k] * XLV / CP + dellat[i, j, k]) * mbdt + tn[i, j, k]  # Update temperature
+                xt[i, j, k] = max(190.0, xt[i, j, k])  # Ensure temperature is above a minimum threshold
 
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        if ierr[i] == 0:  # Check if there is no error
-            xhe[i, ktf] = heo[i, ktf]  # Update moist static energy at the top level
-            xq[i, ktf] = qo[i, ktf]  # Update water vapor mixing ratio at the top level
-            xt[i, ktf] = tn[i, ktf]  # Update temperature at the top level
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            if ierr[i, j] == 0:  # Check if there is no error
+                xhe[i, j, ktf] = heo[i, j, ktf]  # Update moist static energy at the top level
+                xq[i, j, ktf] = qo[i, j, ktf]  # Update water vapor mixing ratio at the top level
+                xt[i, j, ktf] = tn[i, j, ktf]  # Update temperature at the top level
 
     if make_calc_for_xk:  # Check if calculations for xk are enabled
         # Call cup_env() to calculate moist static energy, heights, and qes
         cup_env(xz, xqes, xhe, xhes, xt, xq, po, z1,
                 psur, ierr, tcrit, -1,
-                itf, ktf,
-                its, ite, kts, kte)
+                itf, jtf, ktf,
+                its, ite, jts, jte, kts, kte)
 
         # Call cup_env_clev() to calculate environmental values on cloud levels
         cup_env_clev(xt, xqes, xq, xhe, xhes, xz, po, xqes_cup, xq_cup,
                     xhe_cup, xhes_cup, xz_cup, po_cup, gamma_cup, xt_cup, psur,
                     ierr, z1,
-                    itf, ktf,
-                    its, ite, kts, kte)
+                    itf, jtf, ktf,
+                    its, ite, jts, jte, kts, kte)
 
         # Initialize static control variables
         for k in range(kts, ktf + 1):  # Loop over vertical levels
             for i in range(its, itf + 1):  # Loop over horizontal grid points
-                xhc[i, k] = 0.0  # Reset cloud moist static energy
-                xdby[i, k] = 0.0  # Reset buoyancy term
+                for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+                    xhc[i, j, k] = 0.0  # Reset cloud moist static energy
+                    xdby[i, j, k] = 0.0  # Reset buoyancy term
 
         # Parallel loop to calculate cloud base and initialize xhc
         for i in range(its, itf + 1):  # Loop over horizontal grid points
-            if ierr[i] == 0:  # Check if there is no error
-                x_add = XLV * zqexec[i] + CP * ztexec[i]  # Compute x_add
-                xhkb[i] = get_cloud_bc(kte, xhe_cup[i, :kte + 1], xhkb[i], k22[i], x_add)
-                for k in range(start_level[i]):  # Loop up to start_level(i)-1
-                    xhc[i, k] = xhe_cup[i, k]
-                k = start_level[i]
-                xhc[i, k] = xhkb[i]
+            for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+                if ierr[i, j] == 0:  # Check if there is no error
+                    x_add = XLV * zqexec[i, j] + CP * ztexec[i, j]  # Compute x_add
+                    xhkb[i, j] = get_cloud_bc(kte, xhe_cup[i, j, :kte + 1], xhkb[i, j], k22[i, j], x_add)
+                    for k in range(start_level[i, j]):  # Loop up to start_level(i)-1
+                        xhc[i, j, k] = xhe_cup[i, j, k]
+                    k = start_level[i, j]
+                    xhc[i, j, k] = xhkb[i, j]
 
         # Update xzu and calculate xhc and xdby
         for i in range(its, itf + 1):  # Loop over horizontal grid points
-            if ierr[i] == 0:  # Check if there is no error
-                xzu[i, :ktf] = zuo[i, :ktf]  # Copy zuo to xzu
-                for k in range(start_level[i] + 1, ktop[i] + 1):  # Loop from start_level(i)+1 to ktop(i)
-                    xhc[i, k] = (xhc[i, k - 1] * xzu[i, k - 1] -
-                                0.5 * up_massdetro[i, k - 1] * xhc[i, k - 1] +
-                                up_massentro[i, k - 1] * xhe[i, k - 1]) / \
-                                (xzu[i, k - 1] - 0.5 * up_massdetro[i, k - 1] + up_massentro[i, k - 1])
-                    xdby[i, k] = xhc[i, k] - xhes_cup[i, k]
-                for k in range(ktop[i] + 1, ktf + 1):  # Loop from ktop(i)+1 to ktf
-                    xhc[i, k] = xhes_cup[i, k]
-                    xdby[i, k] = 0.0
-                    xzu[i, k] = 0.0
+            for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+                if ierr[i, j] == 0:  # Check if there is no error
+                    xzu[i, j, :ktf] = zuo[i, j, :ktf]  # Copy zuo to xzu
+                    for k in range(start_level[i, j] + 1, ktop[i, j] + 1):  # Loop from start_level(i)+1 to ktop(i)
+                        xhc[i, j, k] = (xhc[i, j, k - 1] * xzu[i, j, k - 1] -
+                                    0.5 * up_massdetro[i, j, k - 1] * xhc[i, j, k - 1] +
+                                    up_massentro[i, j, k - 1] * xhe[i, j, k - 1]) / \
+                                    (xzu[i, j, k - 1] - 0.5 * up_massdetro[i, j, k - 1] + up_massentro[i, j, k - 1])
+                        xdby[i, j, k] = xhc[i, j, k] - xhes_cup[i, j, k]
+                    for k in range(ktop[i, j] + 1, ktf + 1):  # Loop from ktop(i)+1 to ktf
+                        xhc[i, j, k] = xhes_cup[i, j, k]
+                        xdby[i, j, k] = 0.0
+                        xzu[i, j, k] = 0.0
 
         # Call cup_up_aa0() to calculate workfunctions for updraft
         cup_up_aa0(xaa0, xz, xzu, xdby, gamma_cup, xt_cup,
                 kbcon, ktop, ierr,
-                itf, ktf,
-                its, ite, kts, kte)
+                itf, jtf, ktf,
+                its, ite, jts, jte, kts, kte)
 
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        xmb[i] = 0.0  # Initialize xmb
-        xff_shal = [0.0, 0.0, 0.0]  # Initialize xff_shal array
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            xmb[i, j] = 0.0  # Initialize xmb
+            xff_shal = [0.0, 0.0, 0.0]  # Initialize xff_shal array
 
-        if ierr[i] == 0:  # Check if there is no error
-            xmbmax[i] = 1.0  # Set maximum base mass flux
+            if ierr[i, j] == 0:  # Check if there is no error
+                xmbmax[i, j] = 1.0  # Set maximum base mass flux
 
-            # Stabilization closure
-            xkshal = (xaa0[i] - aa1[i]) / mbdt
-            if xkshal <= 0.0 and xkshal > -0.01 * mbdt:
-                xkshal = -0.01 * mbdt
-            if xkshal > 0.0 and xkshal < 1.0e-2:
-                xkshal = 1.0e-2
+                # Stabilization closure
+                xkshal = (xaa0[i, j] - aa1[i, j]) / mbdt
+                if xkshal <= 0.0 and xkshal > -0.01 * mbdt:
+                    xkshal = -0.01 * mbdt
+                if xkshal > 0.0 and xkshal < 1.0e-2:
+                    xkshal = 1.0e-2
 
-            xff_shal[0] = max(0.0, -(aa1[i] - aa0[i]) / (xkshal * dtime))
+                xff_shal[0] = max(0.0, -(aa1[i, j] - aa0[i, j]) / (xkshal * dtime))
 
-            # Closure from Grant (2001)
-            xff_shal[1] = 0.03 * zws[i]
+                # Closure from Grant (2001)
+                xff_shal[1] = 0.03 * zws[i, j]
 
-            # Boundary layer qe closure
-            blqe = 0.0
-            trash = 0.0
-            for k in range(kbcon[i] + 1):  # Loop over levels up to kbcon(i)
-                blqe += 100.0 * dhdt[i, k] * (po_cup[i, k] - po_cup[i, k + 1]) / G
-            trash = max((hc[i, kbcon[i]] - he_cup[i, kbcon[i]]), 10.0)
-            xff_shal[2] = max(0.0, blqe / trash)
-            xff_shal[2] = min(xmbmax[i], xff_shal[2])
+                # Boundary layer qe closure
+                blqe = 0.0
+                trash = 0.0
+                for k in range(kbcon[i, j] + 1):  # Loop over levels up to kbcon(i)
+                    blqe += 100.0 * dhdt[i, j, k] * (po_cup[i, j, k] - po_cup[i, j, k + 1]) / G
+                trash = max((hc[i, j, kbcon[i, j]] - he_cup[i, j, kbcon[i, j]]), 10.0)
+                xff_shal[2] = max(0.0, blqe / trash)
+                xff_shal[2] = min(xmbmax[i, j], xff_shal[2])
 
-            # Average
-            xmb[i] = (xff_shal[0] + xff_shal[1] + xff_shal[2]) / 3.0
-            xmb[i] = min(xmbmax[i], xmb[i])
-            if ichoice > 0:
-                xmb[i] = min(xmbmax[i], xff_shal[ichoice - 1])
-            if xmb[i] <= 0.0:
-                ierr[i] = 21
-                ierrc[i] = "21"
+                # Average
+                xmb[i, j] = (xff_shal[0] + xff_shal[1] + xff_shal[2]) / 3.0
+                xmb[i, j] = min(xmbmax[i, j], xmb[i, j])
+                if ichoice > 0:
+                    xmb[i, j] = min(xmbmax[i, j], xff_shal[ichoice - 1])
+                if xmb[i, j] <= 0.0:
+                    ierr[i, j] = 21
+                    ierrc[i, j] = "21"
 
-        if ierr[i] != 0:  # Handle error case
-            k22[i] = -1
-            kbcon[i] = -1
-            ktop[i] = -1
-            xmb[i] = 0.0
-            outt[i, :] = 0.0
-            outu[i, :] = 0.0
-            outv[i, :] = 0.0
-            outq[i, :] = 0.0
-            outqc[i, :] = 0.0
-        elif ierr[i] == 0:  # Handle no-error case
-            xmb_out[i] = xmb[i]
+            if ierr[i, j] != 0:  # Handle error case
+                k22[i, j] = -1
+                kbcon[i, j] = -1
+                ktop[i, j] = -1
+                xmb[i, j] = 0.0
+                outt[i, j, :] = 0.0
+                outu[i, j, :] = 0.0
+                outv[i, j, :] = 0.0
+                outq[i, j, :] = 0.0
+                outqc[i, j, :] = 0.0
+            elif ierr[i, j] == 0:  # Handle no-error case
+                xmb_out[i, j] = xmb[i, j]
 
-            # Final tendencies
-            pre[i] = 0.0
-            for k in range(1, ktop[i] + 1):  # Loop over levels from 2 to ktop(i)
-                outt[i, k] = dellat[i, k] * xmb[i]
-                outq[i, k] = dellaq[i, k] * xmb[i]
-                outqc[i, k] = dellaqc[i, k] * xmb[i]
-                pre[i] += pwo[i, k] * xmb[i]
+                # Final tendencies
+                pre[i, j] = 0.0
+                for k in range(1, ktop[i, j] + 1):  # Loop over levels from 2 to ktop(i)
+                    outt[i, j, k] = dellat[i, j, k] * xmb[i, j]
+                    outq[i, j, k] = dellaq[i, j, k] * xmb[i, j]
+                    outqc[i, j, k] = dellaqc[i, j, k] * xmb[i, j]
+                    pre[i, j] += pwo[i, j, k] * xmb[i, j]
 
-            outt[i, 0] = dellat[i, 0] * xmb[i]
-            outq[i, 0] = dellaq[i, 0] * xmb[i]
-            outu[i, 0] = dellu[i, 0] * xmb[i]
-            outv[i, 0] = dellv[i, 0] * xmb[i]
+                outt[i, j, 0] = dellat[i, j, 0] * xmb[i, j]
+                outq[i, j, 0] = dellaq[i, j, 0] * xmb[i, j]
+                outu[i, j, 0] = dellu[i, j, 0] * xmb[i, j]
+                outv[i, j, 0] = dellv[i, j, 0] * xmb[i, j]
 
-            for k in range(kts + 1, ktop[i] + 1):  # Loop over levels from kts+1 to ktop(i)
-                outu[i, k] = 0.25 * (dellu[i, k - 1] + 2.0 * dellu[i, k] + dellu[i, k + 1]) * xmb[i]
-                outv[i, k] = 0.25 * (dellv[i, k - 1] + 2.0 * dellv[i, k] + dellv[i, k + 1]) * xmb[i]
+                for k in range(kts + 1, ktop[i, j] + 1):  # Loop over levels from kts+1 to ktop(i)
+                    outu[i, j, k] = 0.25 * (dellu[i, j, k - 1] + 2.0 * dellu[i, j, k] + dellu[i, j, k + 1]) * xmb[i, j]
+                    outv[i, j, k] = 0.25 * (dellv[i, j, k - 1] + 2.0 * dellv[i, j, k] + dellv[i, j, k + 1]) * xmb[i, j]
 
     for i in range(its, itf + 1):  # Loop over horizontal grid points
-        if ierr[i] == 0:  # Check if there is no error
-            dts = 0.0  # Initialize total kinetic energy dissipation
-            fpi = 0.0  # Initialize integrated potential energy conversion factor
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            if ierr[i, j] == 0:  # Check if there is no error
+                dts = 0.0  # Initialize total kinetic energy dissipation
+                fpi = 0.0  # Initialize integrated potential energy conversion factor
 
-            for k in range(kts, ktop[i] + 1):  # Loop over vertical levels
-                dp = (po_cup[i, k] - po_cup[i, k + 1]) * 100.0  # Compute pressure difference
-                # Total kinetic energy dissipation estimate
-                dts -= (outu[i, k] * us[i, k] + outv[i, k] * vs[i, k]) * dp / G
-                # Compute fpi for conversion to potential energy
-                fpi += np.sqrt(outu[i, k]**2 + outv[i, k]**2) * dp
+                for k in range(kts, ktop[i, j] + 1):  # Loop over vertical levels
+                    dp = (po_cup[i, j, k] - po_cup[i, j, k + 1]) * 100.0  # Compute pressure difference
+                    # Total kinetic energy dissipation estimate
+                    dts -= (outu[i, j, k] * us[i, j, k] + outv[i, j, k] * vs[i, j, k]) * dp / G
+                    # Compute fpi for conversion to potential energy
+                    fpi += np.sqrt(outu[i, j, k]**2 + outv[i, j, k]**2) * dp
 
-            if fpi > 0.0:  # Check if fpi is positive
-                for k in range(kts, ktop[i] + 1):  # Loop over vertical levels
-                    fp = np.sqrt(outu[i, k]**2 + outv[i, k]**2) / fpi  # Compute fp
-                    outt[i, k] += fp * dts * G / CP  # Update temperature tendency
+                if fpi > 0.0:  # Check if fpi is positive
+                    for k in range(kts, ktop[i, j] + 1):  # Loop over vertical levels
+                        fp = np.sqrt(outu[i, j, k]**2 + outv[i, j, k]**2) / fpi  # Compute fp
+                        outt[i, j, k] += fp * dts * G / CP  # Update temperature tendency
     # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
     # print(f"{kpbl[0]:>4}{ichoice:>4}{kbcon[0]:>4}{ktop[0]:>4}{k22[0]:>4}{ipr:>4}{tropics[0]:>4}")
     # print(f"{z1[0]:>20.12E}{psur[0]:>20.12E}{hfx[0]:>20.12E}{qfx[0]:>20.12E}{xland[0]:>20.12E}{tcrit:>20.12E}{dtime:>20.12E}{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
