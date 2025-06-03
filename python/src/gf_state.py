@@ -1,16 +1,19 @@
 import numpy as np
 
 from ndsl.quantity import Quantity
-from ndsl import StencilFactory
+from ndsl import StencilFactory, QuantityFactory
 from ndsl.boilerplate import get_factories_single_tile
+from ndsl.constants import X_DIM, Y_DIM, Z_DIM
 
 class GFState:
     def __init__(self, rkind=np.float64, ikind=np.int32, backend="numpy"):
         self.rkind=rkind
         self.ikind=ikind
         self.backend=backend
-        
+        self.nhalo = 0
+
         self.stencil_factory = None
+        self.quantity_factory = None
 
         self.ntracer = None
         self.garea = None
@@ -96,46 +99,6 @@ class GFState:
         self.dtidx_dim2 = None
         self.num_dfi_radar_p1 = None
         self.fscav_dim = None
-
-        # Allocate state data
-        # self.garea = np.zeros(self.im, dtype=self.rkind)
-        # self.cactiv = np.ones(self.im, dtype=np.int32)
-        # self.cactiv_m = np.ones(self.im, dtype=np.int32)
-        # self.forcet = np.zeros((self.ix, self.km), dtype=self.rkind)
-        # self.forceqv_spechum = np.zeros((self.ix, self.km), dtype=self.rkind)
-        # self.phil = np.zeros((self.ix, self.km), dtype=self.rkind)
-        # self.raincv = np.zeros(self.im, dtype=self.rkind)
-        # self.qv_spechum = np.zeros((self.ix, self.km), dtype=self.rkind)
-        # self.t = np.zeros((self.ix, self.km), dtype=self.rkind)
-        # self.cld1d = np.zeros(self.im, dtype=self.rkind)
-        # self.us = np.zeros((self.ix, self.km), dtype=self.rkind)
-        # self.vs = np.zeros((self.ix, self.km), dtype=self.rkind)
-        # self.t2di = np.zeros((self.ix, self.km), dtype=self.rkind)
-        # self.w = np.zeros((self.ix, self.km), dtype=self.rkind)
-        # self.qv2di_spechum = np.zeros((self.ix, self.km), dtype=self.rkind)
-        # self.p2di = np.zeros((self.ix, self.km), dtype=self.rkind)
-        # self.psuri = np.zeros(self.im, dtype=self.rkind)
-        # self.hbot = np.ones(self.im, dtype=np.int32)
-        # self.htop = np.ones(self.im, dtype=np.int32)
-        # self.kcnv = np.ones(self.im, dtype=np.int32)
-        # self.xland = np.ones(self.im, dtype=np.int32)
-        # self.hfx2 = np.zeros(self.im, dtype=self.rkind)
-        # self.qfx2 = np.zeros(self.im, dtype=self.rkind)
-        # self.aod_gf = np.zeros(self.im, dtype=self.rkind)
-        # self.cliw = np.zeros((self.ix, self.km), dtype=self.rkind)
-        # self.clcw = np.zeros((self.ix, self.km), dtype=self.rkind)
-        # self.pbl = np.zeros(self.im, dtype=self.rkind)
-        # self.ud_mf = np.zeros((self.im, self.km), dtype=self.rkind)
-        # self.dd_mf = np.zeros((self.im, self.km), dtype=self.rkind)
-        # self.dt_mf = np.zeros((self.im, self.km), dtype=self.rkind)
-        # self.cnvw_moist = np.zeros((self.ix, self.km), dtype=self.rkind)
-        # self.cnvc = np.zeros((self.ix, self.km), dtype=self.rkind)
-        # self.dtend = np.zeros((self.im, self.km, self.DTEND_DIM), dtype=self.rkind)
-        # self.dtidx = np.ones((113, 18), dtype=np.int32)
-        # self.qci_conv = np.zeros((self.im, self.km), dtype=self.rkind)
-        # self.ix_dfi_radar = np.ones(self.num_dfi_radar, dtype=np.int32)
-        # self.fh_dfi_radar = np.zeros(self.num_dfi_radar+1, dtype=self.rkind)
-        # self.cap_suppress = np.zeros((self.im, self.num_dfi_radar), dtype=self.rkind)
 
 
     def print_state(self, msg):
@@ -685,7 +648,7 @@ class GFState:
         _ntracerVar[:] = np.transpose(self.ntracer)
 
         # Fill the garea variable
-        _gareaVar[:] = np.transpose(self.garea).reshape((self.im * self.jm,))
+        _gareaVar[:] = np.transpose(self.garea.field).reshape((self.im * self.jm,))
 
         # Fill the dt variable
         _dtVar[:] = np.transpose(self.dt)
@@ -704,11 +667,11 @@ class GFState:
 
         # Fill the cactiv variable
         if self.cactiv is not None:
-         _cactivVar[:] = np.transpose(self.cactiv)[:].reshape((self.im * self.jm,))
+         _cactivVar[:] = np.transpose(self.cactiv.field)[:].reshape((self.im * self.jm,))
 
         # Fill the cactiv_m variable
         if self.cactiv_m is not None:
-            _cactiv_mVar[:] = np.transpose(self.cactiv_m)[:].reshape((self.im * self.jm,))
+            _cactiv_mVar[:] = np.transpose(self.cactiv_m.field)[:].reshape((self.im * self.jm,))
 
         # Fill the g variable
         _gVar[:] = np.transpose(self.g)
@@ -724,94 +687,94 @@ class GFState:
 
         # Fill the forcet variable
         if self.forcet is not None:
-            _forcetVar[:,:] = np.transpose(self.forcet).reshape((self.km, self.im * self.jm,))
+            _forcetVar[:,:] = np.transpose(self.forcet.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the forceqv_spechum variable
         if self.forceqv_spechum is not None:
-            _forceqv_spechumVar[:,:] = np.transpose(self.forceqv_spechum).reshape((self.km, self.im * self.jm,))
+            _forceqv_spechumVar[:,:] = np.transpose(self.forceqv_spechum.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the phil variable
-        _philVar[:,:] = np.transpose(self.phil).reshape((self.km, self.im * self.jm,))
+        _philVar[:,:] = np.transpose(self.phil.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the raincv variable
-        _raincvVar[:] = np.transpose(self.raincv).reshape((self.im * self.jm,))
+        _raincvVar[:] = np.transpose(self.raincv.field).reshape((self.im * self.jm,))
 
         # Fill the qv_spechum variable
-        _qv_spechumVar[:,:] = np.transpose(self.qv_spechum).reshape((self.km, self.im * self.jm,))
+        _qv_spechumVar[:,:] = np.transpose(self.qv_spechum.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the t variable
-        _tVar[:,:] = np.transpose(self.t).reshape((self.km, self.im * self.jm,))
+        _tVar[:,:] = np.transpose(self.t.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the cld1d variable
-        _cld1dVar[:] = np.transpose(self.cld1d).reshape((self.im * self.jm,))
+        _cld1dVar[:] = np.transpose(self.cld1d.field).reshape((self.im * self.jm,))
 
         # Fill the us variable
-        _usVar[:,:] = np.transpose(self.us).reshape((self.km, self.im * self.jm,))
+        _usVar[:,:] = np.transpose(self.us.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the vs variable
-        _vsVar[:,:] = np.transpose(self.vs).reshape((self.km, self.im * self.jm,))
+        _vsVar[:,:] = np.transpose(self.vs.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the t2di variable
-        _t2diVar[:,:] = np.transpose(self.t2di).reshape((self.km, self.im * self.jm,))
+        _t2diVar[:,:] = np.transpose(self.t2di.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the w variable
-        _wVar[:,:] = np.transpose(self.w).reshape((self.km, self.im * self.jm,))
+        _wVar[:,:] = np.transpose(self.w.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the qv2di_spechum variable
-        _qv2di_spechumVar[:,:] = np.transpose(self.qv2di_spechum).reshape((self.km, self.im * self.jm,))
+        _qv2di_spechumVar[:,:] = np.transpose(self.qv2di_spechum.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the p2di variable
-        _p2diVar[:,:] = np.transpose(self.p2di).reshape((self.km, self.im * self.jm,))
+        _p2diVar[:,:] = np.transpose(self.p2di.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the psuri variable
-        _psuriVar[:] = np.transpose(self.psuri).reshape((self.im * self.jm,))
+        _psuriVar[:] = np.transpose(self.psuri.field).reshape((self.im * self.jm,))
 
         # Fill the hbot variable
-        _hbotVar[:] = np.transpose(self.hbot).reshape((self.im * self.jm,))[:] + 1
+        _hbotVar[:] = np.transpose(self.hbot.field).reshape((self.im * self.jm,))[:] + 1
 
         # Fill the htop variable
-        _htopVar[:] = np.transpose(self.htop).reshape((self.im * self.jm,))[:] + 1
+        _htopVar[:] = np.transpose(self.htop.field).reshape((self.im * self.jm,))[:] + 1
 
         # Fill the kcnv variable
-        _kcnvVar[:] = np.transpose(self.kcnv).reshape((self.im * self.jm,))
+        _kcnvVar[:] = np.transpose(self.kcnv.field).reshape((self.im * self.jm,))
 
         # Fill the xland variable
-        _xlandVar[:] = np.transpose(self.xland).reshape((self.im * self.jm,))
+        _xlandVar[:] = np.transpose(self.xland.field).reshape((self.im * self.jm,))
 
         # Fill the hfx2 variable
-        _hfx2Var[:] = np.transpose(self.hfx2).reshape((self.im * self.jm,))
+        _hfx2Var[:] = np.transpose(self.hfx2.field).reshape((self.im * self.jm,))
 
         # Fill the qfx2 variable
-        _qfx2Var[:] = np.transpose(self.qfx2).reshape((self.im * self.jm,))
+        _qfx2Var[:] = np.transpose(self.qfx2.field).reshape((self.im * self.jm,))
 
         # Fill the aod_gf variable
         if self.aod_gf is not None:
-            _aod_gfVar[:] = np.transpose(self.aod_gf).reshape((self.im * self.jm,))
+            _aod_gfVar[:] = np.transpose(self.aod_gf.field).reshape((self.im * self.jm,))
 
         # Fill the cliw variable
-        _cliwVar[:,:] = np.transpose(self.cliw).reshape((self.km, self.im * self.jm,))
+        _cliwVar[:,:] = np.transpose(self.cliw.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the clcw variable
-        _clcwVar[:,:] = np.transpose(self.clcw).reshape((self.km, self.im * self.jm,))
+        _clcwVar[:,:] = np.transpose(self.clcw.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the pbl variable
-        _pblVar[:] = np.transpose(self.pbl).reshape((self.im * self.jm,))
+        _pblVar[:] = np.transpose(self.pbl.field).reshape((self.im * self.jm,))
 
         # Fill the ud_mf variable
         if self.ud_mf is not None:
-            _ud_mfVar[:,:] = np.transpose(self.ud_mf).reshape((self.km, self.im * self.jm,))
+            _ud_mfVar[:,:] = np.transpose(self.ud_mf.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the dd_mf variable
-        _dd_mfVar[:,:] = np.transpose(self.dd_mf).reshape((self.km, self.im * self.jm,))
+        _dd_mfVar[:,:] = np.transpose(self.dd_mf.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the dt_mf variable
-        _dt_mfVar[:,:] = np.transpose(self.dt_mf).reshape((self.km, self.im * self.jm,))
+        _dt_mfVar[:,:] = np.transpose(self.dt_mf.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the cnvw_moist variable
-        _cnvw_moistVar[:,:] = np.transpose(self.cnvw_moist).reshape((self.km, self.im * self.jm,))
+        _cnvw_moistVar[:,:] = np.transpose(self.cnvw_moist.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the cnvc variable
-        _cnvcVar[:,:] = np.transpose(self.cnvc).reshape((self.km, self.im * self.jm,))
+        _cnvcVar[:,:] = np.transpose(self.cnvc.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the imfshalcnv variable
         _imfshalcnvVar[:] = np.transpose(self.imfshalcnv)
@@ -830,7 +793,7 @@ class GFState:
 
         # Fill the dtend variable
         if self.dtend is not None:
-            _dtendVar[:,:,:] = np.transpose(self.dtend).reshape((_dtend_dim3, self.km, self.im * self.jm,))
+            _dtendVar[:,:,:] = np.transpose(self.dtend.field).reshape((_dtend_dim3, self.km, self.im * self.jm,))
 
         # Fill the dtidx variable
         _dtidxVar[:,:] = np.transpose(self.dtidx) + 1
@@ -883,7 +846,7 @@ class GFState:
 
         # Fill the qci_conv variable
         if self.qci_conv is not None:
-            _qci_convVar[:,:] = np.transpose(self.qci_conv).reshape((self.km, self.im * self.jm,))
+            _qci_convVar[:,:] = np.transpose(self.qci_conv.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the do_cap_suppress variable
         if self.do_cap_suppress:
@@ -893,11 +856,11 @@ class GFState:
 
         # Fill the maxupmf variable
         if self.maxupmf is not None:
-            _maxupmfVar[:] = np.transpose(self.maxupmf).reshape((self.im * self.jm,))
+            _maxupmfVar[:] = np.transpose(self.maxupmf.field).reshape((self.im * self.jm,))
 
         # Fill the maxMF variable
         if self.maxMF is not None:
-            _maxMFVar[:] = np.transpose(self.maxMF).reshape((self.im * self.jm,))
+            _maxMFVar[:] = np.transpose(self.maxMF.field).reshape((self.im * self.jm,))
 
         # Fill the do_mynnedmf variable
         if self.do_mynnedmf:
@@ -919,7 +882,7 @@ class GFState:
 
         # Fill the spp_wts_cu_deep variable
         if self.spp_wts_cu_deep is not None:
-            _spp_wts_cu_deepVar[:,:] = np.transpose(self.spp_wts_cu_deep).reshape((self.km, self.im * self.jm,))
+            _spp_wts_cu_deepVar[:,:] = np.transpose(self.spp_wts_cu_deep.field).reshape((self.km, self.im * self.jm,))
 
         # Fill the chem3d variable
         if self.chem3d is not None:
@@ -980,22 +943,18 @@ class GFState:
         self.fscav_dim = len(_dataset.dimensions['fscav_dim'])
 
         # Create the stencil factory
-        nx = self.im
-        ny = 1
-        nz = self.km
-        nhalo = 0
-        self.stencil_factory = get_factories_single_tile(nx, ny, nz, nhalo, backend=self.backend)
+        self.stencil_factory, self.quantity_factory = get_factories_single_tile(self.im, self.jm, self.km, 0, backend=self.backend)
 
         # Get ntracer
         self.ntracer = _dataset.variables["ntracer"][:]
 
         # Get garea
-        self.garea = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["garea"][:]), (self.im, self.jm, 1)),
-            dims=["I", "J", "K"],
+        self.garea = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
             units="m2",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.garea.field[:,:] = np.reshape(np.transpose(_dataset.variables["garea"][:]), (self.im, self.jm))
 
         # Get dt
         self.dt = _dataset.variables["dt"][:]
@@ -1014,21 +973,21 @@ class GFState:
 
         # Get cactiv
         if _dataset.variables.get("cactiv"):
-            self.cactiv = Quantity(
-                data=np.reshape(np.transpose(_dataset.variables["cactiv"][:]), (self.im, self.jm, 1)),
-                dims=["I", "J", "K"],
+            self.cactiv = self.quantity_factory.zeros(
+                dims=[X_DIM, Y_DIM],
                 units="Nondimensional",
-                gt4py_backend=self.backend
+                dtype=self.ikind
             )
+            self.cactiv.field[:,:] = np.reshape(np.transpose(_dataset.variables["cactiv"][:]), (self.im, self.jm))
 
         # Get cactiv_m
         if _dataset.variables.get("cactiv_m"):
-            self.cactiv_m = Quantity(
-                data=np.reshape(np.transpose(_dataset.variables["cactiv_m"][:]), (self.im, self.jm, 1)),
-                dims=["I", "J", "K"],
+            self.cactiv_m = self.quantity_factory.zeros(
+                dims=[X_DIM, Y_DIM],
                 units="Nondimensional",
-                gt4py_backend=self.backend
+                dtype=self.ikind
             )
+            self.cactiv_m.field[:,:] = np.reshape(np.transpose(_dataset.variables["cactiv_m"][:]), (self.im, self.jm))
 
         # Get g
         self.g = _dataset.variables["g"][:]
@@ -1044,241 +1003,241 @@ class GFState:
 
         # Get forcet
         if _dataset.variables.get("forcet"):
-            self.forcet = Quantity(
-                data=np.reshape(np.transpose(_dataset.variables["forcet"][:]), (self.im, self.jm, self.km)),
-                dims=["I", "J", "K"],
+            self.forcet = self.quantity_factory.zeros(
+                dims=[X_DIM, Y_DIM, Z_DIM],
                 units="K s-1",
-                gt4py_backend=self.backend
+                dtype=self.rkind
             )
+            self.forcet.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["forcet"][:]), (self.im, self.jm, self.km))
 
         # Get forceqv_spechum
         if _dataset.variables.get("forceqv_spechum"):
-            self.forceqv_spechum = Quantity(
-                data=np.reshape(np.transpose(_dataset.variables["forceqv_spechum"][:]), (self.im, self.jm, self.km)),
-                dims=["I", "J", "K"],
+            self.forceqv_spechum = self.quantity_factory.zeros(
+                dims=[X_DIM, Y_DIM, Z_DIM],
                 units="kg kg-1 s-1",
-                gt4py_backend=self.backend
+                dtype=self.rkind
             )
+            self.forceqv_spechum.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["forceqv_spechum"][:]), (self.im, self.jm, self.km))
 
         # Get phil
-        self.phil = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["phil"][:]), (self.im, self.jm, self.km)),
-            dims=["I", "J", "K"],
+        self.phil = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
             units="m2 s-2",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.phil.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["phil"][:]), (self.im, self.jm, self.km))
 
         # Get raincv
-        self.raincv = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["raincv"][:]), (self.im, self.jm, 1)),
-            dims=["I", "J", "K"],
+        self.raincv = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
             units="m",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.raincv.field[:,:] = np.reshape(np.transpose(_dataset.variables["raincv"][:]), (self.im, self.jm))
 
         # Get qv_spechum
-        self.qv_spechum = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["qv_spechum"][:]), (self.im, self.jm, self.km)),
-            dims=["I", "J", "K"],
+        self.qv_spechum = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
             units="kg kg-1",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.qv_spechum.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["qv_spechum"][:]), (self.im, self.jm, self.km))
 
         # Get t
-        self.t = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["t"][:]), (self.im, self.jm, self.km)),
-            dims=["I", "J", "K"],
+        self.t = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
             units="K",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.t.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["t"][:]), (self.im, self.jm, self.km))
 
         # Get cld1d
-        self.cld1d = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["cld1d"][:]), (self.im, self.jm, 1)),
-            dims=["I", "J", "K"],
+        self.cld1d = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
             units="m2 s-2",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.cld1d.field[:,:] = np.reshape(np.transpose(_dataset.variables["cld1d"][:]), (self.im, self.jm))
 
         # Get us
-        self.us = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["us"][:]), (self.im, self.jm, self.km)),
-            dims=["I", "J", "K"],
+        self.us = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
             units="m s-1",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.us.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["us"][:]), (self.im, self.jm, self.km))
 
         # Get vs
-        self.vs = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["vs"][:]), (self.im, self.jm, self.km)),
-            dims=["I", "J", "K"],
-            units="m s-1K",
-            gt4py_backend=self.backend
+        self.vs = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="m s-1",
+            dtype=self.rkind
         )
+        self.vs.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["vs"][:]), (self.im, self.jm, self.km))
 
         # Get t2di
-        self.t2di = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["t2di"][:]), (self.im, self.jm, self.km)),
-            dims=["I", "J", "K"],
+        self.t2di = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
             units="K",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.t2di.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["t2di"][:]), (self.im, self.jm, self.km))
 
         # Get w
-        self.w = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["w"][:]), (self.im, self.jm, self.km)),
-            dims=["I", "J", "K"],
+        self.w = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
             units="Pa s-1",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.w.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["w"][:]), (self.im, self.jm, self.km))
 
         # Get qv2di_spechum
-        self.qv2di_spechum = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["qv2di_spechum"][:]), (self.im, self.jm, self.km)),
-            dims=["I", "J", "K"],
-            units="Pa s-1",
-            gt4py_backend=self.backend
+        self.qv2di_spechum = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="kg kg-1",
+            dtype=self.rkind
         )
+        self.qv2di_spechum.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["qv2di_spechum"][:]), (self.im, self.jm, self.km))
 
         # Get p2di
-        self.p2di = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["p2di"][:]), (self.im, self.jm, self.km)),
-            dims=["I", "J", "K"],
+        self.p2di = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
             units="Pa",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.p2di.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["p2di"][:]), (self.im, self.jm, self.km))
 
         # Get psuri
-        self.psuri = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["psuri"][:]), (self.im, self.jm, 1)),
-            dims=["I", "J", "K"],
+        self.psuri = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
             units="Pa",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.psuri.field[:,:] = np.reshape(np.transpose(_dataset.variables["psuri"][:]), (self.im, self.jm))
 
         # Get hbot
-        self.hbot = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["hbot"][:]), (self.im, self.jm, 1)),
-            dims=["I", "J", "K"],
+        self.hbot = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
             units="index",
-            gt4py_backend=self.backend
+            dtype=self.ikind
         )
-        self.hbot.field[:, :, :] -= 1
+        self.hbot.field[:, :] = np.reshape(np.transpose(_dataset.variables["hbot"][:]), (self.im, self.jm))
+        self.hbot.field[:, :] -= 1
 
         # Get htop
-        self.htop = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["htop"][:]), (self.im, self.jm, 1)),
-            dims=["I", "J", "K"],
+        self.htop = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
             units="index",
-            gt4py_backend=self.backend
+            dtype=self.ikind
         )
-        self.htop.field[:, :, :] -= 1
+        self.htop.field[:, :] = np.reshape(np.transpose(_dataset.variables["htop"][:]), (self.im, self.jm))
+        self.htop.field[:, :] -= 1
 
         # Get kcnv
-        self.kcnv = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["kcnv"][:]), (self.im, self.jm, 1)),
-            dims=["I", "J", "K"],
+        self.kcnv = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
             units="flag",
-            gt4py_backend=self.backend
+            dtype=self.ikind
         )
+        self.kcnv.field[:, :] = np.reshape(np.transpose(_dataset.variables["kcnv"][:]), (self.im, self.jm))
 
         # Get xland
-        self.xland = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["xland"][:]), (self.im, self.jm, 1)),
-            dims=["I", "J", "K"],
+        self.xland = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
             units="flag",
-            gt4py_backend=self.backend
+            dtype=self.ikind
         )
+        self.xland.field[:, :] = np.reshape(np.transpose(_dataset.variables["xland"][:]), (self.im, self.jm))
 
         # Get hfx2
-        self.hfx2 = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["hfx2"][:]), (self.im, self.jm, 1)),
-            dims=["I", "J", "K"],
+        self.hfx2 = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
             units="K m s-1",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.hfx2.field[:, :] = np.reshape(np.transpose(_dataset.variables["hfx2"][:]), (self.im, self.jm))
 
         # Get qfx2
-        self.qfx2 = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["qfx2"][:]), (self.im, self.jm, 1)),
-            dims=["I", "J", "K"],
+        self.qfx2 = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
             units="kg kg-1 m s-1",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.qfx2.field[:, :] = np.reshape(np.transpose(_dataset.variables["qfx2"][:]), (self.im, self.jm))
 
         # Get aod_gf
         if _dataset.variables.get("aod_gf"):
-            self.aod_gf = Quantity(
-                data=np.reshape(np.transpose(_dataset.variables["aod_gf"][:]), (self.im, self.jm, 1)),
-                dims=["I", "J", "K"],
+            self.aod_gf = self.quantity_factory.zeros(
+                dims=[X_DIM, Y_DIM],
                 units="none",
-                gt4py_backend=self.backend
+                dtype=self.rkind
             )
+            self.aod_gf.field[:, :] = np.reshape(np.transpose(_dataset.variables["aod_gf"][:]), (self.im, self.jm))
 
         # Get cliw
-        self.cliw = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["cliw"][:]), (self.im, self.jm, self.km)),
-            dims=["I", "J", "K"],
+        self.cliw = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
             units="kg kg-1",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.cliw.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["cliw"][:]), (self.im, self.jm, self.km))
 
         # Get clcw
-        self.clcw = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["clcw"][:]), (self.im, self.jm, self.km)),
-            dims=["I", "J", "K"],
+        self.clcw = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
             units="kg kg-1",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.clcw.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["clcw"][:]), (self.im, self.jm, self.km))
 
         # Get pbl
-        self.pbl = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["pbl"][:]), (self.im, self.jm, 1)),
-            dims=["I", "J", "K"],
-            units="none",
-            gt4py_backend=self.backend
+        self.pbl = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="m",
+            dtype=self.rkind
         )
+        self.pbl.field[:, :] = np.reshape(np.transpose(_dataset.variables["pbl"][:]), (self.im, self.jm))
 
         # Get ud_mf
         if _dataset.variables.get("ud_mf"):
-            self.ud_mf = Quantity(
-                data=np.reshape(np.transpose(_dataset.variables["ud_mf"][:]), (self.im, self.jm, self.km)),
-                dims=["I", "J", "K"],
+            self.ud_mf = self.quantity_factory.zeros(
+                dims=[X_DIM, Y_DIM, Z_DIM],
                 units="kg m-2",
-                gt4py_backend=self.backend
+                dtype=self.rkind
             )
+            self.ud_mf.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["ud_mf"][:]), (self.im, self.jm, self.km))
 
         # Get dd_mf
-        self.dd_mf = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["dd_mf"][:]), (self.im, self.jm, self.km)),
-            dims=["I", "J", "K"],
+        self.dd_mf = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
             units="kg m-2",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.dd_mf.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["dd_mf"][:]), (self.im, self.jm, self.km))
 
         # Get dt_mf
-        self.dt_mf = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["dt_mf"][:]), (self.im, self.jm, self.km)),
-            dims=["I", "J", "K"],
+        self.dt_mf = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
             units="kg m-2",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.dt_mf.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["dt_mf"][:]), (self.im, self.jm, self.km))
 
         # Get cnvw_moist
-        self.cnvw_moist = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["cnvw_moist"][:]), (self.im, self.jm, self.km)),
-            dims=["I", "J", "K"],
+        self.cnvw_moist = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
             units="kg kg-1",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.cnvw_moist.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["cnvw_moist"][:]), (self.im, self.jm, self.km))
 
         # Get cnvc
-        self.cnvc = Quantity(
-            data=np.reshape(np.transpose(_dataset.variables["cnvc"][:]), (self.im, self.jm, self.km)),
-            dims=["I", "J", "K"],
+        self.cnvc = self.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
             units="frac",
-            gt4py_backend=self.backend
+            dtype=self.rkind
         )
+        self.cnvc.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["cnvc"][:]), (self.im, self.jm, self.km))
 
         # Get imfshalcnv
         self.imfshalcnv = _dataset.variables["imfshalcnv"][:]
@@ -1385,12 +1344,12 @@ class GFState:
 
         # Get qci_conv
         if _dataset.variables.get("qci_conv"):
-            self.qci_conv = Quantity(
-                data=np.reshape(np.transpose(_dataset.variables["qci_conv"][:]), (self.im, self.jm, self.km)),
-                dims=["I", "J", "K"],
+            self.qci_conv = self.quantity_factory.zeros(
+                dims=[X_DIM, Y_DIM, Z_DIM],
                 units="kg kg-1",
-                gt4py_backend=self.backend
+                dtype=self.rkind
             )
+            self.qci_conv.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["qci_conv"][:]), (self.im, self.jm, self.km))
 
         # Get do_cap_suppress
         if _dataset.variables["do_cap_suppress"][:] == 1:
@@ -1400,21 +1359,21 @@ class GFState:
 
         # Get maxupmf
         if _dataset.variables.get("maxupmf"):
-            self.maxupmf = Quantity(
-                    data=np.reshape(np.transpose(_dataset.variables["maxupmf"][:]), (self.im, self.jm, 1)),
-                    dims=["I", "J", "K"],
-                    units="m s-1",
-                    gt4py_backend=self.backend
+            self.maxupmf = self.quantity_factory.zeros(
+                dims=[X_DIM, Y_DIM],
+                units="m s-1",
+                dtype=self.rkind
             )
+            self.maxupmf.field[:,:] = np.reshape(np.transpose(_dataset.variables["maxupmf"][:]), (self.im, self.jm))
 
         # Get maxMF
         if _dataset.variables.get("maxMF"):
-            self.maxMF = Quantity(
-                    data=np.reshape(np.transpose(_dataset.variables["maxMF"][:]), (self.im, self.jm, 1)),
-                    dims=["I", "J", "K"],
-                    units="m s-1",
-                    gt4py_backend=self.backend
+            self.maxMF = self.quantity_factory.zeros(
+                dims=[X_DIM, Y_DIM],
+                units="m s-1",
+                dtype=self.rkind
             )
+            self.maxMF.field[:,:] = np.reshape(np.transpose(_dataset.variables["maxMF"][:]), (self.im, self.jm))
 
         # Get do_mynnedmf
         if _dataset.variables["do_mynnedmf"][:] == 1:
@@ -1436,12 +1395,12 @@ class GFState:
 
         # Get spp_wts_cu_deep
         if _dataset.variables.get("spp_wts_cu_deep"):
-            self.spp_wts_cu_deep = Quantity(
-                data=np.reshape(np.transpose(_dataset.variables["spp_wts_cu_deep"][:]), (self.im, self.jm, self.km)),
-                dims=["I", "J", "K"],
+            self.spp_wts_cu_deep = self.quantity_factory.zeros(
+                dims=[X_DIM, Y_DIM, Z_DIM],
                 units="1",
-                gt4py_backend=self.backend
+                dtype=self.rkind
             )
+            self.spp_wts_cu_deep.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["spp_wts_cu_deep"][:]), (self.im, self.jm, self.km))
 
         # Get chem3d
         if _dataset.variables.get("chem3d"):

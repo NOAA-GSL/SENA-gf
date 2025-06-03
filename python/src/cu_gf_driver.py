@@ -444,7 +444,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
     # Loop over grid points to calculate `zo`, `dz8w`, and `zh`
     for i in range(its, ite + 1):  # Adjusted for Python's zero-based indexing
         for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
-            cld1d.field[i, j, 0] = 0.0
+            cld1d.field[i, j] = 0.0
             zo[i, j, :] = phil.field[i, j, :] / g
             dz8w[i, j, 0] = zo[i, j, 1] - zo[i, j, 0]
             zh[0] = 0.0
@@ -455,7 +455,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
             for k in range(kts + 1, ktf + 1):
                 zh[k] = zh[k - 1] + dz8w[i, j, k - 1]
-                if zh[k] > pbl.field[i, j, 0]:
+                if zh[k] > pbl.field[i, j]:
                     kpbli[i, j] = max(1, k)
                     break
 
@@ -469,23 +469,23 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
             # Set AOD and CCN
             if flag_init and not flag_restart:
-                aod_gf.field[i, j, 0] = aodc0
+                aod_gf.field[i, j] = aodc0
             else:
                 if cactiv.field[i, j] == 0 and cactiv_m.field[i, j] == 0:
-                    if aodc0 > aod_gf.field[i, j, 0]:
-                        aod_gf.field[i, j, 0] += (aodc0 - aod_gf.field[i, j, 0]) * (dt / (aodreturn * 60))
-                    if aod_gf.field[i, j, 0] > aodc0:
-                        aod_gf.field[i, j, 0] = aodc0
+                    if aodc0 > aod_gf.field[i, j]:
+                        aod_gf.field[i, j] += (aodc0 - aod_gf.field[i, j]) * (dt / (aodreturn * 60))
+                    if aod_gf.field[i, j] > aodc0:
+                        aod_gf.field[i, j] = aodc0
 
-            ccn_gf[i, j] = max(5.0, (aod_gf.field[i, j, 0] / 0.0027) ** (1 / 0.640))
+            ccn_gf[i, j] = max(5.0, (aod_gf.field[i, j] / 0.0027) ** (1 / 0.640))
             ccn_m[i, j] = ccn_gf[i, j]
 
             ccnclean = max(5.0, (aodc0 / 0.0027) ** (1 / 0.640))
 
-            hbot.field[i, j, 0] = kte
-            htop.field[i, j, 0] = kts
-            raincv.field[i, j, 0] = 0.0
-            xlandi[i, j] = float(xland.field[i, j, 0])  # Convert to real (float in Python)
+            hbot.field[i, j] = kte
+            htop.field[i, j] = kts
+            raincv.field[i, j] = 0.0
+            xlandi[i, j] = float(xland.field[i, j])  # Convert to real (float in Python)
 
     # Initialize `mconv` array
     for i in range(its, itf + 1):  # Loop over horizontal grid points
@@ -504,7 +504,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 zdm[i, j, k] = 0.0
 
     # Scale surface pressure
-    psur[:, :] = 0.01 * psuri.field[:, :, 0]
+    psur[:, :] = 0.01 * psuri.field[:, :]
 
     # Compute `ter11` array
     for i in range(its, itf + 1):  # Loop over horizontal grid points
@@ -634,8 +634,8 @@ def cu_gf_driver_run(state, errmsg, errflg):
     # Convert `hfx2` and `qfx2` to W/m²
     for i in range(its, itf + 1):  # Loop over horizontal grid points
         for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-            hfx[i, j] = hfx2.field[i, j, 0] * cp * rhoi[i, j, 0]
-            qfx[i, j] = qfx2.field[i, j, 0] * xlv * rhoi[i, j, 0]
+            hfx[i, j] = hfx2.field[i, j] * cp * rhoi[i, j, 0]
+            qfx[i, j] = qfx2.field[i, j] * xlv * rhoi[i, j, 0]
             dx[i, j] = np.sqrt(garea.field[i, j])
 
     # Update `tn` and `qo` arrays
@@ -1080,9 +1080,9 @@ def cu_gf_driver_run(state, errmsg, errflg):
     # Initialize `kcnv` and update related arrays
     for i in range(its, itf + 1):  # Loop over horizontal grid points
         for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-            kcnv.field[i, j, 0] = 0
+            kcnv.field[i, j] = 0
             if pretm[i, j] > 0.0:
-                kcnv.field[i, j, 0] = 1  # Previously `jmin(i)` in comments
+                kcnv.field[i, j] = 1  # Previously `jmin(i)` in comments
                 cutenm[i, j] = 1.0
             else:
                 kbconm[i, j] = -1
@@ -1093,7 +1093,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 cuten[i, j] = 1.0
                 cutenm[i, j] = 0.0
                 pretm[i, j] = 0.0
-                kcnv.field[i, j, 0] = 1  # Previously `jmin(i)` in comments
+                kcnv.field[i, j] = 1  # Previously `jmin(i)` in comments
                 ktopm[i, j] = -1
                 kbconm[i, j] = -1
             else:
@@ -1122,9 +1122,9 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 kstop = max(kstop, ktops[i, j])
 
             if kstop > 1:
-                htop.field[i, j, 0] = kstop
+                htop.field[i, j] = kstop
                 if kbcon[i, j] > 1 or kbconm[i, j] > 1:
-                    hbot.field[i, j, 0] = max(kbconm[i, j], kbcon[i, j])
+                    hbot.field[i, j] = max(kbconm[i, j], kbcon[i, j])
 
                 dtime_max = dt
                 forcing2[i, j, 2] = 0.0
@@ -1261,9 +1261,9 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 gdc[i, j, 15, 9] = pret[i, j] * 3600.0
 
                 # Calculate maximum upward mass flux
-                maxupmf.field[i, j, 0] = 0.0
+                maxupmf.field[i, j] = 0.0
                 if forcing2[i, j, 5] > 0.0:
-                    maxupmf.field[i, j, 0] = max(xmb[i, j] * zu[i, j, kts:ktf + 1] / forcing2[i, j, 5])
+                    maxupmf.field[i, j] = max(xmb[i, j] * zu[i, j, kts:ktf + 1] / forcing2[i, j, 5])
 
                 # Update `dt_mf` for deep convection
                 if ktop[i, j] > 1 and pret[i, j] > 0.0:
@@ -1274,7 +1274,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
         for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
             if pret[i, j] > 0.0:
                 cactiv.field[i, j] = 1
-                raincv.field[i, j, 0] = 0.001 * (
+                raincv.field[i, j] = 0.001 * (
                     cutenm[i, j] * pretm[i, j] +
                     cutens[i, j] * prets[i, j] +
                     cuten[i, j] * pret[i, j]
@@ -1282,7 +1282,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
             else:
                 cactiv.field[i, j] = 0
                 if pretm[i, j] > 0.0:
-                    raincv.field[i, j, 0] = 0.001 * cutenm[i, j] * pretm[i, j] * dt
+                    raincv.field[i, j] = 0.001 * cutenm[i, j] * pretm[i, j] * dt
 
             if pretm[i, j] > 0.0:
                 cactiv_m.field[i, j] = 1
@@ -1297,13 +1297,13 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 ccn_gf[i, j] = 0.0
 
             # Convert CCN back to AOD
-            aod_gf.field[i, j, 0] = 0.0027 * (ccn_gf[i, j] ** 0.64)
-            if aod_gf.field[i, j, 0] < 0.007:
-                aod_gf.field[i, j, 0] = 0.007
-                ccn_gf[i, j] = (aod_gf.field[i, j, 0] / 0.0027) ** (1 / 0.64)
-            elif aod_gf.field[i, j, 0] > aodc0:
-                aod_gf.field[i, j, 0] = aodc0
-                ccn_gf[i, j] = (aod_gf.field[i, j, 0] / 0.0027) ** (1 / 0.64)
+            aod_gf.field[i, j] = 0.0027 * (ccn_gf[i, j] ** 0.64)
+            if aod_gf.field[i, j] < 0.007:
+                aod_gf.field[i, j] = 0.007
+                ccn_gf[i, j] = (aod_gf.field[i, j] / 0.0027) ** (1 / 0.64)
+            elif aod_gf.field[i, j] > aodc0:
+                aod_gf.field[i, j] = aodc0
+                ccn_gf[i, j] = (aod_gf.field[i, j] / 0.0027) ** (1 / 0.64)
 
     # Scale dry mixing ratios for water vapor and cloud water to specific humidity / moist mixing ratios
     qv_spechum.field[:, :, :] = qv / (1.0 + qv)
