@@ -411,6 +411,9 @@ def cu_gf_driver_run(state, errmsg, errflg):
     # Initialize `ht` array
     ht[:, :] = phil.field[:, :, 0] / g
 
+    # Scale surface pressure
+    psur[:, :] = 0.01 * psuri.field[:, :]
+
     # Loop over grid points to calculate `zo`, `dz8w`, and `zh`
     for i in range(its, ite + 1):  # Adjusted for Python's zero-based indexing
         for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
@@ -429,9 +432,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
                     kpbli[i, j] = max(1, k)
                     break
 
-    # Initialize arrays and variables
-    for i in range(its, itf + 1):  # Loop over horizontal grid points
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            # Initialize arrays and variables
             forcing[i, j, :] = 0.0
             forcing2[i, j, :] = 0.0
             ccn_gf[i, j] = 0.0
@@ -457,15 +458,11 @@ def cu_gf_driver_run(state, errmsg, errflg):
             raincv.field[i, j] = 0.0
             xlandi[i, j] = float(xland.field[i, j])  # Convert to real (float in Python)
 
-    # Initialize `mconv` array
-    for i in range(its, itf + 1):  # Loop over horizontal grid points
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            # Initialize `mconv` array
             mconv[i, j] = 0.0
 
-    # Initialize `omeg`, `zu`, `zum`, `zus`, `zd`, and `zdm` arrays
-    for k in range(kts, kte + 1):  # Loop over vertical levels
-        for i in range(its, itf + 1):  # Loop over horizontal grid points
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            # Initialize `omeg`, `zu`, `zum`, `zus`, `zd`, and `zdm` arrays
+            for k in range(kts, kte + 1):  # Loop over vertical levels
                 omeg[i, j, k] = 0.0
                 zu[i, j, k] = 0.0
                 zum[i, j, k] = 0.0
@@ -473,18 +470,11 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 zd[i, j, k] = 0.0
                 zdm[i, j, k] = 0.0
 
-    # Scale surface pressure
-    psur[:, :] = 0.01 * psuri.field[:, :]
-
-    # Compute `ter11` array
-    for i in range(its, itf + 1):  # Loop over horizontal grid points
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            # Compute `ter11` array
             ter11[i, j] = max(0.0, ht[i, j])
 
-    # Initialize `cnvw`, `cnvc`, `gdc`, and `gdc2` arrays
-    for k in range(kts, kte + 1):  # Loop over vertical levels
-        for i in range(its, ite + 1):  # Loop over horizontal grid points
-            for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
+            # Initialize `cnvw`, `cnvc`, `gdc`, and `gdc2` arrays
+            for k in range(kts, kte + 1):  # Loop over vertical levels
                 cnvw[i, j, k] = 0.0
                 cnvc.field[i, j, k] = 0.0
                 gdc[i, j, k, 0] = 0.0
