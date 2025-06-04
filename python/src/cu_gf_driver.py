@@ -569,21 +569,15 @@ def cu_gf_driver_run(state, errmsg, errflg):
             for k in range(kts, kpbli[i, j] + 1):  # Loop over vertical levels up to `kpbli`
                 tshall[i, j, k] = t.field[i, j, k]
                 qshall[i, j, k] = max(1.0e-16, qv[i, j, k])
+                tn[i, j, k] = t.field[i, j, k]
+                qo[i, j, k] = max(1.0e-16, qv[i, j, k])
+                dhdt[i, j, k] = cp * (forcet.field[i, j, k] + (t.field[i, j, k] - t2di.field[i, j, k]) / dt) + \
+                            xlv * (forceqv[i, j, k] + (qv[i, j, k] - qv2di[i, j, k]) / dt)
 
             # Convert `hfx2` and `qfx2` to W/m²
             hfx[i, j] = hfx2.field[i, j] * cp * rhoi[i, j, 0]
             qfx[i, j] = qfx2.field[i, j] * xlv * rhoi[i, j, 0]
             dx[i, j] = np.sqrt(garea.field[i, j])
-
-            # Update `tn` and `qo` arrays
-            for k in range(kts, kpbli[i, j] + 1):  # Loop over vertical levels up to `kpbli`
-                tn[i, j, k] = t.field[i, j, k]
-                qo[i, j, k] = max(1.0e-16, qv[i, j, k])
-
-            # Compute `dhdt` array
-            for k in range(kts, kpbli[i, j] + 1):  # Loop over vertical levels up to `kpbli`
-                dhdt[i, j, k] = cp * (forcet.field[i, j, k] + (t.field[i, j, k] - t2di.field[i, j, k]) / dt) + \
-                            xlv * (forceqv[i, j, k] + (qv[i, j, k] - qv2di[i, j, k]) / dt)
 
             # Compute umean, vmean, and pmean
             for k in range(kts + 1, ktf):
