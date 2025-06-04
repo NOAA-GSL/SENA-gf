@@ -521,14 +521,14 @@ def cu_gf_driver_run(state, errmsg, errflg):
             zh[0] = 0.0
             kpbli[i, j] = 1
 
+            zh_mask = True
             for k in range(kts + 1, ktf + 1):  # Loop over vertical levels
                 dz8w[i, j, k] = zo[i, j, k + 1] - zo[i, j, k]
-
-            for k in range(kts + 1, ktf + 1):
-                zh[k] = zh[k - 1] + dz8w[i, j, k - 1]
-                if zh[k] > pbl.field[i, j]:
-                    kpbli[i, j] = max(1, k)
-                    break
+                if zh_mask:
+                    zh[k] = zh[k - 1] + dz8w[i, j, k - 1]
+                    if zh[k] > pbl.field[i, j]:
+                        kpbli[i, j] = max(1, k)
+                        zh_mask = False
 
             # Set AOD and CCN
             if flag_init and not flag_restart:
