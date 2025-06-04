@@ -550,10 +550,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
             # Compute `ter11` array
             ter11[i, j] = max(0.0, ht[i, j])
 
-
-    # Loop over vertical levels and horizontal grid points
-    for i in range(its, itf + 1):  # Loop over horizontal grid points
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            # Loop over vertical levels and horizontal grid points
             for k in range(kts, ktf + 1):  # Loop over vertical levels
                 p2d[i, j, k] = 0.01 * p2di.field[i, j, k]
                 po[i, j, k] = p2d[i, j, k]
@@ -568,37 +565,27 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 tshall[i, j, k] = t2d[i, j, k]
                 qshall[i, j, k] = q2d[i, j, k]
 
-    # Loop over horizontal grid points and vertical levels
-    for i in range(its, itf + 1):  # Loop over horizontal grid points
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            # Loop over horizontal grid points and vertical levels
             for k in range(kts, kpbli[i, j] + 1):  # Loop over vertical levels up to `kpbli`
                 tshall[i, j, k] = t.field[i, j, k]
                 qshall[i, j, k] = max(1.0e-16, qv[i, j, k])
 
-    # Convert `hfx2` and `qfx2` to W/m²
-    for i in range(its, itf + 1):  # Loop over horizontal grid points
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            # Convert `hfx2` and `qfx2` to W/m²
             hfx[i, j] = hfx2.field[i, j] * cp * rhoi[i, j, 0]
             qfx[i, j] = qfx2.field[i, j] * xlv * rhoi[i, j, 0]
             dx[i, j] = np.sqrt(garea.field[i, j])
 
-    # Update `tn` and `qo` arrays
-    for i in range(its, itf + 1):  # Loop over horizontal grid points
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            # Update `tn` and `qo` arrays
             for k in range(kts, kpbli[i, j] + 1):  # Loop over vertical levels up to `kpbli`
                 tn[i, j, k] = t.field[i, j, k]
                 qo[i, j, k] = max(1.0e-16, qv[i, j, k])
 
-    # Compute `dhdt` array
-    for i in range(its, itf + 1):  # Loop over horizontal grid points
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            # Compute `dhdt` array
             for k in range(kts, kpbli[i, j] + 1):  # Loop over vertical levels up to `kpbli`
                 dhdt[i, j, k] = cp * (forcet.field[i, j, k] + (t.field[i, j, k] - t2di.field[i, j, k]) / dt) + \
                             xlv * (forceqv[i, j, k] + (qv[i, j, k] - qv2di[i, j, k]) / dt)
 
-    # Compute umean, vmean, and pmean
-    for i in range(its, itf + 1):
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            # Compute umean, vmean, and pmean
             for k in range(kts + 1, ktf):
                 if (p2d[i, j, 1] - p2d[i, j, k]) > 150 and p2d[i, j, k] > 300:
                     dp = -0.5 * (p2d[i, j, k + 1] - p2d[i, j, k - 1])
@@ -606,9 +593,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
                     vmean[i, j] += vs.field[i, j, k] * dp
                     pmean[i, j] += dp
 
-    # Compute `psum` and update `forcing` arrays
-    for i in range(its, itf + 1):  # Loop over horizontal grid points
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            # Compute `psum` and update `forcing` arrays
             psum = 0.0
             for k in range(kts, ktf - 2):  # Loop over vertical levels
                 if clcw.field[i, j, k] > -999.0 and clcw.field[i, j, k + 1] > -999.0:
@@ -622,21 +607,17 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 forcing[i, j, 6] /= psum
             forcing2[i, j, 6] = forcing[i, j, 6]
 
-    # Update `omeg` array
-    for i in range(its, itf + 1):  # Loop over horizontal grid points
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            # Update `omeg` array
             for k in range(kts, ktf):  # Loop over vertical levels
                 omeg[i, j, k] = w.field[i, j, k]  # Original Fortran comment: `!-g*rhoi(i, j,k)*w(i, j,k)`
 
-    # Update `mconv` and `ierr` arrays
-    for i in range(its, itf + 1):  # Loop over horizontal grid points
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            # Update `mconv` and `ierr` arrays
             if mconv[i, j] < 0.0:
                 mconv[i, j] = 0.0
             if dx[i, j] < 6500.0 and do_mynnedmf and maxMF.field[i, j, 0] > 0.0:
                 ierr[i, j] = 555
 
-   # Check if `dx` at `its` is less than 6500
+    # Check if `dx` at `its` is less than 6500
     if dx[its, jts] < 6500.0:
         imid_gf = 0
 
