@@ -407,85 +407,24 @@ def cu_gf_driver_run(state, errmsg, errflg):
     dd_mf.field[:, :, :] = 0.0
     dt_mf.field[:, :, :] = 0.0
     tau_ecmwf[:] = 0.0
-
-    # Initialize `ht` array
-    ht[:, :] = phil.field[:, :, 0] / g
-
-    # Scale surface pressure
-    psur[:, :] = 0.01 * psuri.field[:, :]
-
-    # Loop over grid points to calculate `zo`, `dz8w`, and `zh`
-    for i in range(its, ite + 1):  # Adjusted for Python's zero-based indexing
-        for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
-            cld1d.field[i, j] = 0.0
-            zo[i, j, :] = phil.field[i, j, :] / g
-            dz8w[i, j, 0] = zo[i, j, 1] - zo[i, j, 0]
-            zh[0] = 0.0
-            kpbli[i, j] = 1
-
-            for k in range(kts + 1, ktf + 1):  # Loop over vertical levels
-                dz8w[i, j, k] = zo[i, j, k + 1] - zo[i, j, k]
-
-            for k in range(kts + 1, ktf + 1):
-                zh[k] = zh[k - 1] + dz8w[i, j, k - 1]
-                if zh[k] > pbl.field[i, j]:
-                    kpbli[i, j] = max(1, k)
-                    break
-
-            # Initialize arrays and variables
-            forcing[i, j, :] = 0.0
-            forcing2[i, j, :] = 0.0
-            ccn_gf[i, j] = 0.0
-            ccn_m[i, j] = 0.0
-
-            # Set AOD and CCN
-            if flag_init and not flag_restart:
-                aod_gf.field[i, j] = aodc0
-            else:
-                if cactiv.field[i, j] == 0 and cactiv_m.field[i, j] == 0:
-                    if aodc0 > aod_gf.field[i, j]:
-                        aod_gf.field[i, j] += (aodc0 - aod_gf.field[i, j]) * (dt / (aodreturn * 60))
-                    if aod_gf.field[i, j] > aodc0:
-                        aod_gf.field[i, j] = aodc0
-
-            ccn_gf[i, j] = max(5.0, (aod_gf.field[i, j] / 0.0027) ** (1 / 0.640))
-            ccn_m[i, j] = ccn_gf[i, j]
-
-            ccnclean = max(5.0, (aodc0 / 0.0027) ** (1 / 0.640))
-
-            hbot.field[i, j] = kte
-            htop.field[i, j] = kts
-            raincv.field[i, j] = 0.0
-            xlandi[i, j] = float(xland.field[i, j])  # Convert to real (float in Python)
-
-            # Initialize `mconv` array
-            mconv[i, j] = 0.0
-
-            # Initialize `omeg`, `zu`, `zum`, `zus`, `zd`, and `zdm` arrays
-            for k in range(kts, kte + 1):  # Loop over vertical levels
-                omeg[i, j, k] = 0.0
-                zu[i, j, k] = 0.0
-                zum[i, j, k] = 0.0
-                zus[i, j, k] = 0.0
-                zd[i, j, k] = 0.0
-                zdm[i, j, k] = 0.0
-
-            # Compute `ter11` array
-            ter11[i, j] = max(0.0, ht[i, j])
-
-            # Initialize `cnvw`, `cnvc`, `gdc`, and `gdc2` arrays
-            for k in range(kts, kte + 1):  # Loop over vertical levels
-                cnvw[i, j, k] = 0.0
-                cnvc.field[i, j, k] = 0.0
-                gdc[i, j, k, 0] = 0.0
-                gdc[i, j, k, 1] = 0.0
-                gdc[i, j, k, 2] = 0.0
-                gdc[i, j, k, 3] = 0.0
-                gdc[i, j, k, 6] = 0.0
-                gdc[i, j, k, 7] = 0.0
-                gdc[i, j, k, 8] = 0.0
-                gdc[i, j, k, 9] = 0.0
-                gdc2[i, j, k, 0] = 0.0
+    forcing[:, :, :] = 0.0
+    forcing2[:, :, :] = 0.0
+    ccn_gf[:, :] = 0.0
+    ccn_m[:, :] = 0.0
+    hbot.field[:, :] = kte
+    htop.field[:, :] = kts
+    raincv.field[:, :] = 0.0
+    mconv[:, :] = 0.0
+    omeg[:, :, :] = 0.0
+    zu[:, :, :] = 0.0
+    zum[:, :, :] = 0.0
+    zus[:, :, :] = 0.0
+    zd[:, :, :] = 0.0
+    zdm[:, :, :] = 0.0
+    cnvw[:, :, :] = 0.0
+    cnvc.field[:, :, :] = 0.0
+    gdc[:, :, :, :] = 0.0
+    gdc2[:, :, :, 0] = 0.0
 
     # Initialize error arrays
     ierr[:, :] = 0
@@ -566,6 +505,51 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
     frhm[:, :] = 0.0
     frhd[:, :] = 0.0
+
+    # Initialize `ht` array
+    ht[:, :] = phil.field[:, :, 0] / g
+
+    # Scale surface pressure
+    psur[:, :] = 0.01 * psuri.field[:, :]
+
+    # Loop over grid points to calculate `zo`, `dz8w`, and `zh`
+    for i in range(its, ite + 1):  # Adjusted for Python's zero-based indexing
+        for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
+            cld1d.field[i, j] = 0.0
+            zo[i, j, :] = phil.field[i, j, :] / g
+            dz8w[i, j, 0] = zo[i, j, 1] - zo[i, j, 0]
+            zh[0] = 0.0
+            kpbli[i, j] = 1
+
+            for k in range(kts + 1, ktf + 1):  # Loop over vertical levels
+                dz8w[i, j, k] = zo[i, j, k + 1] - zo[i, j, k]
+
+            for k in range(kts + 1, ktf + 1):
+                zh[k] = zh[k - 1] + dz8w[i, j, k - 1]
+                if zh[k] > pbl.field[i, j]:
+                    kpbli[i, j] = max(1, k)
+                    break
+
+            # Set AOD and CCN
+            if flag_init and not flag_restart:
+                aod_gf.field[i, j] = aodc0
+            else:
+                if cactiv.field[i, j] == 0 and cactiv_m.field[i, j] == 0:
+                    if aodc0 > aod_gf.field[i, j]:
+                        aod_gf.field[i, j] += (aodc0 - aod_gf.field[i, j]) * (dt / (aodreturn * 60))
+                    if aod_gf.field[i, j] > aodc0:
+                        aod_gf.field[i, j] = aodc0
+
+            ccn_gf[i, j] = max(5.0, (aod_gf.field[i, j] / 0.0027) ** (1 / 0.640))
+            ccn_m[i, j] = ccn_gf[i, j]
+
+            ccnclean = max(5.0, (aodc0 / 0.0027) ** (1 / 0.640))
+
+            xlandi[i, j] = float(xland.field[i, j])  # Convert to real (float in Python)
+
+            # Compute `ter11` array
+            ter11[i, j] = max(0.0, ht[i, j])
+
 
     # Loop over vertical levels and horizontal grid points
     for k in range(kts, ktf + 1):  # Loop over vertical levels
