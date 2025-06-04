@@ -552,9 +552,9 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
 
     # Loop over vertical levels and horizontal grid points
-    for k in range(kts, ktf + 1):  # Loop over vertical levels
-        for i in range(its, itf + 1):  # Loop over horizontal grid points
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+    for i in range(its, itf + 1):  # Loop over horizontal grid points
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            for k in range(kts, ktf + 1):  # Loop over vertical levels
                 p2d[i, j, k] = 0.01 * p2di.field[i, j, k]
                 po[i, j, k] = p2d[i, j, k]
                 rhoi[i, j, k] = 100.0 * p2d[i, j, k] / (287.04 * (t2di.field[i, j, k] * (1.0 + 0.608 * qv2di[i, j, k])))
@@ -597,9 +597,9 @@ def cu_gf_driver_run(state, errmsg, errflg):
                             xlv * (forceqv[i, j, k] + (qv[i, j, k] - qv2di[i, j, k]) / dt)
 
     # Compute umean, vmean, and pmean
-    for k in range(kts + 1, ktf):
-        for i in range(its, itf + 1):
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+    for i in range(its, itf + 1):
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            for k in range(kts + 1, ktf):
                 if (p2d[i, j, 1] - p2d[i, j, k]) > 150 and p2d[i, j, k] > 300:
                     dp = -0.5 * (p2d[i, j, k + 1] - p2d[i, j, k - 1])
                     umean[i, j] += us.field[i, j, k] * dp
@@ -623,9 +623,9 @@ def cu_gf_driver_run(state, errmsg, errflg):
             forcing2[i, j, 6] = forcing[i, j, 6]
 
     # Update `omeg` array
-    for k in range(kts, ktf):  # Loop over vertical levels
-        for i in range(its, itf + 1):  # Loop over horizontal grid points
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+    for i in range(its, itf + 1):  # Loop over horizontal grid points
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            for k in range(kts, ktf):  # Loop over vertical levels
                 omeg[i, j, k] = w.field[i, j, k]  # Original Fortran comment: `!-g*rhoi(i, j,k)*w(i, j,k)`
 
     # Update `mconv` and `ierr` arrays
