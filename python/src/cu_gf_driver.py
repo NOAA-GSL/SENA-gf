@@ -145,12 +145,9 @@ def cu_gf_driver_run(state, errmsg, errflg):
     ter11 = np.zeros((im, jm))  # Terrain height
 
     cnvw = np.zeros((im, jm, km))  # Convective tendencies
-    # cnvc = np.zeros((im, km))
 
     gdc = np.zeros((im, jm, km, 10))  # Diagnostic tendencies
     gdc2 = np.zeros((im, jm, km, 10))
-
-    # qci_conv = np.zeros((im, km))  # Cloud ice mixing ratio
 
     ierr = np.zeros((im, jm), dtype=int)  # Error flags for deep convection
     ierrm = np.zeros((im, jm), dtype=int)  # Error flags
@@ -177,9 +174,6 @@ def cu_gf_driver_run(state, errmsg, errflg):
     pretm = np.zeros((im, jm))
     prets = np.zeros((im, jm))
 
-    # clcw_save = np.zeros((im, km))  # Cloud liquid water save arrays
-    # cliw_save = np.zeros((im, km))
-
     clw_ten = np.zeros((im, jm, km))  # Cloud water tendencies
 
     po_cup = np.zeros(km)  # Pressure at cloud levels
@@ -200,12 +194,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
     psur = np.zeros((im, jm))  # Surface pressure
 
-    # clcw = np.zeros((im, km))  # Cloud liquid water
-    # cliw = np.zeros((im, km))  # Cloud ice water
-
     forcing2 = np.zeros((im, jm, 10))  # Forcing array
-
-    # dt_mf = np.zeros((im, km))  # Mass flux tendencies
 
     tau_ecmwf = np.zeros((im, jm))  # ECMWF tau array
 
@@ -313,9 +302,6 @@ def cu_gf_driver_run(state, errmsg, errflg):
     vmean = np.zeros((im, jm))
     pmean = np.zeros((im, jm))
 
-    errmsg = ""
-    errflg = 0
-
     ichoice = ichoice_in
     ichoicem = ichoicem_in
     ichoice_s = ichoice_s_in
@@ -411,32 +397,16 @@ def cu_gf_driver_run(state, errmsg, errflg):
         ishallow_g3 = 0
 
     # Initialize debugging variables
-    high_resolution = 0
-    subcenter = 0.0
-    iens = 1
     ipr = 0 # CWH
-    jpr = 0
-    ipr_deep = 0
 
     # Set iteration bounds
-    ibeg = its
-    iend = ite
     tcrit = 258.0
-
-    # Initialize additional variables
-    ztm = 0.0
-    ztq = 0.0
-    hfm = 0.0
-    qfm = 0.0
 
     # Initialize arrays
     ud_mf.field[:, :, :] = 0.0
     dd_mf.field[:, :, :] = 0.0
     dt_mf.field[:, :, :] = 0.0
     tau_ecmwf[:] = 0.0
-
-    # Initialize `j`
-    j = 1
 
     # Initialize `ht` array
     ht[:, :] = phil.field[:, :, 0] / g
@@ -645,10 +615,6 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 tn[i, j, k] = t.field[i, j, k]
                 qo[i, j, k] = max(1.0e-16, qv[i, j, k])
 
-    # Initialize `nbegin` and `nend`
-    nbegin = 0
-    nend = 0
-
     # Compute `dhdt` array
     for i in range(its, itf + 1):  # Loop over horizontal grid points
         for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
@@ -807,7 +773,6 @@ def cu_gf_driver_run(state, errmsg, errflg):
         #     print(f"{qcheck[0,k]:>20.10E}{outqs[0,k]:>20.10E}{outts[0,k]:>20.10E}{outus[0,k]:>20.10E}{outvs[0,k]:>20.10E}{outqcs[0,k]:>20.10E}")
 
     ipr = 0
-    jpr_deep = 0  # Previously set to 340765 in commentsments
 
     if imid_gf == 1:
 
@@ -1062,7 +1027,6 @@ def cu_gf_driver_run(state, errmsg, errflg):
         #     print(f"{wetdpc_deep[0,n]:>20.12E}")
         # print(f"{do_smoke_transport:>10}")
 
-        jpr = 0
         ipr = 0
 
         # Update `qcheck` array
