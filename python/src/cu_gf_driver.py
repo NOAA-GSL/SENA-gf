@@ -506,10 +506,16 @@ def cu_gf_driver_run(state, errmsg, errflg):
     frhm[:, :] = 0.0
     frhd[:, :] = 0.0
 
+    cld1d.field[:, :] = 0.0
+
+    xlandi[:, :] = xland.field.astype(state.rkind)[:, :]
+
     # Initialize `ht` array
     ht[:, :] = phil.field[:, :, 0] / g
     zo[:, :, :] = phil.field[:, :, :] / g
     kpbli[:, :] = 1
+
+    ter11 = np.maximum(ht, 0.0)
 
     # Scale surface pressure
     psur[:, :] = 0.01 * psuri.field[:, :]
@@ -519,9 +525,6 @@ def cu_gf_driver_run(state, errmsg, errflg):
     # Loop over grid points to calculate `zo`, `dz8w`, and `zh`
     for i in range(its, ite + 1):  # Adjusted for Python's zero-based indexing
         for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
-            cld1d.field[i, j] = 0.0
-            dz8w[i, j, 0] = zo[i, j, 1] - zo[i, j, 0]
-            zh[0] = 0.0
 
             # Set AOD and CCN
             if flag_init and not flag_restart:
@@ -538,11 +541,8 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
             ccnclean = max(5.0, (aodc0 / 0.0027) ** (1 / 0.640))
 
-            xlandi[i, j] = float(xland.field[i, j])  # Convert to real (float in Python)
-
-            # Compute `ter11` array
-            ter11[i, j] = max(0.0, ht[i, j])
-
+            dz8w[i, j, 0] = zo[i, j, 1] - zo[i, j, 0]
+            zh[0] = 0.0
             zh_mask = True
             for k in range(kts + 1, ktf + 1):  # Loop over vertical levels
                 dz8w[i, j, k] = zo[i, j, k + 1] - zo[i, j, k]
