@@ -508,27 +508,20 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
     # Initialize `ht` array
     ht[:, :] = phil.field[:, :, 0] / g
+    zo[:, :, :] = phil.field[:, :, :] / g
+    kpbli[:, :] = 1
 
     # Scale surface pressure
     psur[:, :] = 0.01 * psuri.field[:, :]
+
+    omeg[:, :, :] = w.field[:, :, :]
 
     # Loop over grid points to calculate `zo`, `dz8w`, and `zh`
     for i in range(its, ite + 1):  # Adjusted for Python's zero-based indexing
         for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
             cld1d.field[i, j] = 0.0
-            zo[i, j, :] = phil.field[i, j, :] / g
             dz8w[i, j, 0] = zo[i, j, 1] - zo[i, j, 0]
             zh[0] = 0.0
-            kpbli[i, j] = 1
-
-            zh_mask = True
-            for k in range(kts + 1, ktf + 1):  # Loop over vertical levels
-                dz8w[i, j, k] = zo[i, j, k + 1] - zo[i, j, k]
-                if zh_mask:
-                    zh[k] = zh[k - 1] + dz8w[i, j, k - 1]
-                    if zh[k] > pbl.field[i, j]:
-                        kpbli[i, j] = max(1, k)
-                        zh_mask = False
 
             # Set AOD and CCN
             if flag_init and not flag_restart:
@@ -550,6 +543,15 @@ def cu_gf_driver_run(state, errmsg, errflg):
             # Compute `ter11` array
             ter11[i, j] = max(0.0, ht[i, j])
 
+            zh_mask = True
+            for k in range(kts + 1, ktf + 1):  # Loop over vertical levels
+                dz8w[i, j, k] = zo[i, j, k + 1] - zo[i, j, k]
+                if zh_mask:
+                    zh[k] = zh[k - 1] + dz8w[i, j, k - 1]
+                    if zh[k] > pbl.field[i, j]:
+                        kpbli[i, j] = max(1, k)
+                        zh_mask = False
+
             # Loop over vertical levels and horizontal grid points
             for k in range(kts, ktf + 1):  # Loop over vertical levels
                 p2d[i, j, k] = 0.01 * p2di.field[i, j, k]
@@ -560,10 +562,10 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 qo[i, j, k] = max(1.0e-16, qv[i, j, k])
                 t2d[i, j, k] = t2di.field[i, j, k] - forcet.field[i, j, k] * dt
                 q2d[i, j, k] = max(1.0e-16, qv2di[i, j, k] - forceqv[i, j, k] * dt)
-                if qo[i, j, k] < 1.0e-16:
-                    qo[i, j, k] = 1.0e-16
                 tshall[i, j, k] = t2d[i, j, k]
                 qshall[i, j, k] = q2d[i, j, k]
+                if qo[i, j, k] < 1.0e-16:
+                    qo[i, j, k] = 1.0e-16
 
             # Loop over horizontal grid points and vertical levels
             for k in range(kts, kpbli[i, j] + 1):  # Loop over vertical levels up to `kpbli`
@@ -600,10 +602,6 @@ def cu_gf_driver_run(state, errmsg, errflg):
             if psum > 0.0:
                 forcing[i, j, 6] /= psum
             forcing2[i, j, 6] = forcing[i, j, 6]
-
-            # Update `omeg` array
-            for k in range(kts, ktf):  # Loop over vertical levels
-                omeg[i, j, k] = w.field[i, j, k]  # Original Fortran comment: `!-g*rhoi(i, j,k)*w(i, j,k)`
 
             # Update `mconv` and `ierr` arrays
             if mconv[i, j] < 0.0:
