@@ -9,3 +9,9 @@ a.out
 
 # Ignore backup files
 *~
+
+# Ignore NDSL
+NDSL
+
+# Ignore .ndsl venv
+.ndsl
