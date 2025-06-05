@@ -522,6 +522,8 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
     omeg[:, :, :] = w.field[:, :, :]
 
+    ccnclean = max(5.0, (aodc0 / 0.0027) ** (1 / 0.640))
+
     # Loop over grid points to calculate `zo`, `dz8w`, and `zh`
     for i in range(its, ite + 1):  # Adjusted for Python's zero-based indexing
         for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
@@ -538,8 +540,6 @@ def cu_gf_driver_run(state, errmsg, errflg):
 
             ccn_gf[i, j] = max(5.0, (aod_gf.field[i, j] / 0.0027) ** (1 / 0.640))
             ccn_m[i, j] = ccn_gf[i, j]
-
-            ccnclean = max(5.0, (aodc0 / 0.0027) ** (1 / 0.640))
 
             dz8w[i, j, 0] = zo[i, j, 1] - zo[i, j, 0]
             zh[0] = 0.0
