@@ -537,14 +537,13 @@ def cu_gf_driver_run(state, errmsg, errflg):
                         aod_gf.field[i, j] += (aodc0 - aod_gf.field[i, j]) * (dt / (aodreturn * 60))
                     if aod_gf.field[i, j] > aodc0:
                         aod_gf.field[i, j] = aodc0
-
             ccn_gf[i, j] = max(5.0, (aod_gf.field[i, j] / 0.0027) ** (1 / 0.640))
             ccn_m[i, j] = ccn_gf[i, j]
 
             dz8w[i, j, 0] = zo[i, j, 1] - zo[i, j, 0]
             zh[0] = 0.0
             zh_mask = True
-            for k in range(kts + 1, ktf + 1):  # Loop over vertical levels
+            for k in range(kts + 1, ktf + 1):
                 dz8w[i, j, k] = zo[i, j, k + 1] - zo[i, j, k]
                 if zh_mask:
                     zh[k] = zh[k - 1] + dz8w[i, j, k - 1]
@@ -552,8 +551,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
                         kpbli[i, j] = max(1, k)
                         zh_mask = False
 
-            # Loop over vertical levels and horizontal grid points
-            for k in range(kts, ktf + 1):  # Loop over vertical levels
+            for k in range(kts, ktf + 1):
                 p2d[i, j, k] = 0.01 * p2di.field[i, j, k]
                 po[i, j, k] = p2d[i, j, k]
                 rhoi[i, j, k] = 100.0 * p2d[i, j, k] / (287.04 * (t2di.field[i, j, k] * (1.0 + 0.608 * qv2di[i, j, k])))
@@ -567,8 +565,8 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 if qo[i, j, k] < 1.0e-16:
                     qo[i, j, k] = 1.0e-16
 
-            # Loop over horizontal grid points and vertical levels
-            for k in range(kts, kpbli[i, j] + 1):  # Loop over vertical levels up to `kpbli`
+            # Loop over vertical levels up to `kpbli`
+            for k in range(kts, kpbli[i, j] + 1):
                 tshall[i, j, k] = t.field[i, j, k]
                 qshall[i, j, k] = max(1.0e-16, qv[i, j, k])
                 tn[i, j, k] = t.field[i, j, k]
@@ -1012,9 +1010,6 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 ktop[i, j] = -1
                 cuten[i, j] = 0.0
 
-    # Loop over horizontal grid points
-    for i in range(its, itf + 1):
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
             massflx[:] = 0.0
             trcflx_in1[:] = 0.0
             clw_in1[:] = 0.0
@@ -1133,7 +1128,7 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 massflx[0] = 0.0
                 trcflx_in1[0] = 0.0
 
-                # Call `fct1d3`` subroutine
+                # Call `fct1d3`
                 fct1d3(
                     kstop, kte, dtime_max, po_cup,
                     clw_in1, massflx, trcflx_in1, clw_ten[i, j, :], g
@@ -1180,9 +1175,6 @@ def cu_gf_driver_run(state, errmsg, errflg):
                 if ktop[i, j] > 1 and pret[i, j] > 0.0:
                     dt_mf.field[i, j, ktop[i, j] - 1] = ud_mf.field[i, j, ktop[i, j]]
 
-    # Loop over horizontal grid points
-    for i in range(its, itf + 1):  # Python's 0-based indexing
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
             if pret[i, j] > 0.0:
                 cactiv.field[i, j] = 1
                 raincv.field[i, j] = 0.001 * (
