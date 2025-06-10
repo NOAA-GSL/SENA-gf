@@ -16,6 +16,25 @@ def initialize_driver(
     kpbli: IntFieldIJ32, # type: ignore
     k_mask: IntFieldK32, # type: ignore
     zh_mask: BoolFieldIJ, # type: ignore
+    p2d: FloatField, # type: ignore
+    p2di: FloatField, # type: ignore
+    t2di: FloatField, # type: ignore
+    qv2di: FloatField, # type: ignore
+    qv2di_spechum: FloatField, # type: ignore
+    qv: FloatField, # type: ignore
+    qv_spechum: FloatField, # type: ignore
+    t: FloatField, # type: ignore
+    forcet: FloatField, # type: ignore
+    forceqv: FloatField, # type: ignore
+    forceqv_spechum: FloatField, # type: ignore
+    rhoi: FloatField, # type: ignore
+    qcheck: FloatField, # type: ignore
+    tn: FloatField, # type: ignore
+    qo: FloatField, # type: ignore
+    t2d: FloatField, # type: ignore
+    q2d: FloatField, # type: ignore
+    tshall: FloatField, # type: ignore
+    qshall: FloatField, # type: ignore
     flag_init: bool,
     flag_restart: bool,
     dt: np.float64,
@@ -55,3 +74,19 @@ def initialize_driver(
                 kpbli = max(1, k_mask)
                 zh_mask = False
 
+    with computation(PARALLEL), interval(...):
+        qv2di = qv2di_spechum / (1.0 - qv2di_spechum)
+        forceqv = forceqv_spechum / (1.0 - qv2di_spechum)
+        qv = qv_spechum / (1.0 - qv_spechum)
+        p2d = 0.01 * p2di
+        po = p2d
+        rhoi = 100.0 * p2d / (287.04 * (t2di * (1.0 + 0.608 * qv2di)))
+        qcheck = qv
+        tn = t
+        qo = max(1.0e-16, qv)
+        t2d = t2di - forcet * dt
+        q2d = max(1.0e-16, qv2di - forceqv * dt)
+        tshall = t2d
+        qshall = q2d
+        if qo < 1.0e-16:
+            qo = 1.0e-16

@@ -35,6 +35,66 @@ class GFDriver:
             units="index",
             dtype=state.ikind
         )
+        self.p2d: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
+        self.t2d: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
+        self.q2d: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
+        self.rhoi: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
+        self.qcheck: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
+        self.tn: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
+        self.qo: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
+        self.qv: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
+        self.qv2di: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
+        self.tshall: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
+        self.qshall: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
+        self.forceqv: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
 
         # Initialize a k-mask for selecting "this vertical level"
         self.k_mask: Quantity = state.quantity_factory.zeros(
@@ -185,8 +245,8 @@ class GFDriver:
         flux_tun = np.zeros((im, jm))  # Flux tuning array
 
         ht = np.zeros((im, jm))  # Height array
-        dz8w = np.zeros((im, jm, km))  # Vertical layer thickness
-        zh = np.zeros(km)  # Vertical height levels
+        # dz8w = np.zeros((im, jm, km))  # Vertical layer thickness
+        # zh = np.zeros(km)  # Vertical height levels
 
         forcing = np.zeros((im, jm, 10))  # Forcing arrays
         forcing2 = np.zeros((im, jm, 10))
@@ -255,17 +315,17 @@ class GFDriver:
 
         tau_ecmwf = np.zeros((im, jm))  # ECMWF tau array
 
-        qcheck = np.zeros((im, jm, km))  # Specific humidity check array
+        # qcheck = np.zeros((im, jm, km))  # Specific humidity check array
 
         massflx = np.zeros(km)  # Mass flux array
         trcflx_in1 = np.zeros(km)  # Tracer flux array
         clw_in1 = np.zeros(km)  # Cloud water input array
 
         # zo = np.zeros((im, jm, km))  # Height at model levels
-        t2d = np.zeros((im, jm, km))  # Temperature at model levels
-        q2d = np.zeros((im, jm, km))  # Specific humidity at model levels
-        tn = np.zeros((im, jm, km))  # Temperature tendency
-        qo = np.zeros((im, jm, km))  # Specific humidity tendency
+        # t2d = np.zeros((im, jm, km))  # Temperature at model levels
+        # q2d = np.zeros((im, jm, km))  # Specific humidity at model levels
+        # tn = np.zeros((im, jm, km))  # Temperature tendency
+        # qo = np.zeros((im, jm, km))  # Specific humidity tendency
 
         outts = np.zeros((im, jm, km))  # Temperature tendencies (shallow convection)
         outqs = np.zeros((im, jm, km))  # Specific humidity tendencies (shallow convection)
@@ -315,11 +375,11 @@ class GFDriver:
         frhm = np.zeros((im, jm))  # Moisture flux (middle convection)
         frhd = np.zeros((im, jm))  # Moisture flux (deep convection)
 
-        p2d = np.zeros((im, jm, km))  # Pressure at model levels
-        qcheck = np.zeros((im, jm, km))  # Specific humidity check
+        # p2d = np.zeros((im, jm, km))  # Pressure at model levels
+        # qcheck = np.zeros((im, jm, km))  # Specific humidity check
 
-        tshall = np.zeros((im, jm, km))  # Shallow convection temperature
-        qshall = np.zeros((im, jm, km))  # Shallow convection specific humidity
+        # tshall = np.zeros((im, jm, km))  # Shallow convection temperature
+        # qshall = np.zeros((im, jm, km))  # Shallow convection specific humidity
 
         hfx = np.zeros((im, jm))  # Surface heat flux
         qfx = np.zeros((im, jm))  # Surface moisture flux
@@ -340,8 +400,8 @@ class GFDriver:
 
         xmbs2 = np.zeros((im, jm))  # Additional mass flux array for shallow convection
 
-        po = np.zeros((im, jm, km))  # Pressure at model levels
-        rhoi = np.zeros((im, jm, km))  # Air density at model levels
+        # po = np.zeros((im, jm, km))  # Pressure at model levels
+        # rhoi = np.zeros((im, jm, km))  # Air density at model levels
 
         forcing2 = np.zeros((im, jm, 10))  # Forcing array for convection calculations
 
@@ -406,9 +466,9 @@ class GFDriver:
                 cliw_save[:, :, :] = cliw.field[:, :, :]
 
         # Scale specific humidity to dry mixing ratio
-        qv2di = qv2di_spechum.field[:, :, :] / (1.0 - qv2di_spechum.field[:, :, :])
-        forceqv = forceqv_spechum.field[:, :, :] / (1.0 - qv2di_spechum.field[:, :, :])
-        qv = qv_spechum.field[:, :, :] / (1.0 - qv_spechum.field[:, :, :])
+        # qv2di = qv2di_spechum.field[:, :, :] / (1.0 - qv2di_spechum.field[:, :, :])
+        # forceqv = forceqv_spechum.field[:, :, :] / (1.0 - qv2di_spechum.field[:, :, :])
+        # qv = qv_spechum.field[:, :, :] / (1.0 - qv_spechum.field[:, :, :])
 
         # Initialize random perturbations based on spp_cu_deep
         if spp_cu_deep == 0:
@@ -590,6 +650,25 @@ class GFDriver:
             kpbli=self.kpbli,
             k_mask=self.k_mask,
             zh_mask=self.zh_mask,
+            p2d=self.p2d,
+            p2di=p2di,
+            t2di=t2di,
+            qv2di=self.qv2di,
+            qv2di_spechum=qv2di_spechum,
+            qv=self.qv,
+            qv_spechum=qv_spechum,
+            t=t,
+            forcet=forcet,
+            forceqv=self.forceqv,
+            forceqv_spechum=forceqv_spechum,
+            rhoi=self.rhoi,
+            qcheck=self.qcheck,
+            tn=self.tn,
+            qo=self.qo,
+            t2d=self.t2d,
+            q2d=self.q2d,
+            tshall=self.tshall,
+            qshall=self.qshall,
             flag_init=flag_init,
             flag_restart=flag_restart,
             dt=dt,
@@ -601,38 +680,24 @@ class GFDriver:
         for i in range(its, ite + 1):  # Adjusted for Python's zero-based indexing
             for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
 
-                for k in range(kts, ktf + 1):
-                    p2d[i, j, k] = 0.01 * p2di.field[i, j, k] 
-                    po[i, j, k] = p2d[i, j, k] # temporary
-                    rhoi[i, j, k] = 100.0 * p2d[i, j, k] / (287.04 * (t2di.field[i, j, k] * (1.0 + 0.608 * qv2di[i, j, k])))
-                    qcheck[i, j, k] = qv[i, j, k]
-                    tn[i, j, k] = t.field[i, j, k]
-                    qo[i, j, k] = max(1.0e-16, qv[i, j, k])
-                    t2d[i, j, k] = t2di.field[i, j, k] - forcet.field[i, j, k] * dt
-                    q2d[i, j, k] = max(1.0e-16, qv2di[i, j, k] - forceqv[i, j, k] * dt)
-                    tshall[i, j, k] = t2d[i, j, k]
-                    qshall[i, j, k] = q2d[i, j, k]
-                    if qo[i, j, k] < 1.0e-16:
-                        qo[i, j, k] = 1.0e-16
-
                 # Loop over vertical levels up to `kpbli`
                 for k in range(kts, self.kpbli.field[i, j] + 1):
-                    tshall[i, j, k] = t.field[i, j, k]
-                    qshall[i, j, k] = max(1.0e-16, qv[i, j, k])
-                    tn[i, j, k] = t.field[i, j, k]
-                    qo[i, j, k] = max(1.0e-16, qv[i, j, k])
+                    self.tshall.field[i, j, k] = t.field[i, j, k]
+                    self.qshall.field[i, j, k] = max(1.0e-16, self.qv.field[i, j, k])
+                    self.tn.field[i, j, k] = t.field[i, j, k]
+                    self.qo.field[i, j, k] = max(1.0e-16, self.qv.field[i, j, k])
                     dhdt[i, j, k] = cp * (forcet.field[i, j, k] + (t.field[i, j, k] - t2di.field[i, j, k]) / dt) + \
-                                xlv * (forceqv[i, j, k] + (qv[i, j, k] - qv2di[i, j, k]) / dt)
+                                xlv * (self.forceqv.field[i, j, k] + (self.qv.field[i, j, k] - self.qv2di.field[i, j, k]) / dt)
 
                 # Convert `hfx2` and `qfx2` to W/m²
-                hfx[i, j] = hfx2.field[i, j] * cp * rhoi[i, j, 0]
-                qfx[i, j] = qfx2.field[i, j] * xlv * rhoi[i, j, 0]
+                hfx[i, j] = hfx2.field[i, j] * cp * self.rhoi.field[i, j, 0]
+                qfx[i, j] = qfx2.field[i, j] * xlv * self.rhoi.field[i, j, 0]
                 dx[i, j] = np.sqrt(garea.field[i, j])
 
                 # Compute umean, vmean, and pmean: This entire loop can be deleted?
                 for k in range(kts + 1, ktf):
-                    if (p2d[i, j, 1] - p2d[i, j, k]) > 150 and p2d[i, j, k] > 300:
-                        dp = -0.5 * (p2d[i, j, k + 1] - p2d[i, j, k - 1])
+                    if (self.p2d.field[i, j, 1] - self.p2d.field[i, j, k]) > 150 and self.p2d.field[i, j, k] > 300:
+                        dp = -0.5 * (self.p2d.field[i, j, k + 1] - self.p2d.field[i, j, k - 1])
                         umean[i, j] += us.field[i, j, k] * dp # can be deleted?
                         vmean[i, j] += vs.field[i, j, k] * dp # can be deleted?
                         pmean[i, j] += dp # can be deleted?
@@ -641,7 +706,7 @@ class GFDriver:
                 psum = 0.0
                 for k in range(kts, ktf - 2):  # Loop over vertical levels
                     if clcw.field[i, j, k] > -999.0 and clcw.field[i, j, k + 1] > -999.0:
-                        dp = p2d[i, j, k] - p2d[i, j, k + 1]
+                        dp = self.p2d.field[i, j, k] - self.p2d.field[i, j, k + 1]
                         psum += dp
                         clwtot = cliw.field[i, j, k] + clcw.field[i, j, k]
                         if clwtot < 1.0e-32:
@@ -688,16 +753,16 @@ class GFDriver:
                 us.field,
                 vs.field,
                 self.zo.field,
-                t2d,
-                q2d,
+                self.t2d.field,
+                self.q2d.field,
                 ter11,
-                tshall,
-                qshall,
-                p2d,
+                self.tshall.field,
+                self.qshall.field,
+                self.p2d.field,
                 psur,
                 dhdt,
                 self.kpbli.field,
-                rhoi,
+                self.rhoi.field,
                 hfx,
                 qfx,
                 xlandi,
@@ -722,7 +787,7 @@ class GFDriver:
                 itf, jtf, ktf, its, ite, jts, jte, kts, kte, ipr,
                 tropics,
             )
-            
+
             # Output variables match
             # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
             # print(f"{ichoice_s:>4}{ipr:>4}")
@@ -756,7 +821,7 @@ class GFDriver:
 
             # Call `neg_check` for GF shallow convection
             neg_check(
-                "shallow", ipn, dt, qcheck, outqs, outts, outus, outvs, outqcs, prets,
+                "shallow", ipn, dt, self.qcheck.field, outqs, outts, outus, outvs, outqcs, prets,
                 its, ite, jts, jte, kts, kte, itf, jtf, ktf, ktops
             )
 
@@ -809,16 +874,16 @@ class GFDriver:
                 xlandi,
                 self.zo.field,
                 forcing,
-                t2d,
-                q2d,
+                self.t2d.field,
+                self.q2d.field,
                 ter11,
-                tshall,
-                qshall,
-                p2d,
+                self.tshall.field,
+                self.qshall.field,
+                self.p2d.field,
                 psur,
                 us.field,
                 vs.field,
-                rhoi,
+                self.rhoi.field,
                 hfx,
                 qfx,
                 dx,
@@ -892,11 +957,11 @@ class GFDriver:
             for i in range(its, itf + 1):
                 for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                     for k in range(kts, ktf + 1):
-                        qcheck[i, j, k] = qv[i, j, k] + outqs[i, j, k] * dt
+                        self.qcheck.field[i, j, k] = self.qv.field[i, j, k] + outqs[i, j, k] * dt
 
             # Call `neg_check` for middle GF convection
             neg_check(
-                "mid", ipn, dt, qcheck, outqm, outtm, outum, outvm,
+                "mid", ipn, dt, self.qcheck.field, outqm, outtm, outum, outvm,
                 outqcm, pretm, its, ite, jts, jte, kts, kte, itf, jtf, ktf, ktopm
             )
 
@@ -942,16 +1007,16 @@ class GFDriver:
                 xlandi,
                 self.zo.field,
                 forcing2,
-                t2d,
-                q2d,
+                self.t2d.field,
+                self.q2d.field,
                 ter11,
-                tn,
-                qo,
-                p2d,
+                self.tn.field,
+                self.qo.field,
+                self.p2d.field,
                 psur,
                 us.field,
                 vs.field,
-                rhoi,
+                self.rhoi.field,
                 hfx,
                 qfx,
                 dx,
@@ -1028,11 +1093,11 @@ class GFDriver:
             for i in range(its, itf + 1):
                 for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                     for k in range(kts, ktf + 1):
-                        qcheck[i, j, k] = qv[i, j, k] + (outqs[i, j, k] + outqm[i, j, k]) * dt
+                        self.qcheck.field[i, j, k] = self.qv.field[i, j, k] + (outqs[i, j, k] + outqm[i, j, k]) * dt
 
             # Call `neg_check` for deep GF convection
             neg_check(
-                "deep", ipn, dt, qcheck, outq, outt, outu, outv,
+                "deep", ipn, dt, self.qcheck.field, outq, outt, outu, outv,
                 outqc, pret, its, ite, jts, jte, kts, kte, itf, jtf, ktf, ktop
             )
 
@@ -1110,9 +1175,9 @@ class GFDriver:
                             outt[i, j, k] * cuten[i, j]
                         )
 
-                        qv[i, j, k] = max(
+                        self.qv.field[i, j, k] = max(
                             1.0e-16,
-                            qv[i, j, k] + dt * (
+                            self.qv.field[i, j, k] + dt * (
                                 cutens[i, j] * outqs[i, j, k] +
                                 cutenm[i, j] * outqm[i, j, k] +
                                 outq[i, j, k] * cuten[i, j]
@@ -1153,9 +1218,9 @@ class GFDriver:
                         gdc[i, j, k, 8] = gdc[i, j, k, 1] + gdc[i, j, k, 2] + gdc[i, j, k, 3]
 
                         # Treat subsidence effects on cloud ice/water
-                        dp = 100.0 * (p2d[i, j, k] - p2d[i, j, k + 1])
+                        dp = 100.0 * (self.p2d.field[i, j, k] - self.p2d.field[i, j, k + 1])
                         dtime_max = min(dtime_max, 0.5 * dp)
-                        po_cup[k] = 0.5 * (p2d[i, j, k] + p2d[i, j, k + 1])
+                        po_cup[k] = 0.5 * (self.p2d.field[i, j, k] + self.p2d.field[i, j, k + 1])
 
                         if clcw.field[i, j, k] > -999.0 and clcw.field[i, j, k + 1] > -999.0:
                             clwtot = cliw.field[i, j, k] + clcw.field[i, j, k]
@@ -1259,8 +1324,8 @@ class GFDriver:
                     self.ccn_gf.field[i, j] = (aod_gf.field[i, j] / 0.0027) ** (1 / 0.64)
 
         # Scale dry mixing ratios for water vapor and cloud water to specific humidity / moist mixing ratios
-        qv_spechum.field[:, :, :] = qv / (1.0 + qv)
-        cnvw_moist.field[:, :, :] = cnvw / (1.0 + qv)
+        qv_spechum.field[:, :, :] = self.qv.field / (1.0 + self.qv.field)
+        cnvw_moist.field[:, :, :] = cnvw / (1.0 + self.qv.field)
 
         # Diagnostic tendency updates
         if ldiag3d:
