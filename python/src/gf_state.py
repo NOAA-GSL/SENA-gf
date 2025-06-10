@@ -957,7 +957,7 @@ class GFState:
         self.garea.field[:,:] = np.reshape(np.transpose(_dataset.variables["garea"][:]), (self.im, self.jm))
 
         # Get dt
-        self.dt = _dataset.variables["dt"][:]
+        self.dt = float(_dataset.variables["dt"][:])
 
         # Get flag_init
         if _dataset.variables["flag_init"][:] == 1:
@@ -990,7 +990,7 @@ class GFState:
             self.cactiv_m.field[:,:] = np.reshape(np.transpose(_dataset.variables["cactiv_m"][:]), (self.im, self.jm))
 
         # Get g
-        self.g = _dataset.variables["g"][:]
+        self.g = float(_dataset.variables["g"][:])
 
         # Get cp
         self.cp = _dataset.variables["cp"][:]

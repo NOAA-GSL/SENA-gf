@@ -1,5 +1,5 @@
 from gf_state import GFState
-from cu_gf_driver import cu_gf_driver_run
+from cu_gf_driver import GFDriver
 
 input_file = "input_state_0400.nc.baseline"
 output_file = "test_output.nc"
@@ -16,7 +16,8 @@ for n in range(1,577):
     state.read_state(input_file)
 
     # Call GF driver
-    cu_gf_driver_run(state, errmsg, errflg)
+    driver = GFDriver(state)
+    driver.cu_gf_driver_run(state, errmsg, errflg)
 
     output_file = f"output_state_{n:04d}.nc"
     state.write_state(output_file)
