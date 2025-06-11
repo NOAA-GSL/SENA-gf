@@ -115,6 +115,21 @@ class GFDriver:
             units="n/a",
             dtype=state.rkind
         )
+        self.forcing: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+        self.forcing2: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+        self.psum: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
         self.ierr: Quantity = state.quantity_factory.zeros(
             dims=[X_DIM, Y_DIM],
             units="n/a",
@@ -271,9 +286,6 @@ class GFDriver:
 
         ht = np.zeros((im, jm))  # Height array
 
-        forcing = np.zeros((im, jm, 10))  # Forcing arrays
-        forcing2 = np.zeros((im, jm, 10))
-
         mconv = np.zeros((im, jm))  # Moisture convergence
         omeg = np.zeros((im, jm, km))  # Vertical velocity
 
@@ -324,8 +336,6 @@ class GFDriver:
         zdm = np.zeros((im, jm, km))  # Middle downdraft mass flux
 
         psur = np.zeros((im, jm))  # Surface pressure
-
-        forcing2 = np.zeros((im, jm, 10))  # Forcing array
 
         tau_ecmwf = np.zeros((im, jm))  # ECMWF tau array
 
@@ -396,8 +406,6 @@ class GFDriver:
 
         xmbs2 = np.zeros((im, jm))  # Additional mass flux array for shallow convection
 
-        forcing2 = np.zeros((im, jm, 10))  # Forcing array for convection calculations
-
         po_cup = np.zeros(km)  # Pressure at cloud levels
 
         massflx = np.zeros(km)  # Mass flux array
@@ -450,11 +458,6 @@ class GFDriver:
                 # Copy data into clcw_save and cliw_save
                 clcw_save[:, :,:] = clcw.field[:, :, :]
                 cliw_save[:, :, :] = cliw.field[:, :, :]
-
-        # Scale specific humidity to dry mixing ratio
-        # qv2di = qv2di_spechum.field[:, :, :] / (1.0 - qv2di_spechum.field[:, :, :])
-        # forceqv = forceqv_spechum.field[:, :, :] / (1.0 - qv2di_spechum.field[:, :, :])
-        # qv = qv_spechum.field[:, :, :] / (1.0 - qv_spechum.field[:, :, :])
 
         # Initialize random perturbations based on spp_cu_deep
         if spp_cu_deep == 0:
@@ -510,8 +513,8 @@ class GFDriver:
         dd_mf.field[:, :, :] = 0.0
         dt_mf.field[:, :, :] = 0.0
         tau_ecmwf[:] = 0.0
-        forcing[:, :, :] = 0.0
-        forcing2[:, :, :] = 0.0
+        # forcing[:, :, :] = 0.0
+        # forcing2[:, :, :] = 0.0
 
         hbot.field[:, :] = kte
         htop.field[:, :] = kts
@@ -658,6 +661,11 @@ class GFDriver:
             garea=garea,
             dx=self.dx,
             maxMF=maxMF,
+            clcw=clcw,
+            cliw=cliw,
+            forcing=self.forcing.data[:,:,6],
+            forcing2=self.forcing2.data[:,:,6],
+            psum=self.psum,
             ierr=self.ierr,
             flag_init=flag_init,
             flag_restart=flag_restart,
@@ -669,24 +677,6 @@ class GFDriver:
             cp=cp,
             xlv=xlv,
         )
-
-        for i in range(its, ite + 1):  # Adjusted for Python's zero-based indexing
-            for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
-
-                # Compute `psum` and update `forcing` arrays
-                psum = 0.0
-                for k in range(kts, ktf - 2):  # Loop over vertical levels
-                    if clcw.field[i, j, k] > -999.0 and clcw.field[i, j, k + 1] > -999.0:
-                        dp = self.p2d.field[i, j, k] - self.p2d.field[i, j, k + 1]
-                        psum += dp
-                        clwtot = cliw.field[i, j, k] + clcw.field[i, j, k]
-                        if clwtot < 1.0e-32:
-                            clwtot = 0.0
-                        forcing[i, j, 6] += clwtot * dp
-                if psum > 0.0:
-                    forcing[i, j, 6] /= psum
-                forcing2[i, j, 6] = forcing[i, j, 6]
-
 
         # Check if `dx` at `its` is less than 6500
         if self.dx.field[its, jts] < 6500.0:
@@ -839,7 +829,7 @@ class GFDriver:
                 self.dhdt.field,
                 xlandi,
                 self.zo.field,
-                forcing,
+                self.forcing.field,
                 self.t2d.field,
                 self.q2d.field,
                 ter11,
@@ -972,7 +962,7 @@ class GFDriver:
                 self.dhdt.field,
                 xlandi,
                 self.zo.field,
-                forcing2,
+                self.forcing2.field,
                 self.t2d.field,
                 self.q2d.field,
                 ter11,
@@ -1114,7 +1104,7 @@ class GFDriver:
                         hbot.field[i, j] = max(kbconm[i, j], kbcon[i, j])
 
                     dtime_max = dt
-                    forcing2[i, j, 2] = 0.0
+                    self.forcing2.field[i, j, 2] = 0.0
 
                     # Loop over vertical levels up to `kstop`
                     for k in range(kts, kstop + 1):
@@ -1203,7 +1193,7 @@ class GFDriver:
                                 (xmbs[i, j] * zus[i, j, k])
                             )
                             trcflx_in1[k] = massflx[k] * 0.5 * (clwtot + clwtot1)
-                            forcing2[i, j, 2] += clwtot
+                            self.forcing2.field[i, j, 2] += clwtot
 
                     # Reset mass flux and tracer flux
                     massflx[0] = 0.0
@@ -1232,14 +1222,14 @@ class GFDriver:
                             cliw.field[i, j, k] = max(0.0, cliw.field[i, j, k] + tem)
 
                     # Update `gdc` array with forcing and other parameters
-                    gdc[i, j, 0, 9] = forcing[i, j, 0]
-                    gdc[i, j, 1, 9] = forcing[i, j, 1]
-                    gdc[i, j, 2, 9] = forcing[i, j, 2]
-                    gdc[i, j, 3, 9] = forcing[i, j, 3]
-                    gdc[i, j, 4, 9] = forcing[i, j, 4]
-                    gdc[i, j, 5, 9] = forcing[i, j, 5]
-                    gdc[i, j, 6, 9] = forcing[i, j, 6]
-                    gdc[i, j, 7, 9] = forcing[i, j, 7]
+                    gdc[i, j, 0, 9] = self.forcing.field[i, j, 0]
+                    gdc[i, j, 1, 9] = self.forcing.field[i, j, 1]
+                    gdc[i, j, 2, 9] = self.forcing.field[i, j, 2]
+                    gdc[i, j, 3, 9] = self.forcing.field[i, j, 3]
+                    gdc[i, j, 4, 9] = self.forcing.field[i, j, 4]
+                    gdc[i, j, 5, 9] = self.forcing.field[i, j, 5]
+                    gdc[i, j, 6, 9] = self.forcing.field[i, j, 6]
+                    gdc[i, j, 7, 9] = self.forcing.field[i, j, 7]
                     gdc[i, j, 9, 9] = xmb[i, j]
                     gdc[i, j, 10, 9] = xmbm[i, j]
                     gdc[i, j, 11, 9] = xmbs[i, j]
@@ -1249,8 +1239,8 @@ class GFDriver:
 
                     # Calculate maximum upward mass flux
                     maxupmf.field[i, j] = 0.0
-                    if forcing2[i, j, 5] > 0.0:
-                        maxupmf.field[i, j] = max(xmb[i, j] * zu[i, j, kts:ktf + 1] / forcing2[i, j, 5])
+                    if self.forcing2.field[i, j, 5] > 0.0:
+                        maxupmf.field[i, j] = max(xmb[i, j] * zu[i, j, kts:ktf + 1] / self.forcing2.field[i, j, 5])
 
                     # Update `dt_mf` for deep convection
                     if ktop[i, j] > 1 and pret[i, j] > 0.0:

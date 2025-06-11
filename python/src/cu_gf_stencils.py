@@ -43,6 +43,11 @@ def initialize_driver(
     garea: FloatFieldIJ, # type: ignore
     dx: FloatFieldIJ, # type: ignore
     maxMF: FloatFieldIJ, # type: ignore
+    clcw: FloatField, # type: ignore
+    cliw: FloatField, # type: ignore
+    forcing: FloatFieldIJ, # type: ignore
+    forcing2: FloatFieldIJ, # type: ignore
+    psum: FloatFieldIJ, # type: ignore
     ierr: IntFieldIJ32, # type: ignore
     flag_init: bool,
     flag_restart: bool,
@@ -112,3 +117,15 @@ def initialize_driver(
         dx = garea ** 0.5
         if dx < 6500.0 and do_mynnedmf and maxMF > 0.0:
             ierr = 555
+
+    with computation(FORWARD), interval(0, -2):
+        if clcw[0, 0, 0] > -999.0 and clcw[0, 0, 1] > -999.0:
+            dp = p2d[0, 0, 0] - p2d[0, 0, 1]
+            psum += dp
+            clwtot = cliw + clcw
+            if clwtot < 1.0e-32:
+                clwtot = 0.0
+            forcing += clwtot * dp
+        if psum > 0.0:
+            forcing /= psum
+        forcing2 = forcing
