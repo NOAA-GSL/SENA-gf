@@ -942,7 +942,7 @@ class GFState:
         self.nchem = len(_dataset.dimensions['nchem'])
         self.fscav_dim = len(_dataset.dimensions['fscav_dim'])
 
-        # Create the stencil factory
+        # Create the stencil and quantity factories
         self.stencil_factory, self.quantity_factory = get_factories_single_tile(self.im, self.jm, self.km, 0, backend=self.backend)
 
         # Get ntracer
@@ -965,7 +965,7 @@ class GFState:
         else:
             self.flag_init = False
 
-        # # Get flag_restart
+        # Get flag_restart
         if _dataset.variables["flag_restart"][:] == 1:
             self.flag_restart = True
         else:

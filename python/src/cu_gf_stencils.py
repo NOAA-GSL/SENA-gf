@@ -1,7 +1,5 @@
 from ndsl.dsl.gt4py import PARALLEL, computation, interval, FORWARD
 from ndsl.dsl.typing import FloatField, IntFieldIJ32, FloatFieldIJ, IntFieldK32, BoolFieldIJ
-from gt4py.cartesian import gtscript
-import ndsl
 import numpy as np
 
 def initialize_driver(
@@ -118,6 +116,7 @@ def initialize_driver(
         if dx < 6500.0 and do_mynnedmf and maxMF > 0.0:
             ierr = 555
 
+    # TODO: use data_dimensions instead of passing slice for "forcing" and "forcing2"
     with computation(FORWARD), interval(0, -2):
         if clcw[0, 0, 0] > -999.0 and clcw[0, 0, 1] > -999.0:
             dp = p2d[0, 0, 0] - p2d[0, 0, 1]

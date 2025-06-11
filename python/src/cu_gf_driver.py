@@ -125,11 +125,6 @@ class GFDriver:
             units="n/a",
             dtype=state.rkind,
         )
-        self.psum: Quantity = state.quantity_factory.zeros(
-            dims=[X_DIM, Y_DIM],
-            units="n/a",
-            dtype=state.rkind,
-        )
         self.ierr: Quantity = state.quantity_factory.zeros(
             dims=[X_DIM, Y_DIM],
             units="n/a",
@@ -153,6 +148,13 @@ class GFDriver:
         )
         self.zh_mask.field[:, :] = True
 
+        # Initialize psum 2D temporary for use in initialization stencil
+        self.psum: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+
         # Get the stencil factory grid indexing
         grid_indexing = state.stencil_factory.grid_indexing
 
@@ -164,6 +166,7 @@ class GFDriver:
         )
 
 
+    # Driver routine for the GF model, incrementally being ported to GF4Py stencils
     def cu_gf_driver_run(self, state, errmsg, errflg):
         ntracer = state.ntracer  # Number of tracers
         garea = state.garea  # Grid area
@@ -188,10 +191,10 @@ class GFDriver:
         cld1d = state.cld1d  # Cloud fraction
         us = state.us  # Zonal wind
         vs = state.vs  # Meridional wind
-        # t2di = state.t2di  # Temperature at model levels
+        # t2di and t must share the same memory
         t2di = state.t  # Temperature at model levels
         w = state.w  # Vertical velocity
-        # qv2di_spechum = state.qv2di_spechum  # Specific humidity at model levels
+        # qv2di_spechum and qv_spechum must share the same memory
         qv2di_spechum = state.qv_spechum  # Specific humidity at model levels
         p2di = state.p2di  # Pressure at model levels
         psuri = state.psuri  # Surface pressure
@@ -296,7 +299,6 @@ class GFDriver:
         gdc = np.zeros((im, jm, km, 10))  # Diagnostic tendencies
         gdc2 = np.zeros((im, jm, km, 10))
 
-        # ierr = np.zeros((im, jm), dtype=int)  # Error flags for deep convection
         ierrm = np.zeros((im, jm), dtype=int)  # Error flags
         ierrs = np.zeros((im, jm), dtype=int)
         ierrc = np.full((im, jm), " ", dtype="<U50")  # Error messages (strings)
@@ -305,12 +307,12 @@ class GFDriver:
         cutenm = np.zeros((im, jm))
         cutens = np.zeros((im, jm))
 
-        kbcon = np.zeros((im, jm), dtype=int)  # Convective base indices (deep convection)
-        kbcons = np.zeros((im, jm), dtype=int)  # Convective base indices
-        kbconm = np.zeros((im, jm), dtype=int)
-        ktop = np.zeros((im, jm), dtype=int)  # Convective cloud top indices (deep convection))
-        ktops = np.zeros((im, jm), dtype=int)
-        ktopm = np.zeros((im, jm), dtype=int)
+        kbcon = np.full((im, jm), -1, dtype=int)  # Convective base indices (deep convection)
+        kbcons = np.full((im, jm), -1, dtype=int)  # Convective base indices
+        kbconm = np.full((im, jm), -1, dtype=int)
+        ktop = np.full((im, jm), -1, dtype=int)  # Convective cloud top indices (deep convection))
+        ktops = np.full((im, jm), -1, dtype=int)
+        ktopm = np.full((im, jm), -1, dtype=int)
 
         xmb = np.zeros((im, jm))  # Mass flux arrays
         xmbm = np.zeros((im, jm))
@@ -337,8 +339,6 @@ class GFDriver:
 
         psur = np.zeros((im, jm))  # Surface pressure
 
-        tau_ecmwf = np.zeros((im, jm))  # ECMWF tau array
-
         massflx = np.zeros(km)  # Mass flux array
         trcflx_in1 = np.zeros(km)  # Tracer flux array
         clw_in1 = np.zeros(km)  # Cloud water input array
@@ -361,12 +361,12 @@ class GFDriver:
         outu = np.zeros((im, jm, km))  # U-wind tendencies (deep convection)
         outv = np.zeros((im, jm, km))  # V-wind tendencies (deep convection)
 
-        k22 = np.zeros((im, jm), dtype=int)  # Updraft originating level (deep convection)
-        k22s = np.zeros((im, jm), dtype=int)  # Updraft originating level (shallow convection)
-        k22m = np.zeros((im, jm), dtype=int)  # Updraft originating level (middle convection)
+        k22 = np.full((im, jm), -1, dtype=int)  # Updraft originating level (deep convection)
+        k22s = np.full((im, jm), -1, dtype=int)  # Updraft originating level (shallow convection)
+        k22m = np.full((im, jm), -1, dtype=int)  # Updraft originating level (middle convection)
 
-        jmin = np.zeros((im, jm), dtype=int)  # Minimum convection level
-        jminm = np.zeros((im, jm), dtype=int)  # Minimum convection level (middle convection)
+        jmin = np.full((im, jm), -1, dtype=int)  # Minimum convection level
+        jminm = np.full((im, jm), -1, dtype=int)  # Minimum convection level (middle convection)
 
         pret = np.zeros((im, jm))  # Precipitation rate (deep convection)
         prets = np.zeros((im, jm))  # Precipitation rate (shallow convection)
@@ -379,13 +379,6 @@ class GFDriver:
         cnvwt = np.zeros((im, jm, km))  # Convective tendencies (deep convection)
         cnvwts = np.zeros((im, jm, km))  # Convective tendencies (shallow convection)
         cnvwtm = np.zeros((im, jm, km))  # Convective tendencies (middle convection)
-
-        hco = np.zeros((im, jm, km))  # Convective heating (deep convection)
-        hcom = np.zeros((im, jm, km))  # Convective heating (middle convection)
-        hcdo = np.zeros((im, jm, km))  # Convective cooling (deep convection)
-        hcdom = np.zeros((im, jm, km))  # Convective cooling (middle convection)
-
-        subm = np.zeros((im, jm, km))  # Subsidence tendencies
 
         frhm = np.zeros((im, jm))  # Moisture flux (middle convection)
         frhd = np.zeros((im, jm))  # Moisture flux (deep convection)
@@ -403,8 +396,6 @@ class GFDriver:
         ierrcm = np.full((im, jm), " ", dtype="<U50")  # Error messages for middle convection
 
         wetdpc_mid = np.zeros((im, jm))  # Wet deposition for middle convection
-
-        xmbs2 = np.zeros((im, jm))  # Additional mass flux array for shallow convection
 
         po_cup = np.zeros(km)  # Pressure at cloud levels
 
@@ -472,7 +463,7 @@ class GFDriver:
                     rand_vmas[i, j] = spp_wts_cu_deep_tmp
                     rand_clos[i, j, :] = spp_wts_cu_deep_tmp
 
-    # Initialize indices and constants
+        # Initialize indices and constants
         its = 0
         ite = im - 1
         itf = ite
@@ -483,17 +474,10 @@ class GFDriver:
         kte = km - 1
         ktf = kte - 1
 
-        # Initialize arrays and constants
-        tropics[:] = 0
-
         # Set tuning constants for radiation coupling
         tun_rad_shall[:] = 0.01
         tun_rad_mid[:] = 0.3  # Previously 0.02
         tun_rad_deep[:] = 0.3  # Previously 0.065
-        edt[:] = 0.0
-        edtm[:] = 0.0
-        edtd[:] = 0.0
-        zdd[:, :] = 0.0
         flux_tun[:] = 5.0
 
         # Determine shallow convection flag
@@ -512,100 +496,11 @@ class GFDriver:
         ud_mf.field[:, :, :] = 0.0
         dd_mf.field[:, :, :] = 0.0
         dt_mf.field[:, :, :] = 0.0
-        tau_ecmwf[:] = 0.0
-        # forcing[:, :, :] = 0.0
-        # forcing2[:, :, :] = 0.0
 
         hbot.field[:, :] = kte
         htop.field[:, :] = kts
         raincv.field[:, :] = 0.0
-        mconv[:, :] = 0.0
-        omeg[:, :, :] = 0.0
-        zu[:, :, :] = 0.0
-        zum[:, :, :] = 0.0
-        zus[:, :, :] = 0.0
-        zd[:, :, :] = 0.0
-        zdm[:, :, :] = 0.0
-        cnvw[:, :, :] = 0.0
         cnvc.field[:, :, :] = 0.0
-        gdc[:, :, :, :] = 0.0
-        gdc2[:, :, :, 0] = 0.0
-
-        # Initialize error arrays
-        # ierr[:, :] = 0
-        ierrm[:, :] = 0
-        ierrs[:, :] = 0
-
-        # Initialize tendency arrays
-        cuten[:, :] = 0.0
-        cutenm[:, :] = 0.0
-        cutens[:, :] = 0.0
-        ierrc[:, :] = " "
-
-        # Initialize arrays
-        kbcon[:, :] = -1
-        kbcons[:, :] = -1
-        kbconm[:, :] = -1
-
-        ktop[:, :] = -1
-        ktops[:, :] = -1
-        ktopm[:, :] = -1
-
-        xmb[:, :] = 0.0
-        xmb_dumm[:, :] = 0.0
-        xmbm[:, :] = 0.0
-        xmbs[:, :] = 0.0
-        xmbs2[:, :] = 0.0
-
-        k22s[:, :] = -1
-        k22m[:, :] = -1
-        k22[:, :] = -1
-
-        jmin[:, :] = -1
-        jminm[:, :] = -1
-
-        pret[:, :] = 0.0
-        prets[:, :] = 0.0
-        pretm[:, :] = 0.0
-
-        cupclw[:, :, :] = 0.0
-        cupclwm[:, :, :] = 0.0
-        cupclws[:, :, :] = 0.0
-
-        cnvwt[:, :, :] = 0.0
-        cnvwts[:, :, :] = 0.0
-        cnvwtm[:, : ,:] = 0.0
-
-        hco[:, :, :] = 0.0
-        hcom[:, :, :] = 0.0
-        hcdo[:, :, :] = 0.0
-        hcdom[:, :, :] = 0.0
-
-        outt[:, :, :] = 0.0
-        outts[:, :, :] = 0.0
-        outtm[:, :, :] = 0.0
-
-        outu[:, :, :] = 0.0
-        outus[:, :, :] = 0.0
-        outum[:, :, :] = 0.0
-
-        outv[:, :, :] = 0.0
-        outvs[:, :, :] = 0.0
-        outvm[:, :, :] = 0.0
-
-        outq[:, :, :] = 0.0
-        outqs[:, :, :] = 0.0
-        outqm[:, :, :] = 0.0
-
-        outqc[:, :, :] = 0.0
-        outqcs[:, :, :] = 0.0
-        outqcm[:, :, :] = 0.0
-
-        subm[:, :, :] = 0.0
-
-        frhm[:, :] = 0.0
-        frhd[:, :] = 0.0
-
         cld1d.field[:, :] = 0.0
 
         xlandi[:, :] = xland.field.astype(state.rkind)[:, :]
