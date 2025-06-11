@@ -95,6 +95,11 @@ class GFDriver:
             units="n/a",
             dtype=state.rkind
         )
+        self.dhdt: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
 
         # Initialize a k-mask for selecting "this vertical level"
         self.k_mask: Quantity = state.quantity_factory.zeros(
@@ -370,7 +375,7 @@ class GFDriver:
         hcdom = np.zeros((im, jm, km))  # Convective cooling (middle convection)
 
         subm = np.zeros((im, jm, km))  # Subsidence tendencies
-        dhdt = np.zeros((im, jm, km))  # Heating rate tendencies
+        # dhdt = np.zeros((im, jm, km))  # Heating rate tendencies
 
         frhm = np.zeros((im, jm))  # Moisture flux (middle convection)
         frhd = np.zeros((im, jm))  # Moisture flux (deep convection)
@@ -411,13 +416,6 @@ class GFDriver:
         trcflx_in1 = np.zeros(km)  # Tracer flux array
         clw_in1 = np.zeros(km)  # Cloud water input array
         cliw_idx = 0
-
-
-        # Initialize variables
-        dhdt = np.zeros((im, jm, km))
-        umean = np.zeros((im, jm))
-        vmean = np.zeros((im, jm))
-        pmean = np.zeros((im, jm))
 
         ichoice = ichoice_in
         ichoicem = ichoicem_in
@@ -579,10 +577,6 @@ class GFDriver:
         prets[:, :] = 0.0
         pretm[:, :] = 0.0
 
-        umean[:, :] = 0.0
-        vmean[:, :] = 0.0
-        pmean[:, :] = 0.0
-
         cupclw[:, :, :] = 0.0
         cupclwm[:, :, :] = 0.0
         cupclws[:, :, :] = 0.0
@@ -617,7 +611,7 @@ class GFDriver:
         outqcm[:, :, :] = 0.0
 
         subm[:, :, :] = 0.0
-        dhdt[:, :, :] = 0.0
+        # dhdt[:, :, :] = 0.0
 
         frhm[:, :] = 0.0
         frhd[:, :] = 0.0
@@ -669,38 +663,24 @@ class GFDriver:
             q2d=self.q2d,
             tshall=self.tshall,
             qshall=self.qshall,
+            dhdt=self.dhdt,
             flag_init=flag_init,
             flag_restart=flag_restart,
             dt=dt,
             aodreturn=aodreturn,
             aodc0=aodc0,
             g=g,
+            cp=cp,
+            xlv=xlv,
         )
 
         for i in range(its, ite + 1):  # Adjusted for Python's zero-based indexing
             for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
 
-                # Loop over vertical levels up to `kpbli`
-                for k in range(kts, self.kpbli.field[i, j] + 1):
-                    self.tshall.field[i, j, k] = t.field[i, j, k]
-                    self.qshall.field[i, j, k] = max(1.0e-16, self.qv.field[i, j, k])
-                    self.tn.field[i, j, k] = t.field[i, j, k]
-                    self.qo.field[i, j, k] = max(1.0e-16, self.qv.field[i, j, k])
-                    dhdt[i, j, k] = cp * (forcet.field[i, j, k] + (t.field[i, j, k] - t2di.field[i, j, k]) / dt) + \
-                                xlv * (self.forceqv.field[i, j, k] + (self.qv.field[i, j, k] - self.qv2di.field[i, j, k]) / dt)
-
                 # Convert `hfx2` and `qfx2` to W/m²
                 hfx[i, j] = hfx2.field[i, j] * cp * self.rhoi.field[i, j, 0]
                 qfx[i, j] = qfx2.field[i, j] * xlv * self.rhoi.field[i, j, 0]
                 dx[i, j] = np.sqrt(garea.field[i, j])
-
-                # Compute umean, vmean, and pmean: This entire loop can be deleted?
-                for k in range(kts + 1, ktf):
-                    if (self.p2d.field[i, j, 1] - self.p2d.field[i, j, k]) > 150 and self.p2d.field[i, j, k] > 300:
-                        dp = -0.5 * (self.p2d.field[i, j, k + 1] - self.p2d.field[i, j, k - 1])
-                        umean[i, j] += us.field[i, j, k] * dp # can be deleted?
-                        vmean[i, j] += vs.field[i, j, k] * dp # can be deleted?
-                        pmean[i, j] += dp # can be deleted?
 
                 # Compute `psum` and update `forcing` arrays
                 psum = 0.0
@@ -760,7 +740,7 @@ class GFDriver:
                 self.qshall.field,
                 self.p2d.field,
                 psur,
-                dhdt,
+                self.dhdt.field,
                 self.kpbli.field,
                 self.rhoi.field,
                 hfx,
@@ -870,7 +850,7 @@ class GFDriver:
                 dt,
                 imid_gf,
                 self.kpbli.field,
-                dhdt,
+                self.dhdt.field,
                 xlandi,
                 self.zo.field,
                 forcing,
@@ -1003,7 +983,7 @@ class GFDriver:
                 dt,
                 0,
                 self.kpbli.field,
-                dhdt,
+                self.dhdt.field,
                 xlandi,
                 self.zo.field,
                 forcing2,

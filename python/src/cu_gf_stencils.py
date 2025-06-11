@@ -35,12 +35,15 @@ def initialize_driver(
     q2d: FloatField, # type: ignore
     tshall: FloatField, # type: ignore
     qshall: FloatField, # type: ignore
+    dhdt: FloatField, # type: ignore
     flag_init: bool,
     flag_restart: bool,
     dt: np.float64,
     aodreturn: np.float64,
     aodc0: np.float64,
     g: np.float64,
+    cp: np.float64,
+    xlv: np.float64,
 ):
     """
     Initialize fields for gf driver
@@ -79,14 +82,17 @@ def initialize_driver(
         forceqv = forceqv_spechum / (1.0 - qv2di_spechum)
         qv = qv_spechum / (1.0 - qv_spechum)
         p2d = 0.01 * p2di
-        po = p2d
-        rhoi = 100.0 * p2d / (287.04 * (t2di * (1.0 + 0.608 * qv2di)))
-        qcheck = qv
-        tn = t
-        qo = max(1.0e-16, qv)
         t2d = t2di - forcet * dt
         q2d = max(1.0e-16, qv2di - forceqv * dt)
-        tshall = t2d
-        qshall = q2d
-        if qo < 1.0e-16:
-            qo = 1.0e-16
+        po = p2d
+        qo = max(1.0e-16, qv)
+        tn = t
+        rhoi = 100.0 * p2d / (287.04 * (t2di * (1.0 + 0.608 * qv2di)))
+        qcheck = qv
+        if k_mask <= kpbli:
+            tshall = t
+            qshall = qo
+            dhdt = cp * (forcet + (t - t2di) / dt) + xlv * (forceqv + (qv - qv2di) / dt)
+        else:
+            tshall = t2d
+            qshall = q2d

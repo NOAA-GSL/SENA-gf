@@ -993,13 +993,13 @@ class GFState:
         self.g = float(_dataset.variables["g"][:])
 
         # Get cp
-        self.cp = _dataset.variables["cp"][:]
+        self.cp = float(_dataset.variables["cp"][:])
 
         # Get xlv
-        self.xlv = _dataset.variables["xlv"][:]
+        self.xlv = float(_dataset.variables["xlv"][:])
 
         # Get r_v
-        self.r_v = _dataset.variables["r_v"][:]
+        self.r_v = float(_dataset.variables["r_v"][:])
 
         # Get forcet
         if _dataset.variables.get("forcet"):
