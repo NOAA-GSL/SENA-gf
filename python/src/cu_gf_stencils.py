@@ -36,8 +36,17 @@ def initialize_driver(
     tshall: FloatField, # type: ignore
     qshall: FloatField, # type: ignore
     dhdt: FloatField, # type: ignore
+    hfx2: FloatFieldIJ, # type: ignore
+    qfx2: FloatFieldIJ, # type: ignore
+    hfx: FloatFieldIJ, # type: ignore
+    qfx: FloatFieldIJ, # type: ignore
+    garea: FloatFieldIJ, # type: ignore
+    dx: FloatFieldIJ, # type: ignore
+    maxMF: FloatFieldIJ, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
     flag_init: bool,
     flag_restart: bool,
+    do_mynnedmf: bool,
     dt: np.float64,
     aodreturn: np.float64,
     aodc0: np.float64,
@@ -96,3 +105,10 @@ def initialize_driver(
         else:
             tshall = t2d
             qshall = q2d
+
+    with computation(FORWARD), interval(0,1):
+        hfx = hfx2 * cp * rhoi
+        qfx = qfx2 * xlv * rhoi
+        dx = garea ** 0.5
+        if dx < 6500.0 and do_mynnedmf and maxMF > 0.0:
+            ierr = 555

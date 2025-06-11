@@ -100,6 +100,26 @@ class GFDriver:
             units="n/a",
             dtype=state.rkind
         )
+        self.hfx: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
+        self.qfx: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
+        self.dx: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="n/a",
+            dtype=state.rkind
+        )
+        self.ierr: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="n/a",
+            dtype=state.ikind,
+        )
 
         # Initialize a k-mask for selecting "this vertical level"
         self.k_mask: Quantity = state.quantity_factory.zeros(
@@ -250,16 +270,9 @@ class GFDriver:
         flux_tun = np.zeros((im, jm))  # Flux tuning array
 
         ht = np.zeros((im, jm))  # Height array
-        # dz8w = np.zeros((im, jm, km))  # Vertical layer thickness
-        # zh = np.zeros(km)  # Vertical height levels
 
         forcing = np.zeros((im, jm, 10))  # Forcing arrays
         forcing2 = np.zeros((im, jm, 10))
-
-        # ccn_gf = np.zeros((im, jm))  # Cloud condensation nuclei (CCN)
-        # ccn_m = np.zeros((im, jm))
-
-        dx = np.zeros((im, jm))  # Grid spacing
 
         mconv = np.zeros((im, jm))  # Moisture convergence
         omeg = np.zeros((im, jm, km))  # Vertical velocity
@@ -271,7 +284,7 @@ class GFDriver:
         gdc = np.zeros((im, jm, km, 10))  # Diagnostic tendencies
         gdc2 = np.zeros((im, jm, km, 10))
 
-        ierr = np.zeros((im, jm), dtype=int)  # Error flags for deep convection
+        # ierr = np.zeros((im, jm), dtype=int)  # Error flags for deep convection
         ierrm = np.zeros((im, jm), dtype=int)  # Error flags
         ierrs = np.zeros((im, jm), dtype=int)
         ierrc = np.full((im, jm), " ", dtype="<U50")  # Error messages (strings)
@@ -304,10 +317,6 @@ class GFDriver:
         trcflx_in1 = np.zeros(km)  # Tracer flux
         clw_in1 = np.zeros(km)  # Cloud water input
 
-        # kpbli = np.zeros((im, jm), dtype=int)  # Convective boundary layer index
-
-        dx = np.zeros((im, jm))  # Grid spacing
-
         zu = np.zeros((im, jm, km))  # Updraft mass flux
         zum = np.zeros((im, jm, km))  # Middle updraft mass flux
         zus = np.zeros((im, jm, km))  # Shallow updraft mass flux
@@ -320,17 +329,9 @@ class GFDriver:
 
         tau_ecmwf = np.zeros((im, jm))  # ECMWF tau array
 
-        # qcheck = np.zeros((im, jm, km))  # Specific humidity check array
-
         massflx = np.zeros(km)  # Mass flux array
         trcflx_in1 = np.zeros(km)  # Tracer flux array
         clw_in1 = np.zeros(km)  # Cloud water input array
-
-        # zo = np.zeros((im, jm, km))  # Height at model levels
-        # t2d = np.zeros((im, jm, km))  # Temperature at model levels
-        # q2d = np.zeros((im, jm, km))  # Specific humidity at model levels
-        # tn = np.zeros((im, jm, km))  # Temperature tendency
-        # qo = np.zeros((im, jm, km))  # Specific humidity tendency
 
         outts = np.zeros((im, jm, km))  # Temperature tendencies (shallow convection)
         outqs = np.zeros((im, jm, km))  # Specific humidity tendencies (shallow convection)
@@ -375,19 +376,9 @@ class GFDriver:
         hcdom = np.zeros((im, jm, km))  # Convective cooling (middle convection)
 
         subm = np.zeros((im, jm, km))  # Subsidence tendencies
-        # dhdt = np.zeros((im, jm, km))  # Heating rate tendencies
 
         frhm = np.zeros((im, jm))  # Moisture flux (middle convection)
         frhd = np.zeros((im, jm))  # Moisture flux (deep convection)
-
-        # p2d = np.zeros((im, jm, km))  # Pressure at model levels
-        # qcheck = np.zeros((im, jm, km))  # Specific humidity check
-
-        # tshall = np.zeros((im, jm, km))  # Shallow convection temperature
-        # qshall = np.zeros((im, jm, km))  # Shallow convection specific humidity
-
-        hfx = np.zeros((im, jm))  # Surface heat flux
-        qfx = np.zeros((im, jm))  # Surface moisture flux
 
         massflx = np.zeros(km)  # Mass flux
         trcflx_in1 = np.zeros(km)  # Tracer flux
@@ -404,9 +395,6 @@ class GFDriver:
         wetdpc_mid = np.zeros((im, jm))  # Wet deposition for middle convection
 
         xmbs2 = np.zeros((im, jm))  # Additional mass flux array for shallow convection
-
-        # po = np.zeros((im, jm, km))  # Pressure at model levels
-        # rhoi = np.zeros((im, jm, km))  # Air density at model levels
 
         forcing2 = np.zeros((im, jm, 10))  # Forcing array for convection calculations
 
@@ -541,7 +529,7 @@ class GFDriver:
         gdc2[:, :, :, 0] = 0.0
 
         # Initialize error arrays
-        ierr[:, :] = 0
+        # ierr[:, :] = 0
         ierrm[:, :] = 0
         ierrs[:, :] = 0
 
@@ -611,7 +599,6 @@ class GFDriver:
         outqcm[:, :, :] = 0.0
 
         subm[:, :, :] = 0.0
-        # dhdt[:, :, :] = 0.0
 
         frhm[:, :] = 0.0
         frhd[:, :] = 0.0
@@ -664,8 +651,17 @@ class GFDriver:
             tshall=self.tshall,
             qshall=self.qshall,
             dhdt=self.dhdt,
+            hfx2=hfx2,
+            qfx2=qfx2,
+            hfx=self.hfx,
+            qfx=self.qfx,
+            garea=garea,
+            dx=self.dx,
+            maxMF=maxMF,
+            ierr=self.ierr,
             flag_init=flag_init,
             flag_restart=flag_restart,
+            do_mynnedmf=do_mynnedmf,
             dt=dt,
             aodreturn=aodreturn,
             aodc0=aodc0,
@@ -676,11 +672,6 @@ class GFDriver:
 
         for i in range(its, ite + 1):  # Adjusted for Python's zero-based indexing
             for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
-
-                # Convert `hfx2` and `qfx2` to W/m²
-                hfx[i, j] = hfx2.field[i, j] * cp * self.rhoi.field[i, j, 0]
-                qfx[i, j] = qfx2.field[i, j] * xlv * self.rhoi.field[i, j, 0]
-                dx[i, j] = np.sqrt(garea.field[i, j])
 
                 # Compute `psum` and update `forcing` arrays
                 psum = 0.0
@@ -696,14 +687,9 @@ class GFDriver:
                     forcing[i, j, 6] /= psum
                 forcing2[i, j, 6] = forcing[i, j, 6]
 
-                # Update `mconv` and `ierr` arrays
-                if mconv[i, j] < 0.0:
-                    mconv[i, j] = 0.0
-                if dx[i, j] < 6500.0 and do_mynnedmf and maxMF.field[i, j, 0] > 0.0:
-                    ierr[i, j] = 555
 
         # Check if `dx` at `its` is less than 6500
-        if dx[its, jts] < 6500.0:
+        if self.dx.field[its, jts] < 6500.0:
             imid_gf = 0
 
         # Call cumulus parameterization
@@ -743,8 +729,8 @@ class GFDriver:
                 self.dhdt.field,
                 self.kpbli.field,
                 self.rhoi.field,
-                hfx,
-                qfx,
+                self.hfx.field,
+                self.qfx.field,
                 xlandi,
                 ichoice_s,
                 tcrit,
@@ -789,9 +775,9 @@ class GFDriver:
                 for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                     if xmbs[i, j] > 0.0:
                         cutens[i, j] = 1.0
-                        if dx[i, j] < 6500.0:
+                        if self.dx.field[i, j] < 6500.0:
                             ierrm[i, j] = 555
-                            ierr[i, j] = 555
+                            self.ierr.field[i, j] = 555
 
             # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
             # print(f"{ipn:>4}{ktops[0]:>4}")
@@ -864,9 +850,9 @@ class GFDriver:
                 us.field,
                 vs.field,
                 self.rhoi.field,
-                hfx,
-                qfx,
-                dx,
+                self.hfx.field,
+                self.qfx.field,
+                self.dx.field,
                 mconv,
                 omeg,
                 cactiv_m.field,
@@ -997,9 +983,9 @@ class GFDriver:
                 us.field,
                 vs.field,
                 self.rhoi.field,
-                hfx,
-                qfx,
-                dx,
+                self.hfx.field,
+                self.qfx.field,
+                self.dx.field,
                 mconv,
                 omeg,
                 cactiv.field,
@@ -1022,7 +1008,7 @@ class GFDriver:
                 ktop,
                 cupclw,
                 frhd,
-                ierr,
+                self.ierr.field,
                 ierrc,
                 nchem,
                 fscav,
@@ -1257,8 +1243,8 @@ class GFDriver:
                     gdc[i, j, 9, 9] = xmb[i, j]
                     gdc[i, j, 10, 9] = xmbm[i, j]
                     gdc[i, j, 11, 9] = xmbs[i, j]
-                    gdc[i, j, 12, 9] = hfx[i, j]
-                    gdc[i, j, 14, 9] = qfx[i, j]
+                    gdc[i, j, 12, 9] = self.hfx.field[i, j]
+                    gdc[i, j, 14, 9] = self.qfx.field[i, j]
                     gdc[i, j, 15, 9] = pret[i, j] * 3600.0
 
                     # Calculate maximum upward mass flux
