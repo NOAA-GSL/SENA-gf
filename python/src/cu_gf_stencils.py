@@ -1,6 +1,6 @@
 from ndsl.dsl.gt4py import PARALLEL, computation, interval, FORWARD
 from ndsl.dsl.typing import FloatField, IntFieldIJ32, FloatFieldIJ, IntFieldK32, BoolFieldIJ
-import numpy as np
+import cu_gf_constants as constants
 
 def initialize_driver(
     aod_gf: FloatFieldIJ, # type: ignore
@@ -47,29 +47,30 @@ def initialize_driver(
     forcing2: FloatFieldIJ, # type: ignore
     psum: FloatFieldIJ, # type: ignore
     ierr: IntFieldIJ32, # type: ignore
-    flag_init: bool,
-    flag_restart: bool,
-    do_mynnedmf: bool,
-    dt: np.float64,
-    aodreturn: np.float64,
-    aodc0: np.float64,
-    g: np.float64,
-    cp: np.float64,
-    xlv: np.float64,
 ):
     """
     Initialize fields for gf driver
 
     """
+    from __externals__ import ( # type: ignore
+        flag_init,
+        flag_restart,
+        do_mynnedmf,
+        dt,
+        g,
+        cp,
+        xlv,
+    )
+
     with computation(FORWARD), interval(...):
         if flag_init and not flag_restart:
-            aod_gf = aodc0
+            aod_gf = constants.AODC0
         else:
             if cactiv == 0 and cactiv_m == 0:
-                if aodc0 > aod_gf:
-                    aod_gf += (aodc0 - aod_gf) * (dt / (aodreturn * 60))
-                if aod_gf > aodc0:
-                    aod_gf = aodc0
+                if constants.AODC0 > aod_gf:
+                    aod_gf += (constants.AODC0 - aod_gf) * (dt / (constants.AODRETURN * 60))
+                if aod_gf > constants.AODC0:
+                    aod_gf = constants.AODC0
 
         ccn_gf = max(5.0, (aod_gf / 0.0027) ** (1 / 0.640))
         ccn_m = ccn_gf

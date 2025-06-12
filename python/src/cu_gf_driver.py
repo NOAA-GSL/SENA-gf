@@ -2,12 +2,11 @@ import numpy as np
 
 from cu_gf_sh import cu_gf_sh_run
 from cu_gf_deep import cu_gf_deep_run, neg_check, fct1d3
-from ndsl.dsl.typing import FloatField
 from ndsl.quantity import Quantity
 from ndsl.constants import X_DIM, Y_DIM, Z_DIM
-#from gt4py.cartesian.gtscript import PARALLEL, computation, interval, stencil
 
 from cu_gf_stencils import (initialize_driver)
+import cu_gf_constants as constants
 
 class GFDriver:
 
@@ -163,6 +162,15 @@ class GFDriver:
             initialize_driver,
             origin=grid_indexing.origin_compute(),
             domain=grid_indexing.domain_compute(),
+            externals={
+                "flag_init": state.flag_init,
+                "flag_restart": state.flag_restart,
+                "do_mynnedmf": state.do_mynnedmf,
+                "dt": state.dt,
+                "g": state.g,
+                "cp": state.cp,
+                "xlv": state.xlv,
+            }
         )
 
 
@@ -255,13 +263,6 @@ class GFDriver:
 
         imid_gf = 1
     
-        aodc0 = 0.14  # Default value for aerosol optical depth
-        aodreturn = 30.0  # Default value for AOD return time (minutes)
-
-        tf = 258.16
-        tcr = 273.16  # Critical temperature for cloud water/ice conversion
-        tcrf = 1.0 / (tcr-tf)  # Scaling factor for temperature conversion
-
         dicycle = 0  # Diurnal cycle flag for deep convection
         dicycle_m = 0  # Diurnal cycle flag for middle convection
 
@@ -276,16 +277,14 @@ class GFDriver:
 
         tropics = np.zeros((im, jm), dtype=int)  # Integer array for tropics flag
 
-        tun_rad_shall = np.zeros((im, jm))  # Tuning constants for radiation coupling
-        tun_rad_mid = np.zeros((im, jm))
-        tun_rad_deep = np.zeros((im, jm))
+        tun_rad_shall = np.full((im, jm), 0.01)  # Tuning constants for radiation coupling
+        tun_rad_mid = np.full((im, jm), 0.3)
 
         edt = np.zeros((im, jm))  # Eddy diffusivity arrays
         edtm = np.zeros((im, jm))
         edtd = np.zeros((im, jm))
 
         zdd = np.zeros((im, jm, km))  # 2D array for downdraft mass flux
-        flux_tun = np.zeros((im, jm))  # Flux tuning array
 
         ht = np.zeros((im, jm))  # Height array
 
@@ -402,6 +401,7 @@ class GFDriver:
         massflx = np.zeros(km)  # Mass flux array
         trcflx_in1 = np.zeros(km)  # Tracer flux array
         clw_in1 = np.zeros(km)  # Cloud water input array
+
         cliw_idx = 0
 
         ichoice = ichoice_in
@@ -474,12 +474,6 @@ class GFDriver:
         kte = km - 1
         ktf = kte - 1
 
-        # Set tuning constants for radiation coupling
-        tun_rad_shall[:] = 0.01
-        tun_rad_mid[:] = 0.3  # Previously 0.02
-        tun_rad_deep[:] = 0.3  # Previously 0.065
-        flux_tun[:] = 5.0
-
         # Determine shallow convection flag
         if imfshalcnv == 3:
             ishallow_g3 = 1
@@ -488,9 +482,6 @@ class GFDriver:
 
         # Initialize debugging variables
         ipr = 0 # CWH
-
-        # Set iteration bounds
-        tcrit = 258.0
 
         # Initialize arrays
         ud_mf.field[:, :, :] = 0.0
@@ -514,8 +505,6 @@ class GFDriver:
         psur[:, :] = 0.01 * psuri.field[:, :]
 
         omeg[:, :, :] = w.field[:, :, :]
-
-        ccnclean = max(5.0, (aodc0 / 0.0027) ** (1 / 0.640))
 
         self._initialize_driver(
             aod_gf=aod_gf,
@@ -562,15 +551,6 @@ class GFDriver:
             forcing2=self.forcing2.data[:,:,6],
             psum=self.psum,
             ierr=self.ierr,
-            flag_init=flag_init,
-            flag_restart=flag_restart,
-            do_mynnedmf=do_mynnedmf,
-            dt=dt,
-            aodreturn=aodreturn,
-            aodc0=aodc0,
-            g=g,
-            cp=cp,
-            xlv=xlv,
         )
 
         # Check if `dx` at `its` is less than 6500
@@ -581,24 +561,9 @@ class GFDriver:
         if ishallow_g3 == 1:
             # Initialize `ierrs` and `ierrm`
             for i in range(its, ite + 1):
-                for j in range(jts, jte + 1):  # Adjusted for Python's zero-based indexing
+                for j in range(jts, jte + 1):
                     ierrs[i, j] = 0
                     ierrm[i, j] = 0
-
-            # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ichoice_s:>4}{ipr:>4}")
-            # for i in range(im):
-            #     print(f"{kpbli[i, j]:>4}{kbcons[i, j]:>4}{ktops[i, j]:>4}{k22s[i, j]:>4}{tropics[i, j]:>4}")
-            # print(f"{tcrit:>20.12E}{dt:>20.12E}")
-            # for i in range(im):
-            #     print(f"{ter11[i, j]:>20.12E}{psur[i, j]:>20.12E}{hfx[i, j]:>20.12E}{qfx[i, j]:>20.12E}{xlandi[i, j]:>20.12E}{xmbs[i, j]:>20.12E}{prets[i, j]:>20.12E}")
-            # for i in range(im):
-            #     for k in range(km):
-            #         print(f"{us[i, j,k]:>20.12E}{vs[i, j,k]:>20.12E}{zo[i, j,k]:>20.12E}{t2d[i, j,k]:>20.12E}{q2d[i, j,k]:>20.12E}{tshall[i, j,k]:>20.12E}{qshall[i, j,k]:>20.12E}")
-            #     for k in range(km):
-            #         print(f"{p2d[i, j,k]:>20.12E}{dhdt[i, j,k]:>20.12E}{rhoi[i, j,k]:>20.12E}{zus[i, j,k]:>20.12E}")
-            #     for k in range(km):
-            #         print(f"{outts[i, j,k]:>20.12E}{outqs[i, j,k]:>20.12E}{outqcs[i, j,k]:>20.12E}{outus[i, j,k]:>20.12E}{outvs[i, j,k]:>20.12E}{cnvwt[i, j,k]:>20.12E}{cupclws[i, j,k]:>20.12E}")
 
             cu_gf_sh_run(
                 us.field,
@@ -618,7 +583,7 @@ class GFDriver:
                 self.qfx.field,
                 xlandi,
                 ichoice_s,
-                tcrit,
+                constants.TCRIT,
                 dt,
                 zus,
                 xmbs,
@@ -639,22 +604,6 @@ class GFDriver:
                 tropics,
             )
 
-            # Output variables match
-            # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ichoice_s:>4}{ipr:>4}")
-            # for i in range(im):
-            #     print(f"{kpbli[i, j]:>4}{kbcons[i, j]:>4}{ktops[i, j]:>4}{k22s[i, j]:>4}{tropics[i, j]:>4}")
-            # print(f"{tcrit:>20.12E}{dt:>20.12E}")
-            # for i in range(im):
-            #     print(f"{ter11[i, j]:>20.12E}{psur[i, j]:>20.12E}{hfx[i, j]:>20.12E}{qfx[i, j]:>20.12E}{xlandi[i, j]:>20.12E}{xmbs[i, j]:>20.12E}{prets[i, j]:>20.12E}")
-            # for i in range(im):
-            #     for k in range(km):
-            #         print(f"{us[i, j,k]:>20.12E}{vs[i, j,k]:>20.12E}{zo[i, j,k]:>20.12E}{t2d[i, j,k]:>20.12E}{q2d[i, j,k]:>20.12E}{tshall[i, j,k]:>20.12E}{qshall[i, j,k]:>20.12E}")
-            #     for k in range(km):
-            #         print(f"{p2d[i, j,k]:>20.12E}{dhdt[i, j,k]:>20.12E}{rhoi[i, j,k]:>20.12E}{zus[i, j,k]:>20.12E}")
-            #     for k in range(km):
-            #         print(f"{outts[i, j,k]:>20.12E}{outqs[i, j,k]:>20.12E}{outqcs[i, j,k]:>20.12E}{outus[i, j,k]:>20.12E}{outvs[i, j,k]:>20.12E}{cnvwt[i, j,k]:>20.12E}{cupclws[i, j,k]:>20.12E}")
-
             # Update `cutens`, `ierrm`, and `ierr` based on `xmbs`
             for i in range(its, itf + 1):
                 for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
@@ -664,52 +613,15 @@ class GFDriver:
                             ierrm[i, j] = 555
                             self.ierr.field[i, j] = 555
 
-            # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ipn:>4}{ktops[0]:>4}")
-            # print(f"{dt:>20.10E}{prets[0]:>20.10E}")
-            # for k in range(km):
-            #     print(f"{qcheck[0,k]:>20.10E}{outqs[0,k]:>20.10E}{outts[0,k]:>20.10E}{outus[0,k]:>20.10E}{outvs[0,k]:>20.10E}{outqcs[0,k]:>20.10E}")
-
             # Call `neg_check` for GF shallow convection
             neg_check(
                 "shallow", ipn, dt, self.qcheck.field, outqs, outts, outus, outvs, outqcs, prets,
                 its, ite, jts, jte, kts, kte, itf, jtf, ktf, ktops
             )
 
-            # Output variables match
-            # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ipn:>4}{ktops[0]:>4}")
-            # print(f"{dt:>20.10E}{prets[0]:>20.10E}")
-            # for k in range(km):
-            #     print(f"{qcheck[0,k]:>20.10E}{outqs[0,k]:>20.10E}{outts[0,k]:>20.10E}{outus[0,k]:>20.10E}{outvs[0,k]:>20.10E}{outqcs[0,k]:>20.10E}")
-
         ipr = 0
 
         if imid_gf == 1:
-
-            # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{dicycle_m:>4}{ichoicem:>4}{ipr:>4}{imid_gf:>4}{kpbli[0]:>4}{cactiv_m[0]:>4}{kbconm[0]:>4}{ktopm[0]:>4}{tropics[0]:>4}")
-            # print(f"{nchem:>4}{spp_cu_deep:>4}{do_cap_suppress_here:>4}{k22m[0]:>4}{jminm[0]:>4}")
-            # print(f"{ccn_m[0]:>20.12E}{ccnclean:>20.12E}{dt:>20.12E}{xlandi[0]:>20.12E}{ter11[0]:>20.12E}{psur[0]:>20.12E}{hfx[0]:>20.12E}{qfx[0]:>20.12E}{dx[0]:>20.12E}{mconv[0]:>20.12E}")
-            # print(f"{edtm[0]:>20.12E}{edtd[0]:>20.12E}{xmbm[0]:>20.12E}{xmb_dumm[0]:>20.12E}{xmbs[0]:>20.12E}{pretm[0]:>20.12E}{frhm[0]:>20.12E}{rand_mom[0]:>20.12E}{rand_vmas[0]:>20.12E}{cap_suppress_j[0]:>20.12E}")
-            # for n in range(4):
-            #     print(f"{rand_clos[0,n]:>20.12E}")
-            # for k in range(km):
-            #     print(f"{dhdt[0,k]:>20.12E}{zo[0,k]:>20.12E}{t2d[0,k]:>20.12E}{q2d[0,k]:>20.12E}{tshall[0,k]:>20.12E}{qshall[0,k]:>20.12E}{p2d[0,k]:>20.12E}")
-            # for k in range(10):
-            #     print(f"{forcing[0,k]:>20.12E}")
-            # for k in range(km):
-            #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{rhoi[0,k]:>20.12E}{omeg[0,k]:>20.12E}{cnvwtm[0,k]:>20.12E}{zum[0,k]:>20.12E}{zdm[0,k]:>20.12E}")
-            # for k in range(km):
-            #     print(f"{zdd[0,k]:>20.12E}{outum[0,k]:>20.12E}{outvm[0,k]:>20.12E}{outtm[0,k]:>20.12E}{outqm[0,k]:>20.12E}{outqcm[0,k]:>20.12E}{cupclwm[0,k]:>20.12E}")
-            # for n in range(3):
-            #     print(f"{fscav[n]:>20.12E}")
-            # for k in range(km):
-            #     for n in range(nchem):
-            #         print(f"{chem3d[0,k,n]:>20.12E}")
-            # for n in range(nchem):
-            #     print(f"{wetdpc_mid[0,n]:>20.12E}")
-            # print(f"{do_smoke_transport:>10}")
 
             cu_gf_deep_run(
                 itf, jtf, ktf, its, ite, jts, jte, kts, kte,
@@ -717,7 +629,7 @@ class GFDriver:
                 ichoicem,
                 ipr,
                 self.ccn_m.field,
-                ccnclean,
+                constants.CCNCLEAN,
                 dt,
                 imid_gf,
                 self.kpbli.field,
@@ -779,31 +691,6 @@ class GFDriver:
                 tropics
             )
 
-            # Output variables match
-            # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{dicycle_m:>4}{ichoicem:>4}{ipr:>4}{imid_gf:>4}{kpbli[0]:>4}{cactiv_m[0]:>4}{kbconm[0]:>4}{ktopm[0]:>4}{tropics[0]:>4}")
-            # print(f"{nchem:>4}{spp_cu_deep:>4}{do_cap_suppress_here:>4}{k22m[0]:>4}{jminm[0]:>4}")
-            # print(f"{ccn_m[0]:>20.12E}{ccnclean:>20.12E}{dt:>20.12E}{xlandi[0]:>20.12E}{ter11[0]:>20.12E}{psur[0]:>20.12E}{hfx[0]:>20.12E}{qfx[0]:>20.12E}{dx[0]:>20.12E}{mconv[0]:>20.12E}")
-            # print(f"{edtm[0]:>20.12E}{edtd[0]:>20.12E}{xmbm[0]:>20.12E}{xmb_dumm[0]:>20.12E}{xmbs[0]:>20.12E}{pretm[0]:>20.12E}{frhm[0]:>20.12E}{rand_mom[0]:>20.12E}{rand_vmas[0]:>20.12E}{cap_suppress_j[0]:>20.12E}")
-            # for n in range(4):
-            #     print(f"{rand_clos[0,n]:>20.12E}")
-            # for k in range(km):
-            #     print(f"{dhdt[0,k]:>20.12E}{zo[0,k]:>20.12E}{t2d[0,k]:>20.12E}{q2d[0,k]:>20.12E}{tshall[0,k]:>20.12E}{qshall[0,k]:>20.12E}{p2d[0,k]:>20.12E}")
-            # for k in range(10):
-            #     print(f"{forcing[0,k]:>20.12E}")
-            # for k in range(km):
-            #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{rhoi[0,k]:>20.12E}{omeg[0,k]:>20.12E}{cnvwtm[0,k]:>20.12E}{zum[0,k]:>20.12E}{zdm[0,k]:>20.12E}")
-            # for k in range(km):
-            #     print(f"{zdd[0,k]:>20.12E}{outum[0,k]:>20.12E}{outvm[0,k]:>20.12E}{outtm[0,k]:>20.12E}{outqm[0,k]:>20.12E}{outqcm[0,k]:>20.12E}{cupclwm[0,k]:>20.12E}")
-            # for n in range(3):
-            #     print(f"{fscav[n]:>20.12E}")
-            # for k in range(km):
-            #     for n in range(nchem):
-            #         print(f"{chem3d[0,k,n]:>20.12E}")
-            # for n in range(nchem):
-            #     print(f"{wetdpc_mid[0,n]:>20.12E}")
-            # print(f"{do_smoke_transport}")
-
             # Update `qcheck` array
             for i in range(its, itf + 1):
                 for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
@@ -818,39 +705,13 @@ class GFDriver:
 
         if ideep == 1:
 
-            # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{dicycle_m:>4}{ichoice:>4}{ipr:>4}{ideep:>4}{kpbli[0]:>4}{cactiv[0]:>4}{kbcon[0]:>4}{ktop[0]:>4}{tropics[0]:>4}")
-            # print(f"{nchem:>4}{spp_cu_deep:>4}{do_cap_suppress_here:>4}{k22[0]:>4}{jmin[0]:>4}")
-            # print(f"{ccn_gf[0]:>20.12E}{ccnclean:>20.12E}{dt:>20.12E}{xlandi[0]:>20.12E}{ter11[0]:>20.12E}{psur[0]:>20.12E}")
-            # print(f"{hfx[0]:>20.12E}{qfx[0]:>20.12E}{dx[0]:>20.12E}{mconv[0]:>20.12E}")
-            # print(f"{edt[0]:>20.12E}{edtm[0]:>20.12E}{xmbm[0]:>20.12E}{xmb[0]:>20.12E}{xmbs[0]:>20.12E}")
-            # print(f"{pret[0]:>20.12E}{frhd[0]:>20.12E}{rand_mom[0]:>20.12E}{rand_vmas[0]:>20.12E}{cap_suppress_j[0]:>20.12E}")
-            # for n in range(4):
-            #     print(f"{rand_clos[0,n]:>20.12E}")
-            # for k in range(km):
-            #     print(f"{dhdt[0,k]:>20.12E}{zo[0,k]:>20.12E}{t2d[0,k]:>20.12E}{q2d[0,k]:>20.12E}{tn[0,k]:>20.12E}{qo[0,k]:>20.12E}{p2d[0,k]:>20.12E}")
-            # for k in range(10):
-            #     print(f"{forcing[0,k]:>20.12E}")
-            # for k in range(km):
-            #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{rhoi[0,k]:>20.12E}{omeg[0,k]:>20.12E}{cnvwt[0,k]:>20.12E}{zu[0,k]:>20.12E}{zd[0,k]:>20.12E}")
-            # for k in range(km):
-            #     print(f"{zdd[0,k]:>20.12E}{outu[0,k]:>20.12E}{outv[0,k]:>20.12E}{outt[0,k]:>20.12E}{outq[0,k]:>20.12E}{outqc[0,k]:>20.12E}{cupclw[0,k]:>20.12E}")
-            # for n in range(3):
-            #     print(f"{fscav[n]:>20.12E}")
-            # for k in range(km):
-            #     for n in range(nchem):
-            #         print(f"{chem3d[0,k,n]:>20.12E}")
-            # for n in range(nchem):
-            #     print(f"{wetdpc_deep[0,n]:>20.12E}")
-            # print(f"{do_smoke_transport:>10}")
-
             cu_gf_deep_run(
                 itf, jtf, ktf, its, ite, jts, jte, kts, kte,
                 dicycle,
                 ichoice,
                 ipr,
                 self.ccn_gf,
-                ccnclean,
+                constants.CCNCLEAN,
                 dt,
                 0,
                 self.kpbli.field,
@@ -911,32 +772,6 @@ class GFDriver:
                 kdt,
                 tropics
             )
-
-            # print(f"{im:>4}{km:>4}{kdt:>4}{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{dicycle_m:>4}{ichoice:>4}{ipr:>4}{ideep:>4}{kpbli[0]:>4}{cactiv[0]:>4}{kbcon[0]:>4}{ktop[0]:>4}{tropics[0]:>4}")
-            # print(f"{nchem:>4}{spp_cu_deep:>4}{do_cap_suppress_here:>4}{k22[0]:>4}{jmin[0]:>4}")
-            # print(f"{ccn_gf[0]:>20.12E}{ccnclean:>20.12E}{dt:>20.12E}{xlandi[0]:>20.12E}{ter11[0]:>20.12E}{psur[0]:>20.12E}")
-            # print(f"{hfx[0]:>20.12E}{qfx[0]:>20.12E}{dx[0]:>20.12E}{mconv[0]:>20.12E}")
-            # print(f"{edt[0]:>20.12E}{edtm[0]:>20.12E}{xmbm[0]:>20.12E}{xmb[0]:>20.12E}{xmbs[0]:>20.12E}")
-            # print(f"{pret[0]:>20.12E}{frhd[0]:>20.12E}{rand_mom[0]:>20.12E}{rand_vmas[0]:>20.12E}{cap_suppress_j[0]:>20.12E}")
-            # for n in range(4):
-            #     print(f"{rand_clos[0,n]:>20.12E}")
-            # for k in range(km):
-            #     print(f"{dhdt[0,k]:>20.12E}{zo[0,k]:>20.12E}{t2d[0,k]:>20.12E}{q2d[0,k]:>20.12E}{tn[0,k]:>20.12E}{qo[0,k]:>20.12E}{p2d[0,k]:>20.12E}")
-            # for k in range(10):
-            #     print(f"{forcing[0,k]:>20.12E}")
-            # for k in range(km):
-            #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{rhoi[0,k]:>20.12E}{omeg[0,k]:>20.12E}{cnvwt[0,k]:>20.12E}{zu[0,k]:>20.12E}{zd[0,k]:>20.12E}")
-            # for k in range(km):
-            #     print(f"{zdd[0,k]:>20.12E}{outu[0,k]:>20.12E}{outv[0,k]:>20.12E}{outt[0,k]:>20.12E}{outq[0,k]:>20.12E}{outqc[0,k]:>20.12E}{cupclw[0,k]:>20.12E}")
-            # for n in range(3):
-            #     print(f"{fscav[n]:>20.12E}")
-            # for k in range(km):
-            #     for n in range(nchem):
-            #         print(f"{chem3d[0,k,n]:>20.12E}")
-            # for n in range(nchem):
-            #     print(f"{wetdpc_deep[0,n]:>20.12E}")
-            # print(f"{do_smoke_transport:>10}")
 
             ipr = 0
 
@@ -1108,7 +943,7 @@ class GFDriver:
                             outqcm[i, j, k] * cutenm[i, j] +
                             clw_ten[i, j, k]
                         )
-                        tem1 = max(0.0, min(1.0, (tcr - t.field[i, j, k]) * tcrf))
+                        tem1 = max(0.0, min(1.0, (constants.TCR - t.field[i, j, k]) * constants.TCRF))
 
                         if clcw.field[i, j, k] > -999.0:
                             cliw.field[i, j, k] = max(0.0, cliw.field[i, j, k] + tem * tem1)  # Ice
@@ -1170,8 +1005,8 @@ class GFDriver:
                 if aod_gf.field[i, j] < 0.007:
                     aod_gf.field[i, j] = 0.007
                     self.ccn_gf.field[i, j] = (aod_gf.field[i, j] / 0.0027) ** (1 / 0.64)
-                elif aod_gf.field[i, j] > aodc0:
-                    aod_gf.field[i, j] = aodc0
+                elif aod_gf.field[i, j] > constants.AODC0:
+                    aod_gf.field[i, j] = constants.AODC0
                     self.ccn_gf.field[i, j] = (aod_gf.field[i, j] / 0.0027) ** (1 / 0.64)
 
         # Scale dry mixing ratios for water vapor and cloud water to specific humidity / moist mixing ratios
@@ -1249,7 +1084,7 @@ class GFDriver:
                         tem_shal = dt * (outqcs[i, j, k] * cutens[i, j] + outqcm[i, j, k] * cutenm[i, j])
                         tem_deep = dt * (outqc[i, j, k] * cuten[i, j] + clw_ten[i, j, k])
                         tem = tem_shal + tem_deep
-                        tem1 = max(0.0, min(1.0, (tcr - t.field[i, j, k]) * tcrf))
+                        tem1 = max(0.0, min(1.0, (constants.TCR - t.field[i, j, k]) * constants.TCRF))
                         weight_sum = abs(tem_shal) + abs(tem_deep)
 
                         if weight_sum < 1e-12:
