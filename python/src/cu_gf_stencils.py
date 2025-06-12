@@ -46,6 +46,22 @@ def initialize_driver(
     forcing: FloatFieldIJ, # type: ignore
     forcing2: FloatFieldIJ, # type: ignore
     psum: FloatFieldIJ, # type: ignore
+    ud_mf: FloatField, # type: ignore
+    dd_mf: FloatField, # type: ignore
+    dt_mf: FloatField, # type: ignore
+    cnvc: FloatField, # type: ignore
+    omeg: FloatField, # type: ignore
+    w: FloatField, # type: ignore
+    raincv: FloatFieldIJ, # type: ignore
+    cld1d: FloatFieldIJ, # type: ignore
+    xland: FloatFieldIJ, # type: ignore
+    xlandi: IntFieldIJ32, # type: ignore
+    ht: FloatFieldIJ, # type: ignore
+    ter11: FloatFieldIJ, # type: ignore
+    psur: FloatFieldIJ, # type: ignore
+    psuri: FloatFieldIJ, # type: ignore
+    hbot: IntFieldIJ32, # type: ignore
+    htop: IntFieldIJ32, # type: ignore
     ierr: IntFieldIJ32, # type: ignore
 ):
     """
@@ -53,6 +69,8 @@ def initialize_driver(
 
     """
     from __externals__ import ( # type: ignore
+        kts,
+        kte,
         flag_init,
         flag_restart,
         do_mynnedmf,
@@ -61,6 +79,23 @@ def initialize_driver(
         cp,
         xlv,
     )
+
+    with computation(PARALLEL), interval(...):
+        ud_mf = 0.0
+        dd_mf = 0.0
+        dt_mf = 0.0
+        cnvc = 0.0
+        omeg = w
+
+    with computation(FORWARD), interval(0,1):
+        raincv = 0.0
+        cld1d = 0.0
+        # xlandi = float(xland)  # This should work but doesn't
+        ht = phil / g
+        ter11 = max(ht, 0.0)
+        psur = psuri * 0.01
+        hbot = kte  # TODO: Use k_end built-in external
+        htop = kts  # TODO: Use k_start built-in external
 
     with computation(FORWARD), interval(...):
         if flag_init and not flag_restart:

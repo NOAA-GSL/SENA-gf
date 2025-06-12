@@ -124,6 +124,31 @@ class GFDriver:
             units="n/a",
             dtype=state.rkind,
         )
+        self.omeg: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+        self.xlandi: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="index",
+            dtype=state.rkind,
+        )
+        self.ht: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+        self.ter11: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+        self.psur: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
         self.ierr: Quantity = state.quantity_factory.zeros(
             dims=[X_DIM, Y_DIM],
             units="n/a",
@@ -163,6 +188,8 @@ class GFDriver:
             origin=grid_indexing.origin_compute(),
             domain=grid_indexing.domain_compute(),
             externals={
+                "kts": 0,
+                "kte": state.km - 1,
                 "flag_init": state.flag_init,
                 "flag_restart": state.flag_restart,
                 "do_mynnedmf": state.do_mynnedmf,
@@ -286,12 +313,7 @@ class GFDriver:
 
         zdd = np.zeros((im, jm, km))  # 2D array for downdraft mass flux
 
-        ht = np.zeros((im, jm))  # Height array
-
         mconv = np.zeros((im, jm))  # Moisture convergence
-        omeg = np.zeros((im, jm, km))  # Vertical velocity
-
-        ter11 = np.zeros((im, jm))  # Terrain height
 
         cnvw = np.zeros((im, jm, km))  # Convective tendencies
 
@@ -335,8 +357,6 @@ class GFDriver:
         zus = np.zeros((im, jm, km))  # Shallow updraft mass flux
         zd = np.zeros((im, jm, km))  # Downdraft mass flux
         zdm = np.zeros((im, jm, km))  # Middle downdraft mass flux
-
-        psur = np.zeros((im, jm))  # Surface pressure
 
         massflx = np.zeros(km)  # Mass flux array
         trcflx_in1 = np.zeros(km)  # Tracer flux array
@@ -483,28 +503,8 @@ class GFDriver:
         # Initialize debugging variables
         ipr = 0 # CWH
 
-        # Initialize arrays
-        ud_mf.field[:, :, :] = 0.0
-        dd_mf.field[:, :, :] = 0.0
-        dt_mf.field[:, :, :] = 0.0
-
-        hbot.field[:, :] = kte
-        htop.field[:, :] = kts
-        raincv.field[:, :] = 0.0
-        cnvc.field[:, :, :] = 0.0
-        cld1d.field[:, :] = 0.0
-
+        # TODO: Make this work inside the stencil
         xlandi[:, :] = xland.field.astype(state.rkind)[:, :]
-
-        # Initialize `ht` array
-        ht[:, :] = phil.field[:, :, 0] / g
-
-        ter11 = np.maximum(ht, 0.0)
-
-        # Scale surface pressure
-        psur[:, :] = 0.01 * psuri.field[:, :]
-
-        omeg[:, :, :] = w.field[:, :, :]
 
         self._initialize_driver(
             aod_gf=aod_gf,
@@ -550,6 +550,22 @@ class GFDriver:
             forcing=self.forcing.data[:,:,6],
             forcing2=self.forcing2.data[:,:,6],
             psum=self.psum,
+            ud_mf=ud_mf,
+            dd_mf=dd_mf,
+            dt_mf=dt_mf,
+            cnvc=cnvc,
+            omeg=self.omeg,
+            w=w,
+            raincv=raincv,
+            cld1d=cld1d,
+            xland=xland,
+            xlandi=self.xlandi,
+            ht=self.ht,
+            ter11=self.ter11,
+            psur=self.psur,
+            psuri=psuri,
+            hbot=hbot,
+            htop=htop,
             ierr=self.ierr,
         )
 
@@ -571,11 +587,11 @@ class GFDriver:
                 self.zo.field,
                 self.t2d.field,
                 self.q2d.field,
-                ter11,
+                self.ter11.field,
                 self.tshall.field,
                 self.qshall.field,
                 self.p2d.field,
-                psur,
+                self.psur.field,
                 self.dhdt.field,
                 self.kpbli.field,
                 self.rhoi.field,
@@ -639,11 +655,11 @@ class GFDriver:
                 self.forcing.field,
                 self.t2d.field,
                 self.q2d.field,
-                ter11,
+                self.ter11.field,
                 self.tshall.field,
                 self.qshall.field,
                 self.p2d.field,
-                psur,
+                self.psur.field,
                 us.field,
                 vs.field,
                 self.rhoi.field,
@@ -651,7 +667,7 @@ class GFDriver:
                 self.qfx.field,
                 self.dx.field,
                 mconv,
-                omeg,
+                self.omeg.field,
                 cactiv_m.field,
                 cnvwtm,
                 zum,
@@ -721,11 +737,11 @@ class GFDriver:
                 self.forcing2.field,
                 self.t2d.field,
                 self.q2d.field,
-                ter11,
+                self.ter11.field,
                 self.tn.field,
                 self.qo.field,
                 self.p2d.field,
-                psur,
+                self.psur.field,
                 us.field,
                 vs.field,
                 self.rhoi.field,
@@ -733,7 +749,7 @@ class GFDriver:
                 self.qfx.field,
                 self.dx.field,
                 mconv,
-                omeg,
+                self.omeg.field,
                 cactiv.field,
                 cnvwt,
                 zu,
