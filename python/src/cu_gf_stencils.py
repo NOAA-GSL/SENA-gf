@@ -54,8 +54,8 @@ def initialize_driver(
     w: FloatField, # type: ignore
     raincv: FloatFieldIJ, # type: ignore
     cld1d: FloatFieldIJ, # type: ignore
-    xland: FloatFieldIJ, # type: ignore
-    xlandi: IntFieldIJ32, # type: ignore
+    xland: IntFieldIJ32, # type: ignore
+    xlandi: FloatFieldIJ, # type: ignore
     ht: FloatFieldIJ, # type: ignore
     ter11: FloatFieldIJ, # type: ignore
     psur: FloatFieldIJ, # type: ignore
@@ -69,8 +69,8 @@ def initialize_driver(
 
     """
     from __externals__ import ( # type: ignore
-        kts,
-        kte,
+        k_start,
+        k_end,
         flag_init,
         flag_restart,
         do_mynnedmf,
@@ -90,12 +90,12 @@ def initialize_driver(
     with computation(FORWARD), interval(0,1):
         raincv = 0.0
         cld1d = 0.0
-        # xlandi = float(xland)  # This should work but doesn't
+        xlandi = float(xland)
         ht = phil / g
         ter11 = max(ht, 0.0)
         psur = psuri * 0.01
-        hbot = kte  # TODO: Use k_end built-in external
-        htop = kts  # TODO: Use k_start built-in external
+        hbot = k_end
+        htop = k_start
 
     with computation(FORWARD), interval(...):
         if flag_init and not flag_restart:

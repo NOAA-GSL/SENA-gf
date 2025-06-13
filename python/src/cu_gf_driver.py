@@ -4,13 +4,14 @@ from cu_gf_sh import cu_gf_sh_run
 from cu_gf_deep import cu_gf_deep_run, neg_check, fct1d3
 from ndsl.quantity import Quantity
 from ndsl.constants import X_DIM, Y_DIM, Z_DIM
+from gf_state import GFState
 
 from cu_gf_stencils import (initialize_driver)
 import cu_gf_constants as constants
 
 class GFDriver:
 
-    def __init__(self, state):
+    def __init__(self, state: GFState):
         self.state = state  # Set the initial state
 
         # Initialize fields
@@ -179,17 +180,11 @@ class GFDriver:
             dtype=state.rkind,
         )
 
-        # Get the stencil factory grid indexing
-        grid_indexing = state.stencil_factory.grid_indexing
-
-        # Create the stencil for initializing AOD and CCN
-        self._initialize_driver = state.stencil_factory.from_origin_domain(
-            initialize_driver,
-            origin=grid_indexing.origin_compute(),
-            domain=grid_indexing.domain_compute(),
+        # Create the stencil for initializing the driver
+        self._initialize_driver = state.stencil_factory.from_dims_halo(
+            func=initialize_driver,
+            compute_dims=(X_DIM, Y_DIM, Z_DIM),
             externals={
-                "kts": 0,
-                "kte": state.km - 1,
                 "flag_init": state.flag_init,
                 "flag_restart": state.flag_restart,
                 "do_mynnedmf": state.do_mynnedmf,
@@ -409,8 +404,6 @@ class GFDriver:
         clw_ten = np.zeros((im, jm, km))  # Cloud water tendencies
         po_cup = np.zeros(km)  # Pressure at cloud levels
 
-        xlandi = np.zeros((im, jm))  # Land mask as a float array
-
         ierrcs = np.full((im, jm), " ", dtype="<U50")  # Error messages for shallow convection
         ierrcm = np.full((im, jm), " ", dtype="<U50")  # Error messages for middle convection
 
@@ -503,9 +496,6 @@ class GFDriver:
         # Initialize debugging variables
         ipr = 0 # CWH
 
-        # TODO: Make this work inside the stencil
-        xlandi[:, :] = xland.field.astype(state.rkind)[:, :]
-
         self._initialize_driver(
             aod_gf=aod_gf,
             ccn_gf=self.ccn_gf,
@@ -597,7 +587,7 @@ class GFDriver:
                 self.rhoi.field,
                 self.hfx.field,
                 self.qfx.field,
-                xlandi,
+                self.xlandi.field,
                 ichoice_s,
                 constants.TCRIT,
                 dt,
@@ -650,7 +640,7 @@ class GFDriver:
                 imid_gf,
                 self.kpbli.field,
                 self.dhdt.field,
-                xlandi,
+                self.xlandi.field,
                 self.zo.field,
                 self.forcing.field,
                 self.t2d.field,
@@ -732,7 +722,7 @@ class GFDriver:
                 0,
                 self.kpbli.field,
                 self.dhdt.field,
-                xlandi,
+                self.xlandi.field,
                 self.zo.field,
                 self.forcing2.field,
                 self.t2d.field,
