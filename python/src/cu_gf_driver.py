@@ -1,6 +1,5 @@
 import numpy as np
 
-from cu_gf_sh import cu_gf_sh_run
 from cu_gf_deep import cu_gf_deep_run, neg_check, fct1d3
 from ndsl.quantity import Quantity
 from ndsl.constants import X_DIM, Y_DIM, Z_DIM
@@ -8,6 +7,7 @@ from gf_state import GFState
 
 from cu_gf_stencils import (initialize_driver)
 import cu_gf_constants as constants
+from cu_gf_sh import GFShallowConvection
 
 class GFDriver:
 
@@ -270,7 +270,7 @@ class GFDriver:
                 "g": state.g,
                 "cp": state.cp,
                 "xlv": state.xlv,
-            }
+            },
         )
 
 
@@ -631,7 +631,8 @@ class GFDriver:
                     self.ierrs.field[i, j] = 0
                     ierrm[i, j] = 0
 
-            cu_gf_sh_run(
+            cu_gf_sh = GFShallowConvection(self.state)
+            cu_gf_sh.cu_gf_sh_run(
                 us=us.field,
                 vs=vs.field,
                 zo=self.zo.field,
@@ -657,7 +658,6 @@ class GFDriver:
                 ktop=self.ktops.field,
                 k22=self.k22s.field,
                 ierr=self.ierrs.field,
-                # ierrc=ierrcs,
                 outt=self.outts.field,
                 outq=self.outqs.field,
                 outqc=self.outqcs.field,
