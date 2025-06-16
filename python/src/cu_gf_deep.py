@@ -864,7 +864,7 @@ def cu_gf_deep_run(
 
     # Call cup_kbcon to determine the level of convective cloud base (kbcon)
     cup_kbcon(
-        ierrc, cap_max_increment, iloop, k22, kbcon, heo_cup, heso_cup,
+        cap_max_increment, iloop, k22, kbcon, heo_cup, heso_cup,
         hkbo, ierr, kbmax, po_cup, cap_max,
         ztexec, zqexec,
         jprnt, itf, jtf, ktf,
@@ -2145,7 +2145,7 @@ def cu_gf_deep_run(
     #     print(f"{heo_cup[0,k]:>20.12E}{heso_cup[0,k]:>20.12E}{po_cup[0,k]:>20.12E}{z_cup[0,k]:>20.12E}{heo[0,k]:>20.12E}")
 
     cup_kbcon(
-        ierrc, cap_max_increment, iloop, k22x, kbconx, heo_cup,
+        cap_max_increment, iloop, k22x, kbconx, heo_cup,
         heso_cup, hkbo, ierr2, kbmax, po_cup, cap_max,
         ztexec, zqexec,
         0, itf, jtf, ktf,
@@ -2172,7 +2172,7 @@ def cu_gf_deep_run(
     # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
 
     cup_kbcon(
-        ierrc, cap_max_increment, iloop, k22x, kbconx, heo_cup,
+        cap_max_increment, iloop, k22x, kbconx, heo_cup,
         heso_cup, hkbo, ierr3, kbmax, po_cup, cap_max,
         ztexec, zqexec,
         0, itf, jtf, ktf,
@@ -3295,7 +3295,7 @@ def cup_forcing_ens_3d(closure_n, xland, aa0, aa1, xaa0, mbdt, dtime, ierr, ierr
     else:
         xf_dicycle[:, :] = 0.0
 
-def cup_kbcon(ierrc, cap_inc, iloop_in, k22, kbcon, he_cup, hes_cup,
+def cup_kbcon(cap_inc, iloop_in, k22, kbcon, he_cup, hes_cup,
               hkb, ierr, kbmax, p_cup, cap_max,
               ztexec, zqexec,
               jprnt, itf, jtf, ktf,
@@ -3381,7 +3381,7 @@ def cup_kbcon(ierrc, cap_inc, iloop_in, k22, kbcon, he_cup, hes_cup,
                         if kbcon[i, j] > kbmax[i, j] + 2:
                             if iloop[i, j] != 4:
                                 ierr[i, j] = 3
-                                ierrc[i, j] = "could not find reasonable kbcon in cup_kbcon"
+                                # ierrc[i, j] = "could not find reasonable kbcon in cup_kbcon"
                             break
                         else:
                             continue
@@ -3426,7 +3426,7 @@ def cup_kbcon(ierrc, cap_inc, iloop_in, k22, kbcon, he_cup, hes_cup,
                         if kbcon[i, j] > kbmax[i, j] + 2:
                             if iloop[i, j] != 4:
                                 ierr[i, j] = 3
-                                ierrc[i, j] = "could not find reasonable kbcon in cup_kbcon"
+                                # ierrc[i, j] = "could not find reasonable kbcon in cup_kbcon"
                             break
 
                 break
@@ -4862,7 +4862,7 @@ def get_melting_profile(ierr, tn_cup, po_cup, p_liq_ice, melting_layer, qrco,
 import numpy as np
 
 def get_cloud_top(name, ktop, ierr, p_cup, entr_rate_2d, hkbo, heo, heso_cup, z_cup, 
-                  kstabi, k22, kbcon, its, ite, itf, kts, kte, ktf, zuo, kpbl, klcl, hcot):
+                  kstabi, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kpbl, klcl, hcot):
     """
     Calculates the cloud top height.
 
@@ -4889,37 +4889,38 @@ def get_cloud_top(name, ktop, ierr, p_cup, entr_rate_2d, hkbo, heo, heso_cup, z_
         dbythresh = 1.0
 
     for i in range(its, itf + 1):
-        kfinalzu = ktf - 2
-        ktop[i, j] = kfinalzu
-        if ierr[i, j] == 0:
-            dby[:] = 0.0
+        for j in range(jts, jtf + 1):
+            kfinalzu = ktf - 2
+            ktop[i, j] = kfinalzu
+            if ierr[i, j] == 0:
+                dby[:] = 0.0
 
-            start_level = kbcon[i, j]
-            hcot[i, j, kts:start_level + 1] = hkbo[i, j]
+                start_level = kbcon[i, j]
+                hcot[i, j, kts:start_level + 1] = hkbo[i, j]
 
-            dz = z_cup[i, j, start_level] - z_cup[i, j, start_level - 1]
-            dby[start_level] = (hcot[i, j, start_level] - heso_cup[i, j, start_level]) * dz
+                dz = z_cup[i, j, start_level] - z_cup[i, j, start_level - 1]
+                dby[start_level] = (hcot[i, j, start_level] - heso_cup[i, j, start_level]) * dz
 
-            for k in range(start_level + 1, ktf - 1):
-                dz = z_cup[i, j, k] - z_cup[i, j, k - 1]
-                hcot[i, j, k] = ((1.0 - 0.5 * entr_rate_2d[i, j, k - 1] * dz) * hcot[i, j, k - 1] +
-                              entr_rate_2d[i, j, k - 1] * dz * heo[i, j, k - 1]) / \
-                             (1.0 + 0.5 * entr_rate_2d[i, j, k - 1] * dz)
-                dby[k] = dby[k - 1] + (hcot[i, j, k] - heso_cup[i, j, k]) * dz
-
-            if FIND_KTOP_OPTION == 0:
-                for k in range(np.argmax(dby), ktf - 1):
-                    if dby[k] < dbythresh * np.max(dby):
-                        kfinalzu = k - 1
-                        ktop[i, j] = kfinalzu
-                        break
-            else:
                 for k in range(start_level + 1, ktf - 1):
-                    if hcot[i, j, k] < heso_cup[i, j, k]:
-                        kfinalzu = k - 1
-                        ktop[i, j] = kfinalzu
-                        break
+                    dz = z_cup[i, j, k] - z_cup[i, j, k - 1]
+                    hcot[i, j, k] = ((1.0 - 0.5 * entr_rate_2d[i, j, k - 1] * dz) * hcot[i, j, k - 1] +
+                                entr_rate_2d[i, j, k - 1] * dz * heo[i, j, k - 1]) / \
+                                (1.0 + 0.5 * entr_rate_2d[i, j, k - 1] * dz)
+                    dby[k] = dby[k - 1] + (hcot[i, j, k] - heso_cup[i, j, k]) * dz
 
-            if kfinalzu <= kbcon[i, j] + 1:
-                ierr[i, j] = 41
+                if FIND_KTOP_OPTION == 0:
+                    for k in range(np.argmax(dby), ktf - 1):
+                        if dby[k] < dbythresh * np.max(dby):
+                            kfinalzu = k - 1
+                            ktop[i, j] = kfinalzu
+                            break
+                else:
+                    for k in range(start_level + 1, ktf - 1):
+                        if hcot[i, j, k] < heso_cup[i, j, k]:
+                            kfinalzu = k - 1
+                            ktop[i, j] = kfinalzu
+                            break
+
+                if kfinalzu <= kbcon[i, j] + 1:
+                    ierr[i, j] = 41
 

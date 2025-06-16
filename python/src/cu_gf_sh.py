@@ -25,7 +25,7 @@ ZERO = 0.0  # Equivalent to "real(kind=kind_phys), parameter :: zero = 0"
 def cu_gf_sh_run(
     us, vs, zo, t, q, z1, tn, qo, po, psur, dhdt, kpbl, rho,
     hfx, qfx, xland, ichoice, tcrit, dtime,
-    zuo, xmb_out, kbcon, ktop, k22, ierr, ierrc,
+    zuo, xmb_out, kbcon, ktop, k22, ierr,
     outt, outq, outqc, outu, outv, cnvwt, pre, cupclw,
     itf, jtf, ktf, its, ite, jts, jte, kts, kte, ipr, tropics
 ):
@@ -306,7 +306,7 @@ def cu_gf_sh_run(
             xmb_out[i, j] = 0.0
             cap_max_increment[i, j] = 25.0
             entr_rate[i, j] = 1.0e-3  # Initial entrainment rate
-            ierrc[i, j] = " "  # Set error description to an empty string
+            # ierrc[i, j] = " "  # Set error description to an empty string
 
     for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
@@ -495,7 +495,7 @@ def cu_gf_sh_run(
                 if k22[i, j] > kbmax[i, j]:  # Check if k22 exceeds kbmax
                     ierr[i, j] = 2
                     # Equivalent to setting error description in Fortran
-                    ierrc[i, j] = "could not find k22"
+                    # ierrc[i, j] = "could not find k22"
                     ktop[i, j] = -1
                     k22[i, j] = -1
                     kbcon[i, j] = -1
@@ -538,7 +538,7 @@ def cu_gf_sh_run(
 
     # Call cup_kbcon() to determine the level of convective cloud base (kbcon)
     cup_kbcon(
-        ierrc, cap_max_increment, 5, k22, kbcon, heo_cup, heso_cup,
+        cap_max_increment, 5, k22, kbcon, heo_cup, heso_cup,
         hkbo, ierr, kbmax, po_cup, cap_max,
         ztexec, zqexec,
         0, itf, jtf, ktf,
@@ -773,7 +773,7 @@ def cu_gf_sh_run(
                 continue
             if ktop[i, j] > ktf - 2:
                 ierr[i, j] = 5
-                ierrc[i, j] = "ktop is larger than ktf-2"
+                # ierrc[i, j] = "ktop is larger than ktf-2"
                 continue
 
             # Call get_cloud_bc() to calculate cloud properties
@@ -866,7 +866,7 @@ def cu_gf_sh_run(
                     if aa1[i, j] <= 0.0:  # Check if cloud work function is zero or negative
                         ierr[i, j] = 17
                         # Equivalent to setting error description in Fortran
-                        ierrc[i, j] = "cloud work function zero"
+                        # ierrc[i, j] = "cloud work function zero"
 
     for k in range(kts, ktf + 1):  # Loop over vertical levels
         for i in range(its, itf + 1):  # Loop over horizontal grid points
@@ -1034,7 +1034,7 @@ def cu_gf_sh_run(
                     xmb[i, j] = min(xmbmax[i, j], xff_shal[ichoice - 1])
                 if xmb[i, j] <= 0.0:
                     ierr[i, j] = 21
-                    ierrc[i, j] = "21"
+                    # ierrc[i, j] = "21"
 
             if ierr[i, j] != 0:  # Handle error case
                 k22[i, j] = -1

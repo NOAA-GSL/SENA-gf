@@ -150,7 +150,85 @@ class GFDriver:
             units="n/a",
             dtype=state.rkind,
         )
+        self.zus: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+        self.xmbs: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+        self.kbcons: Quantity = state.quantity_factory.empty(
+            dims=[X_DIM, Y_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
+        self.kbcons.field[:, :] = -1
+        self.ktops: Quantity = state.quantity_factory.empty(
+            dims=[X_DIM, Y_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
+        self.ktops.field[:, :] = -1
+        self.k22s: Quantity = state.quantity_factory.empty(
+            dims=[X_DIM, Y_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
+        self.k22s.field[:, :] = -1
+        self.outts: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+        self.outqs: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+        self.outqcs: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+        self.outus: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+        self.outvs: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+        self.cnvwt: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+        self.prets: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+        self.cupclws: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
+        self.tropics: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="n/a",
+            dtype=int,
+        )
         self.ierr: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="n/a",
+            dtype=state.ikind,
+        )
+        self.ierrs: Quantity = state.quantity_factory.zeros(
             dims=[X_DIM, Y_DIM],
             units="n/a",
             dtype=state.ikind,
@@ -297,8 +375,6 @@ class GFDriver:
         rand_vmas = np.zeros((im, jm))  # 1D array with size equal to the horizontal grid dimension
         rand_clos = np.zeros((im, jm, km))  # 2D array with horizontal and vertical dimensions
 
-        tropics = np.zeros((im, jm), dtype=int)  # Integer array for tropics flag
-
         tun_rad_shall = np.full((im, jm), 0.01)  # Tuning constants for radiation coupling
         tun_rad_mid = np.full((im, jm), 0.3)
 
@@ -316,7 +392,6 @@ class GFDriver:
         gdc2 = np.zeros((im, jm, km, 10))
 
         ierrm = np.zeros((im, jm), dtype=int)  # Error flags
-        ierrs = np.zeros((im, jm), dtype=int)
         ierrc = np.full((im, jm), " ", dtype="<U50")  # Error messages (strings)
 
         cuten = np.zeros((im, jm))  # Convective tendencies
@@ -324,20 +399,16 @@ class GFDriver:
         cutens = np.zeros((im, jm))
 
         kbcon = np.full((im, jm), -1, dtype=int)  # Convective base indices (deep convection)
-        kbcons = np.full((im, jm), -1, dtype=int)  # Convective base indices
         kbconm = np.full((im, jm), -1, dtype=int)
         ktop = np.full((im, jm), -1, dtype=int)  # Convective cloud top indices (deep convection))
-        ktops = np.full((im, jm), -1, dtype=int)
         ktopm = np.full((im, jm), -1, dtype=int)
 
         xmb = np.zeros((im, jm))  # Mass flux arrays
         xmbm = np.zeros((im, jm))
-        xmbs = np.zeros((im, jm))
         xmb_dumm = np.zeros((im, jm))
 
         pret = np.zeros((im, jm))  # Precipitation arrays
         pretm = np.zeros((im, jm))
-        prets = np.zeros((im, jm))
 
         clw_ten = np.zeros((im, jm, km))  # Cloud water tendencies
 
@@ -349,19 +420,12 @@ class GFDriver:
 
         zu = np.zeros((im, jm, km))  # Updraft mass flux
         zum = np.zeros((im, jm, km))  # Middle updraft mass flux
-        zus = np.zeros((im, jm, km))  # Shallow updraft mass flux
         zd = np.zeros((im, jm, km))  # Downdraft mass flux
         zdm = np.zeros((im, jm, km))  # Middle downdraft mass flux
 
         massflx = np.zeros(km)  # Mass flux array
         trcflx_in1 = np.zeros(km)  # Tracer flux array
         clw_in1 = np.zeros(km)  # Cloud water input array
-
-        outts = np.zeros((im, jm, km))  # Temperature tendencies (shallow convection)
-        outqs = np.zeros((im, jm, km))  # Specific humidity tendencies (shallow convection)
-        outqcs = np.zeros((im, jm, km))  # Cloud water tendencies (shallow convection)
-        outus = np.zeros((im, jm, km))  # U-wind tendencies (shallow convection)
-        outvs = np.zeros((im, jm, km))  # V-wind tendencies (shallow convection)
 
         outtm = np.zeros((im, jm, km))  # Temperature tendencies (middle convection)
         outqm = np.zeros((im, jm, km))  # Specific humidity tendencies (middle convection)
@@ -376,21 +440,17 @@ class GFDriver:
         outv = np.zeros((im, jm, km))  # V-wind tendencies (deep convection)
 
         k22 = np.full((im, jm), -1, dtype=int)  # Updraft originating level (deep convection)
-        k22s = np.full((im, jm), -1, dtype=int)  # Updraft originating level (shallow convection)
         k22m = np.full((im, jm), -1, dtype=int)  # Updraft originating level (middle convection)
 
         jmin = np.full((im, jm), -1, dtype=int)  # Minimum convection level
         jminm = np.full((im, jm), -1, dtype=int)  # Minimum convection level (middle convection)
 
         pret = np.zeros((im, jm))  # Precipitation rate (deep convection)
-        prets = np.zeros((im, jm))  # Precipitation rate (shallow convection)
         pretm = np.zeros((im, jm))  # Precipitation rate (middle convection)
 
         cupclw = np.zeros((im, jm, km))  # Cloud water (deep convection)
-        cupclws = np.zeros((im, jm, km))  # Cloud water (shallow convection)
         cupclwm = np.zeros((im, jm, km))  # Cloud water (middle convection)
 
-        cnvwt = np.zeros((im, jm, km))  # Convective tendencies (deep convection)
         cnvwts = np.zeros((im, jm, km))  # Convective tendencies (shallow convection)
         cnvwtm = np.zeros((im, jm, km))  # Convective tendencies (middle convection)
 
@@ -568,7 +628,7 @@ class GFDriver:
             # Initialize `ierrs` and `ierrm`
             for i in range(its, ite + 1):
                 for j in range(jts, jte + 1):
-                    ierrs[i, j] = 0
+                    self.ierrs.field[i, j] = 0
                     ierrm[i, j] = 0
 
             cu_gf_sh_run(
@@ -591,29 +651,29 @@ class GFDriver:
                 ichoice=ichoice_s,
                 tcrit=constants.TCRIT,
                 dtime=dt,
-                zuo=zus,
-                xmb_out=xmbs,
-                kbcon=kbcons,
-                ktop=ktops,
-                k22=k22s,
-                ierr=ierrs,
-                ierrc=ierrcs,
-                outt=outts,
-                outq=outqs,
-                outqc=outqcs,
-                outu=outus,
-                outv=outvs,
-                cnvwt=cnvwt,
-                pre=prets,
-                cupclw=cupclws,
+                zuo=self.zus.field,
+                xmb_out=self.xmbs.field,
+                kbcon=self.kbcons.field,
+                ktop=self.ktops.field,
+                k22=self.k22s.field,
+                ierr=self.ierrs.field,
+                # ierrc=ierrcs,
+                outt=self.outts.field,
+                outq=self.outqs.field,
+                outqc=self.outqcs.field,
+                outu=self.outus.field,
+                outv=self.outvs.field,
+                cnvwt=self.cnvwt.field,
+                pre=self.prets.field,
+                cupclw=self.cupclws.field,
                 itf=itf, jtf=jtf, ktf=ktf, its=its, ite=ite, jts=jts, jte=jte, kts=kts, kte=kte, ipr=ipr,
-                tropics=tropics,
+                tropics=self.tropics.field,
             )
 
             # Update `cutens`, `ierrm`, and `ierr` based on `xmbs`
             for i in range(its, itf + 1):
                 for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                    if xmbs[i, j] > 0.0:
+                    if self.xmbs.field[i, j] > 0.0:
                         cutens[i, j] = 1.0
                         if self.dx.field[i, j] < 6500.0:
                             ierrm[i, j] = 555
@@ -621,8 +681,8 @@ class GFDriver:
 
             # Call `neg_check` for GF shallow convection
             neg_check(
-                "shallow", ipn, dt, self.qcheck.field, outqs, outts, outus, outvs, outqcs, prets,
-                its, ite, jts, jte, kts, kte, itf, jtf, ktf, ktops
+                "shallow", ipn, dt, self.qcheck.field, self.outqs.field, self.outts.field, self.outus.field, self.outvs.field, self.outqcs.field, self.prets.field,
+                its, ite, jts, jte, kts, kte, itf, jtf, ktf, self.ktops.field
             )
 
         ipr = 0
@@ -667,7 +727,7 @@ class GFDriver:
                 edtd,
                 xmbm,
                 xmb_dumm,
-                xmbs,
+                self.xmbs.field,
                 pretm,
                 outum,
                 outvm,
@@ -694,14 +754,14 @@ class GFDriver:
                 k22m,
                 jminm,
                 kdt,
-                tropics
+                self.tropics.field
             )
 
             # Update `qcheck` array
             for i in range(its, itf + 1):
                 for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                     for k in range(kts, ktf + 1):
-                        self.qcheck.field[i, j, k] = self.qv.field[i, j, k] + outqs[i, j, k] * dt
+                        self.qcheck.field[i, j, k] = self.qv.field[i, j, k] + self.outqs.field[i, j, k] * dt
 
             # Call `neg_check` for middle GF convection
             neg_check(
@@ -741,7 +801,7 @@ class GFDriver:
                 mconv,
                 self.omeg.field,
                 cactiv.field,
-                cnvwt,
+                self.cnvwt.field,
                 zu,
                 zd,
                 zdm,
@@ -749,7 +809,7 @@ class GFDriver:
                 edtm,
                 xmb,
                 xmbm,
-                xmbs,
+                self.xmbs.field,
                 pret,
                 outu,
                 outv,
@@ -776,7 +836,7 @@ class GFDriver:
                 k22,
                 jmin,
                 kdt,
-                tropics
+                self.tropics.field
             )
 
             ipr = 0
@@ -785,7 +845,7 @@ class GFDriver:
             for i in range(its, itf + 1):
                 for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                     for k in range(kts, ktf + 1):
-                        self.qcheck.field[i, j, k] = self.qv.field[i, j, k] + (outqs[i, j, k] + outqm[i, j, k]) * dt
+                        self.qcheck.field[i, j, k] = self.qv.field[i, j, k] + (self.outqs.field[i, j, k] + outqm[i, j, k]) * dt
 
             # Call `neg_check` for deep GF convection
             neg_check(
@@ -831,8 +891,8 @@ class GFDriver:
                 # Determine `kstop` based on convection levels
                 if ktopm[i, j] > kts or ktop[i, j] > kts:
                     kstop = max(ktopm[i, j], ktop[i, j])
-                if ktops[i, j] > kts:
-                    kstop = max(kstop, ktops[i, j])
+                if self.ktops.field[i, j] > kts:
+                    kstop = max(kstop, self.ktops.field[i, j])
 
                 if kstop > 1:
                     htop.field[i, j] = kstop
@@ -847,14 +907,14 @@ class GFDriver:
                         cnvc.field[i, j, k] = (
                             0.04 * np.log(1.0 + 675.0 * zu[i, j, k] * xmb[i, j]) +
                             0.04 * np.log(1.0 + 675.0 * zum[i, j, k] * xmbm[i, j]) +
-                            0.04 * np.log(1.0 + 675.0 * zus[i, j, k] * xmbs[i, j])
+                            0.04 * np.log(1.0 + 675.0 * self.zus.field[i, j, k] * self.xmbs.field[i, j])
                         )
                         cnvc.field[i, j, k] = min(cnvc.field[i, j, k], 0.6)
                         cnvc.field[i, j, k] = max(cnvc.field[i, j, k], 0.0)
 
                         cnvw[i, j, k] = (
-                            cnvwt[i, j, k] * xmb[i, j] * dt +
-                            cnvwts[i, j, k] * xmbs[i, j] * dt +
+                            self.cnvwt.field[i, j, k] * xmb[i, j] * dt +
+                            cnvwts[i, j, k] * self.xmbs.field[i, j] * dt +
                             cnvwtm[i, j, k] * xmbm[i, j] * dt
                         )
 
@@ -862,7 +922,7 @@ class GFDriver:
                         dd_mf.field[i, j, k] = cuten[i, j] * zd[i, j, k] * edt[i, j] * xmb[i, j] * dt
 
                         t.field[i, j, k] += dt * (
-                            cutens[i, j] * outts[i, j, k] +
+                            cutens[i, j] * self.outts.field[i, j, k] +
                             cutenm[i, j] * outtm[i, j, k] +
                             outt[i, j, k] * cuten[i, j]
                         )
@@ -870,7 +930,7 @@ class GFDriver:
                         self.qv.field[i, j, k] = max(
                             1.0e-16,
                             self.qv.field[i, j, k] + dt * (
-                                cutens[i, j] * outqs[i, j, k] +
+                                cutens[i, j] * self.outqs.field[i, j, k] +
                                 cutenm[i, j] * outqm[i, j, k] +
                                 outq[i, j, k] * cuten[i, j]
                             )
@@ -881,21 +941,21 @@ class GFDriver:
                         us.field[i, j, k] += (
                             outu[i, j, k] * cuten[i, j] * dt +
                             outum[i, j, k] * cutenm[i, j] * dt +
-                            outus[i, j, k] * cutens[i, j] * dt
+                            self.outus.field[i, j, k] * cutens[i, j] * dt
                         )
 
                         vs.field[i, j, k] += (
                             outv[i, j, k] * cuten[i, j] * dt +
                             outvm[i, j, k] * cutenm[i, j] * dt +
-                            outvs[i, j, k] * cutens[i, j] * dt
+                            self.outvs.field[i, j, k] * cutens[i, j] * dt
                         )
 
-                        gdc[i, j, k, 0] = max(0.0, tun_rad_shall[i, j] * cupclws[i, j, k] * cutens[i, j])
+                        gdc[i, j, k, 0] = max(0.0, tun_rad_shall[i, j] * self.cupclws.field[i, j, k] * cutens[i, j])
                         gdc2[i, j, k, 0] = max(
                             0.0,
                             tun_rad_mid[i, j] * cupclwm[i, j, k] * cutenm[i, j] +
                             frhd[i, j] * cupclw[i, j, k] * cuten[i, j] +
-                            tun_rad_shall[i, j] * cupclws[i, j, k] * cutens[i, j]
+                            tun_rad_shall[i, j] * self.cupclws.field[i, j, k] * cutens[i, j]
                         )
 
                         # Initialize qci_conv
@@ -904,9 +964,9 @@ class GFDriver:
                         # Update gdc array with tendencies and other parameters
                         gdc[i, j, k, 1] = outt[i, j, k] * 86400.0
                         gdc[i, j, k, 2] = outtm[i, j, k] * 86400.0
-                        gdc[i, j, k, 3] = outts[i, j, k] * 86400.0
+                        gdc[i, j, k, 3] = self.outts.field[i, j, k] * 86400.0
                         gdc[i, j, k, 6] = -(gdc[i, j, k, 6] - np.sqrt(us.field[i, j, k]**2 + vs.field[i, j, k]**2)) / dt
-                        gdc[i, j, k, 7] = (outqm[i, j, k] + outqs[i, j, k] + outq[i, j, k]) * 86400.0 * xlv / cp
+                        gdc[i, j, k, 7] = (outqm[i, j, k] + self.outqs.field[i, j, k] + outq[i, j, k]) * 86400.0 * xlv / cp
                         gdc[i, j, k, 8] = gdc[i, j, k, 1] + gdc[i, j, k, 2] + gdc[i, j, k, 3]
 
                         # Treat subsidence effects on cloud ice/water
@@ -926,7 +986,7 @@ class GFDriver:
                             massflx[k] = (
                                 -(xmb[i, j] * (zu[i, j, k] - edt[i, j] * zd[i, j, k])) -
                                 (xmbm[i, j] * (zdm[i, j, k] - edtm[i, j] * zdm[i, j, k])) -
-                                (xmbs[i, j] * zus[i, j, k])
+                                (self.xmbs.field[i, j] * self.zus.field[i, j, k])
                             )
                             trcflx_in1[k] = massflx[k] * 0.5 * (clwtot + clwtot1)
                             self.forcing2.field[i, j, 2] += clwtot
@@ -944,7 +1004,7 @@ class GFDriver:
                     # Update cloud ice and water tendencies
                     for k in range(kstop + 1):  # Python's 0-based indexing
                         tem = dt * (
-                            outqcs[i, j, k] * cutens[i, j] +
+                            self.outqcs.field[i, j, k] * cutens[i, j] +
                             outqc[i, j, k] * cuten[i, j] +
                             outqcm[i, j, k] * cutenm[i, j] +
                             clw_ten[i, j, k]
@@ -968,7 +1028,7 @@ class GFDriver:
                     gdc[i, j, 7, 9] = self.forcing.field[i, j, 7]
                     gdc[i, j, 9, 9] = xmb[i, j]
                     gdc[i, j, 10, 9] = xmbm[i, j]
-                    gdc[i, j, 11, 9] = xmbs[i, j]
+                    gdc[i, j, 11, 9] = self.xmbs.field[i, j]
                     gdc[i, j, 12, 9] = self.hfx.field[i, j]
                     gdc[i, j, 14, 9] = self.qfx.field[i, j]
                     gdc[i, j, 15, 9] = pret[i, j] * 3600.0
@@ -986,7 +1046,7 @@ class GFDriver:
                     cactiv.field[i, j] = 1
                     raincv.field[i, j] = 0.001 * (
                         cutenm[i, j] * pretm[i, j] +
-                        cutens[i, j] * prets[i, j] +
+                        cutens[i, j] * self.prets.field[i, j] +
                         cuten[i, j] * pret[i, j]
                     ) * dt
                 else:
@@ -1030,24 +1090,24 @@ class GFDriver:
                 if uidx >= 0:
                     # Update tendencies for x-wind
                     for k in range(kts, ktf + 1):  # Python's 0-based indexing
-                        dtend.field[:, :, k, uidx] += cutens[:, :] * outus[:, :, k] * dt
+                        dtend.field[:, :, k, uidx] += cutens[:, :] * self.outus.field[:, :, k] * dt
 
                 if vidx >= 0:
                     # Update tendencies for y-wind
                     for k in range(kts, ktf + 1):
-                        dtend.field[:, :, k, vidx] += cutens[:, :] * outvs[:, :, k] * dt
+                        dtend.field[:, :, k, vidx] += cutens[:, :] * self.outvs.field[:, :, k] * dt
 
                 if tidx >= 0:
                     # Update tendencies for temperature
                     for k in range(kts, ktf + 1):
-                        dtend.field[:, :, k, tidx] += cutens[:] * outts[:, :, k] * dt
+                        dtend.field[:, :, k, tidx] += cutens[:] * self.outts.field[:, :, k] * dt
 
                 if qidx >= 0:
                     # Update tendencies for specific humidity
                     for k in range(kts, ktf + 1):
                         for i in range(its, itf + 1):
                             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                                tem = cutens[i, j] * outqs[i, j, k] * dt
+                                tem = cutens[i, j] * self.outqs.field[i, j, k] * dt
                                 tem = tem / (1.0 + tem)
                                 dtend.field[i, j, k, qidx] += tem
 
@@ -1087,7 +1147,7 @@ class GFDriver:
             for k in range(kts, ktf + 1):  # Python's 0-based indexing
                 for i in range(its, itf + 1):
                     for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                        tem_shal = dt * (outqcs[i, j, k] * cutens[i, j] + outqcm[i, j, k] * cutenm[i, j])
+                        tem_shal = dt * (self.outqcs.field[i, j, k] * cutens[i, j] + outqcm[i, j, k] * cutenm[i, j])
                         tem_deep = dt * (outqc[i, j, k] * cuten[i, j] + clw_ten[i, j, k])
                         tem = tem_shal + tem_deep
                         tem1 = max(0.0, min(1.0, (constants.TCR - t.field[i, j, k]) * constants.TCRF))
