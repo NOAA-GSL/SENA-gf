@@ -164,3 +164,6 @@ def initialize_driver(
         if psum > 0.0:
             forcing /= psum
         forcing2 = forcing
+
+def initialize_shallow_convection():
+    pass
