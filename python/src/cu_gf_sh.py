@@ -66,39 +66,20 @@ def cu_gf_sh_run(
     # Initialize logical flag
     make_calc_for_xk = True
 
-    # Initialize output-only arrays
-    # xmb_out.fill(0.0)
-    # kbcon.fill(0)
-    # ktop.fill(0)
-    # k22.fill(0)
-
-    # itf = (itf + 1) * (jtf + 1) - 1
-    # ite = itf
-
     # Dimensions based on Fortran variables
-    # num_horizontal_points = ite - its + 1  # Number of horizontal grid points
     num_vertical_levels = kte - kts + 1  # Number of vertical levels
 
     # Initialize arrays based on Fortran code
     xmb = np.zeros((ite - its +1, jte - jts + 1))  # Base mass flux
     xff_shal = np.zeros(3)  # Shallow convection closure terms
     xmbmax = np.zeros((ite - its +1, jte - jts + 1))  # Maximum base mass flux
-    # ierrc = np.full(ite - its +1, jte - jts + 1, "", dtype=object)  # Error description
-    # pre = np.zeros((ite - its +1, jte - jts + 1))  # Precipitation rate
     dellu = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Change in x wind
     dellv = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Change in y wind
     dellah = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Change in moist static energy
     dellaq = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Change in water vapor mixing ratio
     dellaqc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Change in cloud water mixing ratio
-    # outt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Temperature tendencies
-    # outq = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Water vapor tendencies
-    # outqc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud water tendencies
-    # outu = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # X wind tendencies
-    # outv = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Y wind tendencies
     po_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Pressure at cloud levels
     pwo = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Precipitation rate at cloud levels
-    # us = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # X wind
-    # vs = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Y wind
     hc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud moist static energy
     hco = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Environmental moist static energy
     qco = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud water vapor mixing ratio
@@ -106,9 +87,7 @@ def cu_gf_sh_run(
     dby = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Buoyancy term
     dbyo = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Environmental buoyancy term
     zu = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Updraft normalized mass flux
-    # zuo = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Environmental updraft normalized mass flux
     xzu = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Alternative updraft normalized mass flux
-    # cnvwt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Convective weight
     gammao_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Environmental lapse rate
     z_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud height
     zo_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Environmental height
@@ -122,7 +101,6 @@ def cu_gf_sh_run(
     up_massdetr = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Updraft mass detrainment
     entr_rate_2d = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Entrainment rate
     c1d = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud liquid water detrainment coefficient
-    # cupclw = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud liquid water mixing ratio
 
     # Initialize arrays based on their usage in the code
     u_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud x wind
@@ -145,18 +123,15 @@ def cu_gf_sh_run(
     rand_vmas = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "rand_vmas(:)=0."
     flux_tun = np.full((ite - its +1, jte - jts + 1), FLUXTUNE)  # Equivalent to "flux_tun(:)=fluxtune"
     lambau = np.full((ite - its +1, jte - jts + 1), 2.0)  # Equivalent to "lambau(:)=2."
-    # c1d = np.zeros((ite - its + 1, kte - kts + 1))  # Equivalent to "c1d(:,:)=0."
 
     # Initialize arrays based on their usage in the code
     uc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud x wind
     vc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud y wind
     xhkb = np.zeros((ite - its +1, jte - jts + 1))  # Cloud base moist static energy (alternative)
-    xhco = np.zeros((ite - its +1, jte - jts + 1))  # Environmental cloud base moist static energy (alternative)
     kstabi = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Stability index
     dtempdz = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Temperature gradient with height
 
     # Initialize scalar variables
-    frh = 0.0  # Fractional relative humidity
     pmin_lev = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "xland1(its:ite)"
 
 
@@ -165,7 +140,6 @@ def cu_gf_sh_run(
     ktopx = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "ktopx(its:ite)"
     cap_max_increment = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "cap_max_increment(its:ite)"
     entr_rate = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "entr_rate(its:ite)"
-    # pre = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "pre(its:ite)"
     up_massentro = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "up_massentro(its:ite, kts:kte)"
     up_massdetro = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "up_massdetro(its:ite, kts:kte)"
     up_massentru = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "up_massentru(its:ite, kts:kte)"
@@ -176,7 +150,6 @@ def cu_gf_sh_run(
     pwo = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "pwo(its:ite, kts:kte)"
     cd = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "cd(its:ite, kts:kte)"
     dellaqc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "dellaqc(its:ite, kts:kte)"
-    # cupclw = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "cupclw(its:ite, kts:kte)"
     kbmax = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "kbmax(its:ite)"
     aa0 = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "aa0(its:ite)"
     aa1 = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "aa1(its:ite)"
@@ -209,11 +182,9 @@ def cu_gf_sh_run(
 
     # Initialize arrays based on their usage in the code
     xaa0 = np.zeros((ite - its +1, jte - jts + 1))  # Cloud work function for updraft
-    xaa1 = np.zeros((ite - its +1, jte - jts + 1))  # Cloud work function for environment
     xhc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud moist static energy
     xdby = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Buoyancy term
     dellat = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Temperature tendency
-    # cnvwt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Convective weight
 
     # Initialize arrays based on their usage in the code
     xqes = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xqes(its:ite, kts:kte)"
@@ -232,7 +203,7 @@ def cu_gf_sh_run(
     p_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "p_cup(its:ite, kts:kte)"
     gammao_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "gammao_cup(its:ite, kts:kte)"
     dbyt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "dbyt(its:ite, kts:kte)"
-    # c1d = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "c1d(its:ite, kts:kte)"
+
     # Initialize xhes based on its usage in the code
     xhes = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xhes(its:ite, kts:kte)"
 
@@ -263,7 +234,6 @@ def cu_gf_sh_run(
     rand_vmas = np.zeros((ite - its +1, jte - jts + 1))  # Random mass flux profile
 
     # Initialize scalar variables
-    totmas = 0.0  # Total mass flux adjustment
     fp = 0.0  # Fractional potential energy
 
     # Initialize scalar variables
