@@ -354,14 +354,6 @@ class GFShallowConvection:
             kpbl=kpbl,
         )
 
-        # Input variables match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"")
-        # print(f"{z1[0]:>20.12E}{psur[0]:>20.12E}{tcrit:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{z[0,k]:>20.12E}{qes[0,k]:>20.12E}{he[0,k]:>20.12E}{hes[0,k]:>20.12E}{t[0,k]:>20.12E}{q[0,k]:>20.12E}{po[0,k]:>20.12E}")
-
-
         # Call cup_env() to calculate moist static energy, heights, and qes
         cup_env(
             self.z.field, qes, he, hes, t, q, po, z1,
@@ -370,43 +362,12 @@ class GFShallowConvection:
             its, ite, jts, jte, kts, kte
         )
 
-        # Output variables match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"")
-        # print(f"{z1[0]:>20.12E}{psur[0]:>20.12E}{tcrit:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{z[0,k]:>20.12E}{qes[0,k]:>20.12E}{he[0,k]:>20.12E}{hes[0,k]:>20.12E}{t[0,k]:>20.12E}{q[0,k]:>20.12E}{po[0,k]:>20.12E}")
-
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"")
-        # print(f"{z1[0]:>20.12E}{psur[0]:>20.12E}{tcrit:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{zo[0,k]:>20.12E}{qeso[0,k]:>20.12E}{heo[0,k]:>20.12E}{heso[0,k]:>20.12E}{tn[0,k]:>20.12E}{qo[0,k]:>20.12E}{po[0,k]:>20.12E}")
-
         cup_env(
             zo, qeso, heo, heso, tn, qo, po, z1,
             psur, ierr, tcrit, -1,
             itf, jtf, ktf,
             its, ite, jts, jte, kts, kte
         )
-
-        # Output variables match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"")
-        # print(f"{z1[0]:>20.12E}{psur[0]:>20.12E}{tcrit:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{zo[0,k]:>20.12E}{qeso[0,k]:>20.12E}{heo[0,k]:>20.12E}{heso[0,k]:>20.12E}{tn[0,k]:>20.12E}{qo[0,k]:>20.12E}{po[0,k]:>20.12E}")
-
-
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"")
-        # print(f"{z1[0]:>20.12E}{psur[0]:>20.12E}{tcrit:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{t[0,k]:>20.12E}{qes[0,k]:>20.12E}{q[0,k]:>20.12E}{he[0,k]:>20.12E}{hes[0,k]:>20.12E}{z[0,k]:>20.12E}{po[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{qes_cup[0,k]:>20.12E}{q_cup[0,k]:>20.12E}{he_cup[0,k]:>20.12E}{hes_cup[0,k]:>20.12E}{z_cup[0,k]:>20.12E}{p_cup[0,k]:>20.12E}{gamma_cup[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{t_cup[0,k]:>20.12E}")
 
         # Call cup_env_clev() to calculate environmental values on cloud levels
         cup_env_clev(
@@ -417,27 +378,6 @@ class GFShallowConvection:
             its, ite, jts, jte, kts, kte
         )
 
-        # Output variables match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"")
-        # print(f"{z1[0]:>20.12E}{psur[0]:>20.12E}{tcrit:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{t[0,k]:>20.12E}{qes[0,k]:>20.12E}{q[0,k]:>20.12E}{he[0,k]:>20.12E}{hes[0,k]:>20.12E}{z[0,k]:>20.12E}{po[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{qes_cup[0,k]:>20.12E}{q_cup[0,k]:>20.12E}{he_cup[0,k]:>20.12E}{hes_cup[0,k]:>20.12E}{z_cup[0,k]:>20.12E}{p_cup[0,k]:>20.12E}{gamma_cup[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{t_cup[0,k]:>20.12E}")
-
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"")
-        # print(f"{z1[0]:>20.12E}{psur[0]:>20.12E}{tcrit:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{tn[0,k]:>20.12E}{qeso[0,k]:>20.12E}{qo[0,k]:>20.12E}{heo[0,k]:>20.12E}{heso[0,k]:>20.12E}{zo[0,k]:>20.12E}{po[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{qeso_cup[0,k]:>20.12E}{qo_cup[0,k]:>20.12E}{heo_cup[0,k]:>20.12E}{heso_cup[0,k]:>20.12E}{zo_cup[0,k]:>20.12E}{po_cup[0,k]:>20.12E}{gammao_cup[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{tn_cup[0,k]:>20.12E}")
-
         cup_env_clev(
             tn, qeso, qo, heo, heso, zo, po, qeso_cup, qo_cup,
             heo_cup, heso_cup, zo_cup, po_cup, gammao_cup, tn_cup, psur,
@@ -445,18 +385,6 @@ class GFShallowConvection:
             itf, jtf, ktf,
             its, ite, jts, jte, kts, kte
         )
-
-        # # Output variables match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"")
-        # print(f"{z1[0]:>20.12E}{psur[0]:>20.12E}{tcrit:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{tn[0,k]:>20.12E}{qeso[0,k]:>20.12E}{qo[0,k]:>20.12E}{heo[0,k]:>20.12E}{heso[0,k]:>20.12E}{zo[0,k]:>20.12E}{po[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{qeso_cup[0,k]:>20.12E}{qo_cup[0,k]:>20.12E}{heo_cup[0,k]:>20.12E}{heso_cup[0,k]:>20.12E}{zo_cup[0,k]:>20.12E}{po_cup[0,k]:>20.12E}{gammao_cup[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{tn_cup[0,k]:>20.12E}")
-
 
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
@@ -485,7 +413,6 @@ class GFShallowConvection:
                     k22[i, j] = max(1, k22[i, j])  # Ensure k22 is at least 1
                     if k22[i, j] > self.kbmax.field[i, j]:  # Check if k22 exceeds kbmax
                         ierr[i, j] = 2
-                        # Equivalent to setting error description in Fortran
                         # ierrc[i, j] = "could not find k22"
                         ktop[i, j] = -1
                         k22[i, j] = -1
@@ -495,37 +422,15 @@ class GFShallowConvection:
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
                 if ierr[i, j] == 0:  # Equivalent to "if(ierr(i).eq.0)"
                     x_add = XLV * self.zqexec.field[i, j] + CP * self.ztexec.field[i, j]  # Compute x_add
-                    # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-                    # print(f"{k22[i, j]:>4}")
-                    # print(f"{hkb[i, j]:>20.12E}{hkbo[i, j]:>20.12E}{x_add:>20.12E}")
-                    # for k in range(kte+1):
-                    #     print(f"{he_cup[i,k]:>20.12E}{heo_cup[i,k]:>20.12E}")
-
                     # Call get_cloud_bc() for he_cup
                     hkb[i, j] = get_cloud_bc(kte, he_cup[i, j, :kte + 1], hkb[i, j], k22[i, j], x_add)
                     # Call get_cloud_bc() for heo_cup
                     hkbo[i, j] = get_cloud_bc(kte, heo_cup[i, j, :kte + 1], hkbo[i, j], k22[i, j], x_add)
 
-                    # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-                    # print(f"{k22[i, j]:>4}")
-                    # print(f"{hkb[i, j]:>20.12E}{hkbo[i, j]:>20.12E}{x_add:>20.12E}")
-                    # for k in range(kte+1):
-                    #     print(f"{he_cup[i,k]:>20.12E}{heo_cup[i,k]:>20.12E}")
-
         for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
             for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
                 for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
                     dbyo[i, j, k] = 0.0  # Equivalent to "dbyo(i,k)= 0. !hkbo(i)-heso_cup(i,k)"
-
-
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-        #     print(f"{k22[i, j]:>4}{kbcon[i, j]:>4}{kbmax[i, j]:>4}")
-        # for i in range(its, itf + 1):
-        #     print(f"{cap_max_increment[i, j]:>20.12E}{hkbo[i, j]:>20.12E}{cap_max[i, j]:>20.12E}{ztexec[i, j]:>20.12E}{zqexec[i, j]:>20.12E}{entr_rate[i, j]:>20.12E}")
-        # for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-        #     for k in range(kte+1):
-        #         print(f"{heo_cup[i,k]:>20.12E}{heso_cup[i,k]:>20.12E}{po_cup[i,k]:>20.12E}{z_cup[i,k]:>20.12E}{heo[i,k]:>20.12E}")
 
         # Call cup_kbcon() to determine the level of convective cloud base (kbcon)
         cup_kbcon(
@@ -537,22 +442,6 @@ class GFShallowConvection:
             z_cup, self.entr_rate.field, heo, 0
         )
 
-        # Output variables match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-        #     print(f"{k22[i, j]:>4}{kbcon[i, j]:>4}{kbmax[i, j]:>4}")
-        # for i in range(its, itf + 1):
-        #     print(f"{cap_max_increment[i, j]:>20.12E}{hkbo[i, j]:>20.12E}{cap_max[i, j]:>20.12E}{ztexec[i, j]:>20.12E}{zqexec[i, j]:>20.12E}{entr_rate[i, j]:>20.12E}")
-        # for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-        #     for k in range(kte+1):
-        #         print(f"{heo_cup[i,k]:>20.12E}{heso_cup[i,k]:>20.12E}{po_cup[i,k]:>20.12E}{z_cup[i,k]:>20.12E}{heo[i,k]:>20.12E}")
-
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{kbcon[0]:>4}{kbmax[0]:>4}{kstabi[0]:>4}")
-        # print(f"")
-        # for k in range(kte+1):
-        #     print(f"{heso_cup[0,k]:>20.12E}")
-
         # Call cup_minimi() to get inversion layers for cloud tops
         cup_minimi(
             heso_cup, kbcon, self.kbmax.field, kstabi, ierr,
@@ -560,36 +449,10 @@ class GFShallowConvection:
             its, ite, jts, jte, kts, kte
         )
 
-        # Output variables match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{kbcon[0]:>4}{kbmax[0]:>4}{kstabi[0]:>4}")
-        # print(f"")
-        # for k in range(kte+1):
-        #     print(f"{heso_cup[0,k]:>20.12E}")
-
-        # Call get_inversion_layers() to calculate inversion layers
-
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{kbcon[0]:>4}{kstabi[0]:>4}")
-        # print(f"")
-        # for k in range(kte+1):
-        #     print(f"{k_inv_layers[0,k]:>4}")
-        # for k in range(kte+1):
-        #     print(f"{p_cup[0,k]:>20.12E}{t_cup[0,k]:>20.12E}{z_cup[0,k]:>20.12E}{q_cup[0,k]:>20.12E}{qes_cup[0,k]:>20.12E}{dtempdz[0,k]:>20.12E}")
-
         get_inversion_layers(
             ierr, p_cup, t_cup, z_cup, q_cup, qes_cup, k_inv_layers,
             kbcon, kstabi, dtempdz, itf, jtf, ktf, its, ite, jts, jte, kts, kte
         )
-
-        # Output variables match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{kbcon[0]:>4}{kstabi[0]:>4}")
-        # print(f"")
-        # for k in range(kte+1):
-        #     print(f"{k_inv_layers[0,k]:>4}")
-        # for k in range(kte+1):
-        #     print(f"{p_cup[0,k]:>20.12E}{t_cup[0,k]:>20.12E}{z_cup[0,k]:>20.12E}{q_cup[0,k]:>20.12E}{qes_cup[0,k]:>20.12E}{dtempdz[0,k]:>20.12E}")
 
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
@@ -619,34 +482,11 @@ class GFShallowConvection:
                                 ktop[i, j] = k
                                 break  # Exit the loop
 
-        # Call rates_up_pdf() to get normalized mass flux profile
-
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{ipr:>4}")
-        # for i in range(its, itf + 1):
-        #     print(f"{ktop[i, j]:>4}{xland1[i, j]:>4}{kstabi[i, j]:>4}{k22[i, j]:>4}{kbcon[i, j]:>4}{kpbl[i, j]:>4}{ktopx[i, j]:>4}{pmin_lev[i, j]:>4}")
-        # for i in range(its, itf + 1):
-        #     print(f"{rand_vmas[i, j]:>20.12E}{hkbo[i, j]:>20.12E}")
-        # for i in range(its, itf + 1):
-        #     for k in range(kte+1):
-        #         print(f"{po_cup[i,k]:>20.12E}{entr_rate_2d[i,k]:>20.12E}{heo[i,k]:>20.12E}{heso_cup[i,k]:>20.12E}{zo_cup[i,k]:>20.12E}{zuo[i,k]:>20.12E}")
-
         rates_up_pdf(
             rand_vmas, ipr, 'shallow', ktop, ierr, po_cup, entr_rate_2d, hkbo, heo, heso_cup, zo_cup,
             self.xland1.field, kstabi, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kpbl, self.ktopx.field, kbcon, pmin_lev
         )
     
-        # # Output variables match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{ipr:>4}")
-        # for i in range(its, itf + 1):
-        #     print(f"{ktop[i, j]:>4}{xland1[i, j]:>4}{kstabi[i, j]:>4}{k22[i, j]:>4}{kbcon[i, j]:>4}{kpbl[i, j]:>4}{ktopx[i, j]:>4}{pmin_lev[i, j]:>4}")
-        # for i in range(its, itf + 1):
-        #     print(f"{rand_vmas[i, j]:>20.12E}{hkbo[i, j]:>20.12E}")
-        # for i in range(its, itf + 1):
-        #     for k in range(kte+1):
-        #         print(f"{po_cup[i,k]:>20.12E}{entr_rate_2d[i,k]:>20.12E}{heo[i,k]:>20.12E}{heso_cup[i,k]:>20.12E}{zo_cup[i,k]:>20.12E}{zuo[i,k]:>20.12E}")
-
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
                 if ierr[i, j] == 0:  # Equivalent to "if(ierr(i).eq.0)"
@@ -672,14 +512,6 @@ class GFShallowConvection:
 
                     k22[i, j] = max(1, k22[i, j])  # Ensure k22 is at least 1
 
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}")
-        # print(f"{lambau[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{zo_cup[0,k]:>20.12E}{zuo[0,k]:>20.12E}{cd[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{up_massentro[0,k]:>20.12E}{up_massdetro[0,k]:>20.12E}{up_massentr[0,k]:>20.12E}{up_massdetr[0,k]:>20.12E}{up_massentru[0,k]:>20.12E}{up_massdetru[0,k]:>20.12E}")
-
         # Call get_lateral_massflux() to calculate mass entrainment and detrainment
         get_lateral_massflux(
             itf, jtf, ktf, its, ite, jts, jte, kts, kte,
@@ -687,16 +519,6 @@ class GFShallowConvection:
             self.up_massentro.field, self.up_massdetro.field, up_massentr, up_massdetr,
             2, kbcon, k22, self.up_massentru.field, self.up_massdetru.field, lambau
         )
-
-        # Output variables match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}")
-        # print(f"{lambau[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{zo_cup[0,k]:>20.12E}{zuo[0,k]:>20.12E}{cd[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{up_massentro[0,k]:>20.12E}{up_massdetro[0,k]:>20.12E}{up_massentr[0,k]:>20.12E}{up_massdetr[0,k]:>20.12E}{up_massentru[0,k]:>20.12E}{up_massdetru[0,k]:>20.12E}")
-
 
         for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
@@ -826,30 +648,12 @@ class GFShallowConvection:
 
         if make_calc_for_xk:  # Check if calculations for xk are enabled
             # Call cup_up_aa0() to calculate cloud work functions
-
-            # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ktop[0]:>4}{kbcon[0]:>4}")
-            # print(f"{aa0[0]:>20.12E}{aa1[0]:>20.12E}")
-            # for k in range(kte+1):
-            #     print(f"{z[0,k]:>20.12E}{zu[0,k]:>20.12E}{dby[0,k]:>20.12E}{gamma_cup[0,k]:>20.12E}{t_cup[0,k]:>20.12E}")
-            # for k in range(kte+1):
-            #     print(f"{zo[0,k]:>20.12E}{zuo[0,k]:>20.12E}{dbyo[0,k]:>20.12E}{tn_cup[0,k]:>20.12E}")
-
             cup_up_aa0(self.aa0.field, self.z.field, zu, dby, gamma_cup, t_cup,
                     kbcon, ktop, ierr,
                     itf, jtf, ktf, its, ite, jts, jte, kts, kte)
             cup_up_aa0(self.aa1.field, zo, zuo, dbyo, gammao_cup, tn_cup,
                     kbcon, ktop, ierr,
                     itf, jtf, ktf, its, ite, jts, jte, kts, kte)
-
-            # Output variables match
-            # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ktop[0]:>4}{kbcon[0]:>4}")
-            # print(f"{aa0[0]:>20.12E}{aa1[0]:>20.12E}")
-            # for k in range(kte+1):
-            #     print(f"{z[0,k]:>20.12E}{zu[0,k]:>20.12E}{dby[0,k]:>20.12E}{gamma_cup[0,k]:>20.12E}{t_cup[0,k]:>20.12E}")
-            # for k in range(kte+1):
-            #     print(f"{zo[0,k]:>20.12E}{zuo[0,k]:>20.12E}{dbyo[0,k]:>20.12E}{tn_cup[0,k]:>20.12E}")
 
             for i in range(its, itf + 1):  # Loop over horizontal grid points
                 for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
@@ -906,13 +710,6 @@ class GFShallowConvection:
 
                         dellv[i, j, k] = -(zuo[i, j, k + 1] * (vc[i, j, k + 1] - v_cup[i, j, k + 1]) -
                                         zuo[i, j, k] * (vc[i, j, k] - v_cup[i, j, k])) * G / dp
-
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}{ipr:>4}")
-        # print(f"{kpbl[0]:>4}{ichoice:>4}{kbcon[0]:>4}{ktop[0]:>4}{k22[0]:>4}")
-        # print(f"{psur[0]:>20.12E}{hfx[0]:>20.12E}{qfx[0]:>20.12E}{xland[0]:>20.12E}{tcrit:>20.12E}{dtime:>20.12E}{xmb_out[0]:>20.12E}")
-        # for k in range(kte + 1):
-        #     # print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{zo[0,k]:>20.12E}{t2d[0,k]:>20.12E}{q2d[0,k]:>20.12E}{tshall[0,k]:>20.12E}{qshall[0,k]:>20.12E}")
-        #     print(f"{outt[0,k]:>20.12E}{outq[0,k]:>20.12E}{outqc[0,k]:>20.12E}{outu[0,k]:>20.12E}{outv[0,k]:>20.12E}{cnvwt[0,k]:>20.12E}{cupclw[0,k]:>20.12E}")
 
         mbdt = 0.5 #3.e-4
 
@@ -1074,15 +871,3 @@ class GFShallowConvection:
                         for k in range(kts, ktop[i, j] + 1):  # Loop over vertical levels
                             fp = np.sqrt(outu[i, j, k]**2 + outv[i, j, k]**2) / fpi  # Compute fp
                             outt[i, j, k] += fp * dts * G / CP  # Update temperature tendency
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{kpbl[0]:>4}{ichoice:>4}{kbcon[0]:>4}{ktop[0]:>4}{k22[0]:>4}{ipr:>4}{tropics[0]:>4}")
-        # print(f"{z1[0]:>20.12E}{psur[0]:>20.12E}{hfx[0]:>20.12E}{qfx[0]:>20.12E}{xland[0]:>20.12E}{tcrit:>20.12E}{dtime:>20.12E}{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{zo[0,k]:>20.12E}{t[0,k]:>20.12E}{q[0,k]:>20.12E}{tn[0,k]:>20.12E}{qo[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{po[0,k]:>20.12E}{dhdt[0,k]:>20.12E}{rho[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{outt[0,k]:>20.12E}{outq[0,k]:>20.12E}{outqc[0,k]:>20.12E}{outu[0,k]:>20.12E}{outv[0,k]:>20.12E}{cnvwt[0,k]:>20.12E}{cupclw[0,k]:>20.12E}")
-
-        # return (q, qo, zuo, xmb_out, kbcon, ktop, k22, ierr,
-        #         outt, outq, outqc, outu, outv, cnvwt, pre, cupclw)
