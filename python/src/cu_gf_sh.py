@@ -96,6 +96,7 @@ class GFShallowConvection:
         dellah = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Change in moist static energy
         dellaq = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Change in water vapor mixing ratio
         dellaqc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Change in cloud water mixing ratio
+        dellat = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Temperature tendency
         po_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Pressure at cloud levels
         pwo = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Precipitation rate at cloud levels
         hc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud moist static energy
@@ -132,10 +133,6 @@ class GFShallowConvection:
         xhe = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Moist static energy
         xq = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Water vapor mixing ratio
 
-        # Initialize scalar variables
-        qaver = 0.0  # Average cloud water vapor mixing ratio
-        fp = 0.0  # Fractional potential energy
-
         # Translate Fortran array allocations to Python
         start_level = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "start_level(:)=0"
         rand_vmas = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "rand_vmas(:)=0."
@@ -148,27 +145,18 @@ class GFShallowConvection:
         xhkb = np.zeros((ite - its +1, jte - jts + 1))  # Cloud base moist static energy (alternative)
         kstabi = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Stability index
         dtempdz = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Temperature gradient with height
-
-        # Initialize scalar variables
-        pmin_lev = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "xland1(its:ite)"
-
+        pmin_lev = np.zeros((ite - its +1, jte - jts + 1), dtype=int)
 
         # Initialize arrays based on Fortran ranges
         xland1 = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "xland1(its:ite)"
         ktopx = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "ktopx(its:ite)"
         cap_max_increment = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "cap_max_increment(its:ite)"
         entr_rate = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "entr_rate(its:ite)"
-        up_massentro = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "up_massentro(its:ite, kts:kte)"
-        up_massdetro = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "up_massdetro(its:ite, kts:kte)"
         up_massentru = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "up_massentru(its:ite, kts:kte)"
         up_massdetru = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "up_massdetru(its:ite, kts:kte)"
         z = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "z(its:ite, kts:kte)"
         xz = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xz(its:ite, kts:kte)"
-        qrco = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "qrco(its:ite, kts:kte)"
-        pwo = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "pwo(its:ite, kts:kte)"
         cd = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "cd(its:ite, kts:kte)"
-        dellaqc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "dellaqc(its:ite, kts:kte)"
-        kbmax = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "kbmax(its:ite)"
         aa0 = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "aa0(its:ite)"
         aa1 = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "aa1(its:ite)"
         cap_max = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "cap_max(its:ite)"
@@ -183,28 +171,20 @@ class GFShallowConvection:
         heso = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "heso(its:ite, kts:kte)"
         qes_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "qes_cup(its:ite, kts:kte)"
         q_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "q_cup(its:ite, kts:kte)"
-        he_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "he_cup(its:ite, kts:kte)"
-        hes_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "hes_cup(its:ite, kts:kte)"
-        z_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "z_cup(its:ite, kts:kte)"
         p_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "p_cup(its:ite, kts:kte)"
         gamma_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "gamma_cup(its:ite, kts:kte)"
         t_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "t_cup(its:ite, kts:kte)"
-        qeso_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "qeso_cup(its:ite, kts:kte)"
-        qo_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "qo_cup(its:ite, kts:kte)"
         heo_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "heo_cup(its:ite, kts:kte)"
         heso_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "heso_cup(its:ite, kts:kte)"
-        zo_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "zo_cup(its:ite, kts:kte)"
-        po_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "po_cup(its:ite, kts:kte)"
-        gammao_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "gammao_cup(its:ite, kts:kte)"
         tn_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "tn_cup(its:ite, kts:kte)"
 
         # Initialize arrays based on their usage in the code
         xaa0 = np.zeros((ite - its +1, jte - jts + 1))  # Cloud work function for updraft
         xhc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud moist static energy
         xdby = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Buoyancy term
-        dellat = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Temperature tendency
 
         # Initialize arrays based on their usage in the code
+        xhes = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xhes(its:ite, kts:kte)"
         xqes = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xqes(its:ite, kts:kte)"
         xqes_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xqes_cup(its:ite, kts:kte)"
         xq_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xq_cup(its:ite, kts:kte)"
@@ -212,47 +192,15 @@ class GFShallowConvection:
         xhes_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xhes_cup(its:ite, kts:kte)"
         xz_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xz_cup(its:ite, kts:kte)"
         xt_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xt_cup(its:ite, kts:kte)"
-        gamma_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "gamma_cup(its:ite, kts:kte)"
-
-        # Initialize arrays based on their usage in the code
-        tn_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "tn_cup(its:ite, kts:kte)"
-        heo_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "heo_cup(its:ite, kts:kte)"
-        heso_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "heso_cup(its:ite, kts:kte)"
-        p_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "p_cup(its:ite, kts:kte)"
-        gammao_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "gammao_cup(its:ite, kts:kte)"
-        dbyt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "dbyt(its:ite, kts:kte)"
-
-        # Initialize xhes based on its usage in the code
-        xhes = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xhes(its:ite, kts:kte)"
 
         # Initialize scalar variables
-        dts = 0.0  # Total kinetic energy dissipation
-        fpi = 0.0  # Integrated potential energy conversion factor
-        trash = 0.0  # Temporary variable for calculations
-        trash2 = 0.0  # Temporary variable for calculations
-        xkshal = 0.0  # Stabilization closure variable
-
-        # Initialize arrays based on their usage in the code
-        ztexec = np.zeros((ite - its +1, jte - jts + 1))  # Temperature excess
-        zqexec = np.zeros((ite - its +1, jte - jts + 1))  # Moisture excess
-        flux_tun = np.full((ite - its +1, jte - jts + 1), FLUXTUNE)  # Flux tuning parameter
-        rand_vmas = np.zeros((ite - its +1, jte - jts + 1))  # Random mass flux profile
-
-        # Initialize scalar variables
-        dts = 0.0  # Total kinetic energy dissipation
-        fpi = 0.0  # Integrated potential energy conversion factor
-        trash = 0.0  # Temporary variable for calculations
-        trash2 = 0.0  # Temporary variable for calculations
-        xkshal = 0.0  # Stabilization closure variable
-
-        # Initialize arrays based on their usage in the code
-        ztexec = np.zeros((ite - its +1, jte - jts + 1))  # Temperature excess
-        zqexec = np.zeros((ite - its +1, jte - jts + 1))  # Moisture excess
-        flux_tun = np.full((ite - its +1, jte - jts + 1), FLUXTUNE)  # Flux tuning parameter
-        rand_vmas = np.zeros((ite - its +1, jte - jts + 1))  # Random mass flux profile
-
-        # Initialize scalar variables
+        qaver = 0.0  # Average cloud water vapor mixing ratio
         fp = 0.0  # Fractional potential energy
+        dts = 0.0  # Total kinetic energy dissipation
+        fpi = 0.0  # Integrated potential energy conversion factor
+        trash = 0.0  # Temporary variable for calculations
+        trash2 = 0.0  # Temporary variable for calculations
+        xkshal = 0.0  # Stabilization closure variable
 
         # Initialize scalar variables
         blqe = 0.0  # Boundary layer QE closure variable
