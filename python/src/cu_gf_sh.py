@@ -14,7 +14,10 @@ from ndsl.constants import X_DIM, Y_DIM, Z_DIM
 from ndsl.quantity import Quantity
 from gf_state import GFState
 
-from cu_gf_stencils import initialize_shallow_convection
+from cu_gf_stencils import (
+    initialize_shallow_convection,
+    estimate_convective_velocity_and_excesses
+)
 
 # Constants
 C1_SHAL = 0.0  # Parameter for shallow convection
@@ -141,11 +144,33 @@ class GFShallowConvection:
             units="none",
             dtype=state.rkind
         )
+        self.buo_flux: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind
+        )
+        self.pgeoh: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind
+        )
+        self.flux_tun: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind
+        )
+        self.flux_tun.field[:,:] = FLUXTUNE  # Set flux tuning parameter
 
         self._initialize_shallow_convection = state.stencil_factory.from_dims_halo(
             func=initialize_shallow_convection,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={"cap_maxs": 175.0},
+        )
+
+        self._estimate_convective_velocity_and_excesses = state.stencil_factory.from_dims_halo(
+            func=estimate_convective_velocity_and_excesses,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
         )
 
     # Define the main shallow convection function
@@ -239,7 +264,6 @@ class GFShallowConvection:
         # Translate Fortran array allocations to Python
         start_level = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "start_level(:)=0"
         rand_vmas = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "rand_vmas(:)=0."
-        flux_tun = np.full((ite - its +1, jte - jts + 1), FLUXTUNE)  # Equivalent to "flux_tun(:)=fluxtune"
         lambau = np.full((ite - its +1, jte - jts + 1), 2.0)  # Equivalent to "lambau(:)=2."
 
         # Initialize arrays based on their usage in the code
@@ -297,15 +321,7 @@ class GFShallowConvection:
         c_up = 0.0  # Cloud water mixing ratio adjustment
         ki = 0  # Index of the maximum value in dbyt
         kstart = 0  # Starting level for determining ktop
-
-        # Initialize scalar variables
-        blqe = 0.0  # Boundary layer QE closure variable
-        entup = 0.0  # Entrainment rate for updraft
-        detup = 0.0  # Detrainment rate for updraft
-        dz = 0.0  # Height difference
-        c_up = 0.0  # Cloud water mixing ratio adjustment
-        ki = 0  # Index of the maximum value in dbyt
-        kstart = 0  # Starting level for determining ktop
+        zkbmax = 3000.0  # Equivalent to "zkbmax=3000."
     
         # Initialize shallow convection parameters
         self._initialize_shallow_convection(
@@ -323,28 +339,20 @@ class GFShallowConvection:
             cd=self.cd,
         )
 
-        for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-            for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                # Buoyancy flux (h + le)
-                buo_flux = (hfx[i, j] / CP + 0.608 * t[i, j, 0] * qfx[i, j] / XLV) / rho[i, j, 0]
-                pgeoh = zo[i, j, 1] * G
-                # Convective-scale velocity w*
-                self.zws.field[i, j] = max(0.0, flux_tun[i, j] * 0.41 * buo_flux * zo[i, j, 1] * G / t[i, j, 0])
-                if self.zws.field[i, j] > np.finfo(float).tiny * pgeoh:  # Equivalent to "tiny(pgeoh)"
-                    # Convective-scale velocity w*
-                    self.zws.field[i, j] = 1.2 * self.zws.field[i, j] ** 0.3333
-                    # Temperature excess
-                    self.ztexec.field[i, j] = max(flux_tun[i, j] * hfx[i, j] / (rho[i, j, 0] * self.zws.field[i, j] * CP), 0.0)
-                    # Moisture excess
-                    self.zqexec.field[i, j] = max(flux_tun[i, j] * qfx[i, j] / (XLV * rho[i, j, 0] * self.zws.field[i, j]), 0.0)
-                # Calculate zws for shallow convection closure (Grant 2001)
-                # Height of the PBL
-                self.zws.field[i, j] = max(0.0, flux_tun[i, j] * 0.41 * buo_flux * zo[i, j, kpbl[i, j]] * G / t[i, j, kpbl[i, j]])
-                self.zws.field[i, j] = 1.2 * self.zws.field[i, j] ** 0.3333
-                self.zws.field[i, j] = self.zws.field[i, j] * rho[i, j, kpbl[i, j]]  # Check if zrho is correct
-
-        zkbmax = 3000.0  # Equivalent to "zkbmax=3000."
-
+        self._estimate_convective_velocity_and_excesses(
+            buo_flux=self.buo_flux,
+            hfx=hfx,
+            qfx=qfx,
+            t=t,
+            rho=rho,
+            pgeoh=self.pgeoh,
+            zo=zo,
+            zws=self.zws,
+            flux_tun=self.flux_tun,
+            ztexec=self.ztexec,
+            zqexec=self.zqexec,
+            kpbl=kpbl,
+        )
 
         # Input variables match
         # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")

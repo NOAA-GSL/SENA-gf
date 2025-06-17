@@ -209,9 +209,18 @@ def estimate_convective_velocity_and_excesses(
         zo: FloatField, # type: ignore
         zws: FloatFieldIJ, # type: ignore
         flux_tun: FloatFieldIJ, # type: ignore
-        zws: FloatFieldIJ, # type: ignore
         ztexec: FloatFieldIJ, # type: ignore
         zqexec: FloatFieldIJ, # type: ignore
         kpbl: IntFieldIJ32, # type: ignore
 ):
-    pass
+    with computation(FORWARD), interval(0,1):
+        buo_flux = (hfx / constants.CP + 0.608 * t * qfx / constants.XLV) / rho
+        pgeoh = zo * constants.G
+        zws = max(0.0, flux_tun * 0.41 * buo_flux * zo[0, 0, 1] * constants.G / t)
+        if zws > constants.TINY * pgeoh:
+            zws = 1.2 * zws ** 0.3333
+            ztexec = max(flux_tun * hfx / (rho * zws * constants.CP), 0.0)
+            zqexec = max(flux_tun * qfx / (rho * zws * constants.XLV), 0.0)
+        zws = max(0.0, flux_tun * 0.41 * buo_flux * zo.at(K=kpbl) * constants.G / t.at(K=kpbl))
+        zws = 1.2 * zws ** 0.3333
+        zws = zws * rho.at(K=kpbl)
