@@ -165,5 +165,53 @@ def initialize_driver(
             forcing /= psum
         forcing2 = forcing
 
-def initialize_shallow_convection():
+def initialize_shallow_convection(
+        xland: FloatFieldIJ, # type: ignore
+        xland1: IntFieldIJ32, # type: ignore
+        ktopx: IntFieldIJ32, # type: ignore
+        pre: FloatFieldIJ, # type: ignore
+        xmb_out: FloatFieldIJ, # type: ignore
+        cap_max_increment: FloatFieldIJ, # type: ignore
+        entr_rate: FloatFieldIJ, # type: ignore
+        cap_max: FloatFieldIJ, # type: ignore
+        z: FloatField, # type: ignore
+        zo: FloatField, # type: ignore
+        xz: FloatField, # type: ignore
+        cd: FloatField, # type: ignore
+):
+    from __externals__ import ( # type: ignore
+        cap_maxs,
+    )
+
+    with computation(FORWARD), interval(0,1):
+        xland1 = int(xland + 0.001)
+        ktopx = -1
+        if xland > 1.5 or xland < 0.5:
+            xland1 = 0
+        pre = 0.0
+        xmb_out = 0.0
+        cap_max_increment = 25.0
+        entr_rate = 1.0e-3
+        cap_max = cap_maxs
+
+    with computation(PARALLEL), interval(...):
+        z = zo
+        xz = zo
+        cd = 0.75 * entr_rate
+
+def estimate_convective_velocity_and_excesses(
+        buo_flux: FloatFieldIJ, # type: ignore
+        hfx: FloatFieldIJ, # type: ignore
+        qfx: FloatFieldIJ, # type: ignore
+        t: FloatField, # type: ignore
+        rho: FloatField, # type: ignore
+        pgeoh: FloatFieldIJ, # type: ignore
+        zo: FloatField, # type: ignore
+        zws: FloatFieldIJ, # type: ignore
+        flux_tun: FloatFieldIJ, # type: ignore
+        zws: FloatFieldIJ, # type: ignore
+        ztexec: FloatFieldIJ, # type: ignore
+        zqexec: FloatFieldIJ, # type: ignore
+        kpbl: IntFieldIJ32, # type: ignore
+):
     pass
