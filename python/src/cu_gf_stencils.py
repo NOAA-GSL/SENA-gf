@@ -1,6 +1,7 @@
-from ndsl.dsl.gt4py import PARALLEL, computation, interval, FORWARD
+from ndsl.dsl.gt4py import PARALLEL, computation, interval, FORWARD, function
 from ndsl.dsl.typing import FloatField, IntFieldIJ32, FloatFieldIJ, IntFieldK32, BoolFieldIJ
 import cu_gf_constants as constants
+from ndsl.dsl.gt4py import log
 
 def initialize_driver(
     aod_gf: FloatFieldIJ, # type: ignore
@@ -224,3 +225,93 @@ def estimate_convective_velocity_and_excesses(
         zws = max(0.0, flux_tun * 0.41 * buo_flux * zo.at(K=kpbl) * constants.G / t.at(K=kpbl))
         zws = 1.2 * zws ** 0.3333
         zws = zws * rho.at(K=kpbl)
+
+def cup_env_stencil(
+    z: FloatField, # type: ignore
+    qes: FloatField, # type: ignore
+    he: FloatField, # type: ignore
+    hes: FloatField, # type: ignore
+    t: FloatField, # type: ignore
+    q: FloatField, # type: ignore
+    p: FloatField, # type: ignore
+    z1: FloatFieldIJ, # type: ignore
+    psur: FloatFieldIJ, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    itest: int,
+):
+    """
+    Compute cup environment variables
+    """
+
+    with computation(PARALLEL), interval(...):
+        tv = 0.0
+        e = 0.0
+        tvbar = 0.0
+
+    # Calculate saturation vapor pressure and specific humidity
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            e = satvap(t)
+            qes = 0.622 * e / max(1.0e-8, (p - e))
+            if qes <= 1.0e-16:
+                qes = 1.0e-16
+            if qes < q:
+                qes = q
+            tv = t + 0.608 * q * t
+
+    # Calculate heights for itest = 1 or 0
+    with computation(FORWARD), interval(0, 1):
+        if itest == 1 or itest == 0:
+            if ierr == 0:
+                z = max(0.0, z1) - (log(p) - log(psur)) * 287.0 * tv / 9.81
+
+    with computation(FORWARD), interval(1, None):
+        if itest == 1 or itest == 0:
+            if ierr == 0:
+                tvbar = 0.5 * tv + 0.5 * tv[0, 0, -1]
+                z = z[0, 0, -1] - (log(p) - log(p[0, 0, -1])) * 287.0 * tvbar / 9.81
+
+    # Calculate heights for itest = 2
+    with computation(PARALLEL), interval(...):
+        if itest == 2:
+            if ierr == 0:
+                z = (he - 1004.0 * t - 2.5e6 * q) / 9.81
+                z = max(1.0e-3, z)
+
+    # Calculate moist static energy and ensure it does not exceed saturation value
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            he = 9.81 * z + 1004.0 * t + 2.5e6 * q
+            hes = 9.81 * z + 1004.0 * t + 2.5e6 * qes
+            if he >= hes:
+                he = hes
+
+
+@function
+def satvap(
+    temp2: FloatField, # type: ignore
+) -> FloatField: # type: ignore
+    """
+    Compute saturation vapor pressure
+    """
+
+    temp = temp2 - 273.155
+    if temp < -20.0:
+        toot = 273.16 / temp2
+        toto = 1.0 / toot
+        eilog = (-9.09718 * (toot - 1.0)
+                 - 3.56654 * (log(toot) / log(10.0))
+                 + 0.876793 * (1.0 - toto)
+                 + (log(6.1071) / log(10.0)))
+        satvap = 10.0 ** eilog
+    else:  # Water saturation
+        tsot = 373.16 / temp2
+        ewlog = (-7.90298 * (tsot - 1.0)
+                 + 5.02808 * (log(tsot) / log(10.0)))
+        ewlog2 = (ewlog
+                  - 1.3816e-07 * (10.0 ** (11.344 * (1.0 - (1.0 / tsot))) - 1.0))
+        ewlog3 = (ewlog2
+                  + 0.0081328 * (10.0 ** (-3.49149 * (tsot - 1.0)) - 1.0))
+        ewlog4 = ewlog3 + (log(1013.246) / log(10.0))
+        satvap = 10.0 ** ewlog4
+    return satvap

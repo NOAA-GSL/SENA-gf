@@ -16,7 +16,8 @@ from gf_state import GFState
 
 from cu_gf_stencils import (
     initialize_shallow_convection,
-    estimate_convective_velocity_and_excesses
+    estimate_convective_velocity_and_excesses,
+    cup_env_stencil,
 )
 
 # Constants
@@ -160,6 +161,61 @@ class GFShallowConvection:
             dtype=state.rkind
         )
         self.flux_tun.field[:,:] = FLUXTUNE  # Set flux tuning parameter
+        self.qes: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind
+        )
+        self.hes: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind
+        )
+        self.he: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind
+        )
+        self.qeso: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind
+        )
+        self.heso: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind
+        )
+        self.heo: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind
+        )
+        self.xqes: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind
+        )
+        self.xhes: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind
+        )
+        self.xhe: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind
+        )
+        self.xq: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind
+        )
+        self.xt: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind
+        )
 
         self._initialize_shallow_convection = state.stencil_factory.from_dims_halo(
             func=initialize_shallow_convection,
@@ -169,6 +225,12 @@ class GFShallowConvection:
 
         self._estimate_convective_velocity_and_excesses = state.stencil_factory.from_dims_halo(
             func=estimate_convective_velocity_and_excesses,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        self._cup_env = state.stencil_factory.from_dims_halo(
+            func=cup_env_stencil,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
         )
@@ -257,9 +319,6 @@ class GFShallowConvection:
         hkbo = np.zeros((ite - its +1, jte - jts + 1))  # Environmental cloud base moist static energy
         dbyt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Buoyancy tendency
         k_inv_layers = np.full((ite - its +1, jte - jts + 1, num_vertical_levels), -1, dtype=int)  # Inversion layers (10 is an assumed max number of layers)
-        xt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Temperature tendency
-        xhe = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Moist static energy
-        xq = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Water vapor mixing ratio
 
         # Translate Fortran array allocations to Python
         start_level = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "start_level(:)=0"
@@ -274,12 +333,6 @@ class GFShallowConvection:
         dtempdz = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Temperature gradient with height
         pmin_lev = np.zeros((ite - its +1, jte - jts + 1), dtype=int)
 
-        qes = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "qes(its:ite, kts:kte)"
-        he = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "he(its:ite, kts:kte)"
-        hes = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "hes(its:ite, kts:kte)"
-        qeso = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "qeso(its:ite, kts:kte)"
-        heo = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "heo(its:ite, kts:kte)"
-        heso = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "heso(its:ite, kts:kte)"
         qes_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "qes_cup(its:ite, kts:kte)"
         q_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "q_cup(its:ite, kts:kte)"
         p_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "p_cup(its:ite, kts:kte)"
@@ -295,8 +348,6 @@ class GFShallowConvection:
         xdby = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Buoyancy term
 
         # Initialize arrays based on their usage in the code
-        xhes = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xhes(its:ite, kts:kte)"
-        xqes = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xqes(its:ite, kts:kte)"
         xqes_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xqes_cup(its:ite, kts:kte)"
         xq_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xq_cup(its:ite, kts:kte)"
         xhe_cup = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Equivalent to "xhe_cup(its:ite, kts:kte)"
@@ -355,77 +406,91 @@ class GFShallowConvection:
         )
 
         # Call cup_env() to calculate moist static energy, heights, and qes
-        cup_env(
-            self.z.field, qes, he, hes, t, q, po, z1,
-            psur, ierr, tcrit, -1,
-            itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte
+        self._cup_env(
+            z=self.z,
+            qes=self.qes,
+            he=self.he,
+            hes=self.hes,
+            t=t,
+            q=q,
+            p=po,
+            z1=z1,
+            psur=psur,
+            ierr=ierr,
+            itest=-1,
         )
 
-        cup_env(
-            zo, qeso, heo, heso, tn, qo, po, z1,
-            psur, ierr, tcrit, -1,
-            itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte
+        self._cup_env(
+            z=zo,
+            qes=self.qeso,
+            he=self.heo,
+            hes=self.heso,
+            t=tn,
+            q=qo,
+            p=po,
+            z1=z1,
+            psur=psur,
+            ierr=ierr,
+            itest=-1,
         )
 
         # Call cup_env_clev() to calculate environmental values on cloud levels
         cup_env_clev(
-            t, qes, q, he, hes, self.z.field, po, qes_cup, q_cup, he_cup,
-            hes_cup, z_cup, p_cup, gamma_cup, t_cup, psur,
-            ierr, z1,
+            t.field, self.qes.field, q.field, self.he.field, self.hes.field, self.z.field, po.field, qes_cup, q_cup, he_cup,
+            hes_cup, z_cup, p_cup, gamma_cup, t_cup, psur.field,
+            ierr.field, z1.field,
             itf, jtf, ktf,
             its, ite, jts, jte, kts, kte
         )
 
         cup_env_clev(
-            tn, qeso, qo, heo, heso, zo, po, qeso_cup, qo_cup,
-            heo_cup, heso_cup, zo_cup, po_cup, gammao_cup, tn_cup, psur,
-            ierr, z1,
+            tn.field, self.qeso.field, qo.field, self.heo.field, self.heso.field, zo.field, po.field, qeso_cup, qo_cup,
+            heo_cup, heso_cup, zo_cup, po_cup, gammao_cup, tn_cup, psur.field,
+            ierr.field, z1.field,
             itf, jtf, ktf,
             its, ite, jts, jte, kts, kte
         )
 
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                if ierr[i, j] == 0:  # Equivalent to "if(ierr(i).eq.0)"
-                    u_cup[i, j, kts] = us[i, j, kts]  # kts corresponds to index 0 in Python
-                    v_cup[i, j, kts] = vs[i, j, kts]  # kts corresponds to index 0 in Python
+                if ierr.field[i, j] == 0:  # Equivalent to "if(ierr(i).eq.0)"
+                    u_cup[i, j, kts] = us.field[i, j, kts]  # kts corresponds to index 0 in Python
+                    v_cup[i, j, kts] = vs.field[i, j, kts]  # kts corresponds to index 0 in Python
                     for k in range(kts + 1, ktf + 1):  # Adjusted to retain the same number of iterations
-                        u_cup[i, j, k] = 0.5 * (us[i, j, k - 1] + us[i, j, k])
-                        v_cup[i, j, k] = 0.5 * (vs[i, j, k - 1] + vs[i, j, k])
+                        u_cup[i, j, k] = 0.5 * (us.field[i, j, k - 1] + us.field[i, j, k])
+                        v_cup[i, j, k] = 0.5 * (vs.field[i, j, k - 1] + vs.field[i, j, k])
 
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                if ierr[i, j] == 0:  # Equivalent to "if(ierr(i).eq.0)"
+                if ierr.field[i, j] == 0:  # Equivalent to "if(ierr(i).eq.0)"
                     for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
-                        if zo_cup[i, j, k] > zkbmax + z1[i, j]:  # Check if height exceeds zkbmax + surface height
+                        if zo_cup[i, j, k] > zkbmax + z1.field[i, j]:  # Check if height exceeds zkbmax + surface height
                             self.kbmax.field[i, j] = k
                             break  # Equivalent to "go to 25"
                     self.kbmax.field[i, j] = min(self.kbmax.field[i, j], ktf // 2)  # Equivalent to "kbmax(i)=min(kbmax(i),ktf/2)"
 
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                if kpbl[i, j] > 2:  # Equivalent to "if(kpbl(i).gt.3)"
-                    self.cap_max.field[i, j] = po_cup[i, j, kpbl[i, j]]  # Adjust kpbl index for 0-based indexing
-                if ierr[i, j] == 0:  # Equivalent to "if(ierr(i) == 0)"
-                    k22[i, j] = np.argmax(heo_cup[i, j, 1:self.kbmax.field[i, j]] + 1)  # Equivalent to "maxloc(heo_cup(i,2:kbmax(i)),1)"
-                    k22[i, j] = max(1, k22[i, j])  # Ensure k22 is at least 1
-                    if k22[i, j] > self.kbmax.field[i, j]:  # Check if k22 exceeds kbmax
-                        ierr[i, j] = 2
+                if kpbl.field[i, j] > 2:  # Equivalent to "if(kpbl(i).gt.3)"
+                    self.cap_max.field[i, j] = po_cup[i, j, kpbl.field[i, j]]  # Adjust kpbl index for 0-based indexing
+                if ierr.field[i, j] == 0:  # Equivalent to "if(ierr(i) == 0)"
+                    k22.field[i, j] = np.argmax(heo_cup[i, j, 1:self.kbmax.field[i, j]] + 1)  # Equivalent to "maxloc(heo_cup(i,2:kbmax(i)),1)"
+                    k22.field[i, j] = max(1, k22.field[i, j])  # Ensure k22 is at least 1
+                    if k22.field[i, j] > self.kbmax.field[i, j]:  # Check if k22 exceeds kbmax
+                        ierr.field[i, j] = 2
                         # ierrc[i, j] = "could not find k22"
-                        ktop[i, j] = -1
-                        k22[i, j] = -1
-                        kbcon[i, j] = -1
+                        ktop.field[i, j] = -1
+                        k22.field[i, j] = -1
+                        kbcon.field[i, j] = -1
 
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                if ierr[i, j] == 0:  # Equivalent to "if(ierr(i).eq.0)"
+                if ierr.field[i, j] == 0:  # Equivalent to "if(ierr(i).eq.0)"
                     x_add = XLV * self.zqexec.field[i, j] + CP * self.ztexec.field[i, j]  # Compute x_add
                     # Call get_cloud_bc() for he_cup
-                    hkb[i, j] = get_cloud_bc(kte, he_cup[i, j, :kte + 1], hkb[i, j], k22[i, j], x_add)
+                    hkb[i, j] = get_cloud_bc(kte, he_cup[i, j, :kte + 1], hkb[i, j], k22.field[i, j], x_add)
                     # Call get_cloud_bc() for heo_cup
-                    hkbo[i, j] = get_cloud_bc(kte, heo_cup[i, j, :kte + 1], hkbo[i, j], k22[i, j], x_add)
+                    hkbo[i, j] = get_cloud_bc(kte, heo_cup[i, j, :kte + 1], hkbo[i, j], k22.field[i, j], x_add)
 
         for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
             for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
@@ -434,90 +499,90 @@ class GFShallowConvection:
 
         # Call cup_kbcon() to determine the level of convective cloud base (kbcon)
         cup_kbcon(
-            self.cap_max_increment.field, 5, k22, kbcon, heo_cup, heso_cup,
-            hkbo, ierr, self.kbmax.field, po_cup, self.cap_max.field,
+            self.cap_max_increment.field, 5, k22.field, kbcon.field, heo_cup, heso_cup,
+            hkbo, ierr.field, self.kbmax.field, po_cup, self.cap_max.field,
             self.ztexec.field, self.zqexec.field,
             0, itf, jtf, ktf,
             its, ite, jts, jte, kts, kte,
-            z_cup, self.entr_rate.field, heo, 0
+            z_cup, self.entr_rate.field, self.heo.field, 0
         )
 
         # Call cup_minimi() to get inversion layers for cloud tops
         cup_minimi(
-            heso_cup, kbcon, self.kbmax.field, kstabi, ierr,
+            heso_cup, kbcon.field, self.kbmax.field, kstabi, ierr.field,
             itf, jtf, ktf,
             its, ite, jts, jte, kts, kte
         )
 
         get_inversion_layers(
-            ierr, p_cup, t_cup, z_cup, q_cup, qes_cup, k_inv_layers,
-            kbcon, kstabi, dtempdz, itf, jtf, ktf, its, ite, jts, jte, kts, kte
+            ierr.field, p_cup, t_cup, z_cup, q_cup, qes_cup, k_inv_layers,
+            kbcon.field, kstabi, dtempdz, itf, jtf, ktf, its, ite, jts, jte, kts, kte
         )
 
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
                 entr_rate_2d[i, j, :] = self.entr_rate.field[i, j]  # Copy entr_rate to entr_rate_2d
-                if ierr[i, j] == 0:  # Equivalent to "if(ierr(i) == 0)"
-                    start_level[i, j] = k22[i, j]  # Set start_level to k22
+                if ierr.field[i, j] == 0:  # Equivalent to "if(ierr(i) == 0)"
+                    start_level[i, j] = k22.field[i, j]  # Set start_level to k22
                     x_add = XLV * self.zqexec.field[i, j] + CP * self.ztexec.field[i, j]  # Compute x_add
                     # Call get_cloud_bc() for he_cup
-                    hkb[i, j] = get_cloud_bc(kte, he_cup[i, j, :kte + 1], hkb[i, j], k22[i, j], x_add)
-                    if kbcon[i, j] > ktf - 4:  # Check if kbcon exceeds ktf - 4
-                        ierr[i, j] = 231
+                    hkb[i, j] = get_cloud_bc(kte, he_cup[i, j, :kte + 1], hkb[i, j], k22.field[i, j], x_add)
+                    if kbcon.field[i, j] > ktf - 4:  # Check if kbcon exceeds ktf - 4
+                        ierr.field[i, j] = 231
                     for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
                         frh = 2.0 * min(qo_cup[i, j, k] / qeso_cup[i, j, k], 1.0)  # Compute frh
                         entr_rate_2d[i, j, k] = self.entr_rate.field[i, j]  # Copy entr_rate to entr_rate_2d
                         self.cd.field[i, j, k] = 0.75 * entr_rate_2d[i, j, k]  # Compute cd
 
                     # First estimate for shallow convection
-                    ktop[i, j] = 0
-                    kstart = kpbl[i, j]
-                    if kpbl[i, j] < 4:  # Check if kpbl is less than 4
-                        kstart = kbcon[i, j]
+                    ktop.field[i, j] = 0
+                    kstart = kpbl.field[i, j]
+                    if kpbl.field[i, j] < 4:  # Check if kpbl is less than 4
+                        kstart = kbcon.field[i, j]
                     if k_inv_layers[i, j, 0] > -1 and (po_cup[i, j, kstart] - po_cup[i, j, k_inv_layers[i, j, 0]]) < 200.0:
-                        ktop[i, j] = k_inv_layers[i, j, 0]
+                        ktop.field[i, j] = k_inv_layers[i, j, 0]
                     else:
-                        for k in range(kbcon[i, j] + 1, ktf + 1):  # Adjusted loop range
+                        for k in range(kbcon.field[i, j] + 1, ktf + 1):  # Adjusted loop range
                             if (po_cup[i, j, kstart] - po_cup[i, j, k]) > 200.0:
-                                ktop[i, j] = k
+                                ktop.field[i, j] = k
                                 break  # Exit the loop
 
         rates_up_pdf(
-            rand_vmas, ipr, 'shallow', ktop, ierr, po_cup, entr_rate_2d, hkbo, heo, heso_cup, zo_cup,
-            self.xland1.field, kstabi, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kpbl, self.ktopx.field, kbcon, pmin_lev
+            rand_vmas, ipr, 'shallow', ktop.field, ierr.field, po_cup, entr_rate_2d, hkbo, self.heo.field, heso_cup, zo_cup,
+            self.xland1.field, kstabi, k22.field, kbcon.field, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo.field, kpbl.field, self.ktopx.field, kbcon.field, pmin_lev
         )
     
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                if ierr[i, j] == 0:  # Equivalent to "if(ierr(i).eq.0)"
-                    if k22[i, j] > 0:  # Check if k22 is greater than 0
-                        for k in range(k22[i, j]):  # Loop from 1 to k22(i)-1
-                            zuo[i, j, k] = 0.0
+                if ierr.field[i, j] == 0:  # Equivalent to "if(ierr(i).eq.0)"
+                    if k22.field[i, j] > 0:  # Check if k22 is greater than 0
+                        for k in range(k22.field[i, j]):  # Loop from 1 to k22(i)-1
+                            zuo.field[i, j, k] = 0.0
                             zu[i, j, k] = 0.0
                             xzu[i, j, k] = 0.0
 
-                    for k in range(np.argmax(zuo[i, j, :]), ktop[i, j] + 1):  # Loop from maxloc(zuo(i,:)) to ktop(i)
-                        if zuo[i, j, k] < 1.0e-6:  # Check if zuo(i,k) is less than 1.e-6
-                            ktop[i, j] = k - 1
+                    for k in range(np.argmax(zuo.field[i, j, :]), ktop.field[i, j] + 1):  # Loop from maxloc(zuo(i,:)) to ktop(i)
+                        if zuo.field[i, j, k] < 1.0e-6:  # Check if zuo(i,k) is less than 1.e-6
+                            ktop.field[i, j] = k - 1
                             break  # Exit the loop
 
-                    for k in range(k22[i, j], ktop[i, j] + 1):  # Loop from k22(i) to ktop(i)
-                        xzu[i, j, k] = zuo[i, j, k]
-                        zu[i, j, k] = zuo[i, j, k]
+                    for k in range(k22.field[i, j], ktop.field[i, j] + 1):  # Loop from k22(i) to ktop(i)
+                        xzu[i, j, k] = zuo.field[i, j, k]
+                        zu[i, j, k] = zuo.field[i, j, k]
 
-                    for k in range(ktop[i, j] + 1, ktf + 1):  # Loop from ktop(i)+1 to ktf
-                        zuo[i, j, k] = 0.0
+                    for k in range(ktop.field[i, j] + 1, ktf + 1):  # Loop from ktop(i)+1 to ktf
+                        zuo.field[i, j, k] = 0.0
                         zu[i, j, k] = 0.0
                         xzu[i, j, k] = 0.0
 
-                    k22[i, j] = max(1, k22[i, j])  # Ensure k22 is at least 1
+                    k22.field[i, j] = max(1, k22.field[i, j])  # Ensure k22 is at least 1
 
         # Call get_lateral_massflux() to calculate mass entrainment and detrainment
         get_lateral_massflux(
             itf, jtf, ktf, its, ite, jts, jte, kts, kte,
-            ierr, ktop, zo_cup, zuo, self.cd.field, entr_rate_2d,
+            ierr.field, ktop.field, zo_cup, zuo.field, self.cd.field, entr_rate_2d,
             self.up_massentro.field, self.up_massdetro.field, up_massentr, up_massdetr,
-            2, kbcon, k22, self.up_massentru.field, self.up_massdetru.field, lambau
+            2, kbcon.field, k22.field, self.up_massentru.field, self.up_massdetru.field, lambau
         )
 
         for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
@@ -532,7 +597,7 @@ class GFShallowConvection:
 
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                if ierr[i, j] != 0:  # Equivalent to "if(ierr(i) /= 0)"
+                if ierr.field[i, j] != 0:  # Equivalent to "if(ierr(i) /= 0)"
                     continue  # Skip to the next iteration if ierr[i, j] is not zero
                 for k in range(start_level[i, j] + 1):  # Loop from 1 to start_level(i)
                     uc[i, j, k] = u_cup[i, j, k]
@@ -547,63 +612,63 @@ class GFShallowConvection:
         for i in range(its, itf + 1):  # Loop over horizontal grid points
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
                 dbyt[i, j, :] = 0.0  # Initialize dbyt for this grid point
-                if ierr[i, j] != 0:  # Skip if there is an error
+                if ierr.field[i, j] != 0:  # Skip if there is an error
                     continue
 
                 # Sequential loop for levels from start_level(i)+1 to ktop(i)
-                for k in range(start_level[i, j] + 1, ktop[i, j] + 1):
+                for k in range(start_level[i, j] + 1, ktop.field[i, j] + 1):
                     hc[i, j, k] = (hc[i, j, k - 1] * zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] * hc[i, j, k - 1] +
-                                up_massentr[i, j, k - 1] * he[i, j, k - 1]) / \
+                                up_massentr[i, j, k - 1] * self.he.field[i, j, k - 1]) / \
                             (zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
                     uc[i, j, k] = (uc[i, j, k - 1] * zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] * uc[i, j, k - 1] +
-                                up_massentr[i, j, k - 1] * us[i, j, k - 1]) / \
+                                up_massentr[i, j, k - 1] * us.field[i, j, k - 1]) / \
                             (zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
                     vc[i, j, k] = (vc[i, j, k - 1] * zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] * vc[i, j, k - 1] +
-                                up_massentr[i, j, k - 1] * vs[i, j, k - 1]) / \
+                                up_massentr[i, j, k - 1] * vs.field[i, j, k - 1]) / \
                             (zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
                     dby[i, j, k] = max(0.0, hc[i, j, k] - hes_cup[i, j, k])
-                    hco[i, j, k] = (hco[i, j, k - 1] * zuo[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] * hco[i, j, k - 1] +
-                                self.up_massentro.field[i, j, k - 1] * heo[i, j, k - 1]) / \
-                                (zuo[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] + self.up_massentro.field[i, j, k - 1])
+                    hco[i, j, k] = (hco[i, j, k - 1] * zuo.field[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] * hco[i, j, k - 1] +
+                                self.up_massentro.field[i, j, k - 1] * self.heo.field[i, j, k - 1]) / \
+                                (zuo.field[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] + self.up_massentro.field[i, j, k - 1])
                     dbyo[i, j, k] = hco[i, j, k] - heso_cup[i, j, k]
                     dz = zo_cup[i, j, k + 1] - zo_cup[i, j, k]
-                    if k >= kbcon[i, j]:
+                    if k >= kbcon.field[i, j]:
                         dbyt[i, j, k] = dbyt[i, j, k - 1] + dbyo[i, j, k] * dz
 
                 ki = np.argmax(dbyt[i, j, :])  # Find the index of the maximum value in dbyt
-                if ktop[i, j] > ki + 1:
-                    ktop[i, j] = ki + 1
-                    zuo[i, j, ktop[i, j] + 1:ktf + 1] = 0.0
-                    zu[i, j, ktop[i, j] + 1:ktf + 1] = 0.0
-                    self.cd.field[i, j, ktop[i, j] + 1:ktf + 1] = 0.0
-                    self.up_massdetro.field[i, j, ktop[i, j]] = zuo[i, j, ktop[i, j]]
-                    self.up_massentro.field[i, j, ktop[i, j]:ktf + 1] = 0.0
-                    self.up_massdetro.field[i, j, ktop[i, j] + 1:ktf + 1] = 0.0
-                    entr_rate_2d[i, j, ktop[i, j] + 1:ktf + 1] = 0.0
+                if ktop.field[i, j] > ki + 1:
+                    ktop.field[i, j] = ki + 1
+                    zuo.field[i, j, ktop.field[i, j] + 1:ktf + 1] = 0.0
+                    zu[i, j, ktop.field[i, j] + 1:ktf + 1] = 0.0
+                    self.cd.field[i, j, ktop.field[i, j] + 1:ktf + 1] = 0.0
+                    self.up_massdetro.field[i, j, ktop.field[i, j]] = zuo.field[i, j, ktop.field[i, j]]
+                    self.up_massentro.field[i, j, ktop.field[i, j]:ktf + 1] = 0.0
+                    self.up_massdetro.field[i, j, ktop.field[i, j] + 1:ktf + 1] = 0.0
+                    entr_rate_2d[i, j, ktop.field[i, j] + 1:ktf + 1] = 0.0
 
-                if ktop[i, j] < kbcon[i, j] + 1:
-                    ierr[i, j] = 5
+                if ktop.field[i, j] < kbcon.field[i, j] + 1:
+                    ierr.field[i, j] = 5
                     continue
-                if ktop[i, j] > ktf - 2:
-                    ierr[i, j] = 5
-                    # ierrc[i, j] = "ktop is larger than ktf-2"
+                if ktop.field[i, j] > ktf - 2:
+                    ierr.field[i, j] = 5
+                    # ierrc[i, j] = "ktop.field is larger than ktf-2"
                     continue
 
                 # Call get_cloud_bc() to calculate cloud properties
-                qaver = get_cloud_bc(kte, qo_cup[i, j, :kte + 1], qaver, k22[i, j], ZERO)
+                qaver = get_cloud_bc(kte, qo_cup[i, j, :kte + 1], qaver, k22.field[i, j], ZERO)
                 qaver += self.zqexec.field[i, j]
                 for k in range(start_level[i, j]):
                     qco[i, j, k] = qo_cup[i, j, k]
                 k = start_level[i, j]
                 qco[i, j, k] = qaver
 
-                # Sequential loop for levels from start_level(i)+1 to ktop(i)
-                for k in range(start_level[i, j] + 1, ktop[i, j] + 1):
+                # Sequential loop for levels from start_level(i)+1 to ktop.field(i)
+                for k in range(start_level[i, j] + 1, ktop.field[i, j] + 1):
                     trash = qeso_cup[i, j, k] + (1.0 / XLV) * (gammao_cup[i, j, k] / (1.0 + gammao_cup[i, j, k])) * dbyo[i, j, k]
                     trash2 = qco[i, j, k - 1]
-                    qco[i, j, k] = (trash2 * (zuo[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1]) +
-                                up_massentr[i, j, k - 1] * qo[i, j, k - 1]) / \
-                                (zuo[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
+                    qco[i, j, k] = (trash2 * (zuo.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1]) +
+                                up_massentr[i, j, k - 1] * qo.field[i, j, k - 1]) / \
+                                (zuo.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
 
                     if qco[i, j, k] >= trash:
                         dz = z_cup[i, j, k] - z_cup[i, j, k - 1]
@@ -612,28 +677,28 @@ class GFShallowConvection:
                         if self.qrco.field[i, j, k] < 0.0:
                             self.qrco.field[i, j, k] = 0.0
                             c1d[i, j, k] = 0.0
-                        self.pwo.field[i, j, k] = C0_SHAL * dz * self.qrco.field[i, j, k] * zuo[i, j, k]
+                        self.pwo.field[i, j, k] = C0_SHAL * dz * self.qrco.field[i, j, k] * zuo.field[i, j, k]
                         qco[i, j, k] = trash + self.qrco.field[i, j, k]
                     else:
                         self.qrco.field[i, j, k] = 0.0
-                    cupclw[i, j, k] = self.qrco.field[i, j, k]
+                    cupclw.field[i, j, k] = self.qrco.field[i, j, k]
 
                 trash = 0.0
                 trash2 = 0.0
 
-                # Loop from k22(i)+1 to ktop(i)
-                for k in range(k22[i, j] + 1, ktop[i, j] + 1):  # Adjusted for Python indexing
+                # Loop from k22.field(i)+1 to ktop.field(i)
+                for k in range(k22.field[i, j] + 1, ktop.field[i, j] + 1):  # Adjusted for Python indexing
                     dp = 100.0 * (po_cup[i, j, k] - po_cup[i, j, k + 1])  # Compute pressure difference
-                    cnvwt[i, j, k] = zuo[i, j, k] * cupclw[i, j, k] * G / dp  # Compute convective weight
+                    cnvwt.field[i, j, k] = zuo.field[i, j, k] * cupclw.field[i, j, k] * G / dp  # Compute convective weight
                     trash2 += entr_rate_2d[i, j, k]  # Accumulate entrainment rate
                     qco[i, j, k] = qco[i, j, k] - self.qrco.field[i, j, k]  # Adjust cloud water vapor mixing ratio
 
-                # Loop from k22(i)+1 to max(kbcon(i), k22(i)+1)
-                for k in range(k22[i, j] + 1, max(kbcon[i, j], k22[i, j] + 1) + 1):  # Adjusted for Python indexing
+                # Loop from k22.field(i)+1 to max(kbcon.field(i), k22.field(i)+1)
+                for k in range(k22.field[i, j] + 1, max(kbcon.field[i, j], k22.field[i, j] + 1) + 1):  # Adjusted for Python indexing
                     trash += entr_rate_2d[i, j, k]  # Accumulate entrainment rate
 
-                # Loop from ktop(i)+1 to ktf-1
-                for k in range(ktop[i, j] + 1, ktf):  # Adjusted for Python indexing
+                # Loop from ktop.field(i)+1 to ktf-1
+                for k in range(ktop.field[i, j] + 1, ktf):  # Adjusted for Python indexing
                     hc[i, j, k] = hes_cup[i, j, k]  # Set cloud moist static energy
                     hco[i, j, k] = heso_cup[i, j, k]  # Set cloud moist static energy for environment
                     qco[i, j, k] = qeso_cup[i, j, k]  # Set cloud water vapor mixing ratio
@@ -644,24 +709,24 @@ class GFShallowConvection:
                     dbyo[i, j, k] = 0.0  # Reset buoyancy term for environment
                     zu[i, j, k] = 0.0  # Reset updraft normalized mass flux
                     xzu[i, j, k] = 0.0  # Reset updraft normalized mass flux (alternative)
-                    zuo[i, j, k] = 0.0  # Reset updraft normalized mass flux for environment
+                    zuo.field[i, j, k] = 0.0  # Reset updraft normalized mass flux for environment
 
         if make_calc_for_xk:  # Check if calculations for xk are enabled
             # Call cup_up_aa0() to calculate cloud work functions
             cup_up_aa0(self.aa0.field, self.z.field, zu, dby, gamma_cup, t_cup,
-                    kbcon, ktop, ierr,
+                    kbcon.field, ktop.field, ierr.field,
                     itf, jtf, ktf, its, ite, jts, jte, kts, kte)
-            cup_up_aa0(self.aa1.field, zo, zuo, dbyo, gammao_cup, tn_cup,
-                    kbcon, ktop, ierr,
+            cup_up_aa0(self.aa1.field, zo.field, zuo.field, dbyo, gammao_cup, tn_cup,
+                    kbcon.field, ktop.field, ierr.field,
                     itf, jtf, ktf, its, ite, jts, jte, kts, kte)
 
             for i in range(its, itf + 1):  # Loop over horizontal grid points
                 for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                    if ierr[i, j] == 0:  # Check if there is no error
+                    if ierr.field[i, j] == 0:  # Check if there is no error
                         if self.aa1.field[i, j] <= 0.0:  # Check if cloud work function is zero or negative
-                            ierr[i, j] = 17
+                            ierr.field[i, j] = 17
                             # Equivalent to setting error description in Fortran
-                            # ierrc[i, j] = "cloud work function zero"
+                            # ierrc.field[i, j] = "cloud work function zero"
 
         for k in range(kts, ktf + 1):  # Loop over vertical levels
             for i in range(its, itf + 1):  # Loop over horizontal grid points
@@ -676,40 +741,40 @@ class GFShallowConvection:
 
         for i in range(its, itf + 1):  # Loop over horizontal grid points
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                if ierr[i, j] == 0:  # Check if there is no error
+                if ierr.field[i, j] == 0:  # Check if there is no error
                     dp = 100.0 * (po_cup[i, j, 0] - po_cup[i, j, 1])  # Compute pressure difference
-                    dellu[i, j, 0] = -zuo[i, j, 1] * (uc[i, j, 1] - u_cup[i, j, 1]) * G / dp
-                    dellv[i, j, 0] = -zuo[i, j, 1] * (vc[i, j, 1] - v_cup[i, j, 1]) * G / dp
-                    dellah[i, j, 0] = -zuo[i, j, 1] * (hco[i, j, 1] - heo_cup[i, j, 1]) * G / dp
-                    dellaq[i, j, 0] = -zuo[i, j, 1] * (qco[i, j, 1] - qo_cup[i, j, 1]) * G / dp
+                    dellu[i, j, 0] = -zuo.field[i, j, 1] * (uc[i, j, 1] - u_cup[i, j, 1]) * G / dp
+                    dellv[i, j, 0] = -zuo.field[i, j, 1] * (vc[i, j, 1] - v_cup[i, j, 1]) * G / dp
+                    dellah[i, j, 0] = -zuo.field[i, j, 1] * (hco[i, j, 1] - heo_cup[i, j, 1]) * G / dp
+                    dellaq[i, j, 0] = -zuo.field[i, j, 1] * (qco[i, j, 1] - qo_cup[i, j, 1]) * G / dp
 
-                    for k in range(k22[i, j], ktop[i, j] + 1):  # Loop over vertical levels
+                    for k in range(k22.field[i, j], ktop.field[i, j] + 1):  # Loop over vertical levels
                         entup = self.up_massentro.field[i, j, k]
                         detup = self.up_massdetro.field[i, j, k]
-                        totmas = detup - entup + zuo[i, j, k + 1] - zuo[i, j, k]
+                        totmas = detup - entup + zuo.field[i, j, k + 1] - zuo.field[i, j, k]
 
                         dp = 100.0 * (po_cup[i, j, k] - po_cup[i, j, k + 1])  # Compute pressure difference
-                        dellah[i, j, k] = -(zuo[i, j, k + 1] * (hco[i, j, k + 1] - heo_cup[i, j, k + 1]) -
-                                        zuo[i, j, k] * (hco[i, j, k] - heo_cup[i, j, k])) * G / dp
+                        dellah[i, j, k] = -(zuo.field[i, j, k + 1] * (hco[i, j, k + 1] - heo_cup[i, j, k + 1]) -
+                                        zuo.field[i, j, k] * (hco[i, j, k] - heo_cup[i, j, k])) * G / dp
 
                         dz = zo_cup[i, j, k + 1] - zo_cup[i, j, k]  # Compute height difference
-                        if k < ktop[i, j] and c1d[i, j, k] > 0:
-                            self.dellaqc.field[i, j, k] = zuo[i, j, k] * c1d[i, j, k] * self.qrco.field[i, j, k] * dz / dp * G
+                        if k < ktop.field[i, j] and c1d[i, j, k] > 0:
+                            self.dellaqc.field[i, j, k] = zuo.field[i, j, k] * c1d[i, j, k] * self.qrco.field[i, j, k] * dz / dp * G
                         else:
                             self.dellaqc.field[i, j, k] = detup * 0.5 * (self.qrco.field[i, j, k + 1] + self.qrco.field[i, j, k]) * G / dp
 
-                        c_up = self.dellaqc.field[i, j, k] + (zuo[i, j, k + 1] * self.qrco.field[i, j, k + 1] -
-                                                zuo[i, j, k] * self.qrco.field[i, j, k]) * G / dp
+                        c_up = self.dellaqc.field[i, j, k] + (zuo.field[i, j, k + 1] * self.qrco.field[i, j, k + 1] -
+                                                zuo.field[i, j, k] * self.qrco.field[i, j, k]) * G / dp
 
-                        dellaq[i, j, k] = -(zuo[i, j, k + 1] * (qco[i, j, k + 1] - qo_cup[i, j, k + 1]) -
-                                        zuo[i, j, k] * (qco[i, j, k] - qo_cup[i, j, k])) * G / dp - \
+                        dellaq[i, j, k] = -(zuo.field[i, j, k + 1] * (qco[i, j, k + 1] - qo_cup[i, j, k + 1]) -
+                                        zuo.field[i, j, k] * (qco[i, j, k] - qo_cup[i, j, k])) * G / dp - \
                                         c_up - 0.5 * (self.pwo.field[i, j, k] + self.pwo.field[i, j, k + 1]) * G / dp
 
-                        dellu[i, j, k] = -(zuo[i, j, k + 1] * (uc[i, j, k + 1] - u_cup[i, j, k + 1]) -
-                                        zuo[i, j, k] * (uc[i, j, k] - u_cup[i, j, k])) * G / dp
+                        dellu[i, j, k] = -(zuo.field[i, j, k + 1] * (uc[i, j, k + 1] - u_cup[i, j, k + 1]) -
+                                        zuo.field[i, j, k] * (uc[i, j, k] - u_cup[i, j, k])) * G / dp
 
-                        dellv[i, j, k] = -(zuo[i, j, k + 1] * (vc[i, j, k + 1] - v_cup[i, j, k + 1]) -
-                                        zuo[i, j, k] * (vc[i, j, k] - v_cup[i, j, k])) * G / dp
+                        dellv[i, j, k] = -(zuo.field[i, j, k + 1] * (vc[i, j, k + 1] - v_cup[i, j, k + 1]) -
+                                        zuo.field[i, j, k] * (vc[i, j, k] - v_cup[i, j, k])) * G / dp
 
         mbdt = 0.5 #3.e-4
 
@@ -717,32 +782,41 @@ class GFShallowConvection:
             for i in range(its, itf + 1):  # Loop over horizontal grid points
                 for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
                     dellat[i, j, k] = 0.0  # Reset temperature tendency
-                    if ierr[i, j] != 0:  # Skip if there is an error
+                    if ierr.field[i, j] != 0:  # Skip if there is an error
                         continue
-                    xhe[i, j, k] = dellah[i, j, k] * mbdt + heo[i, j, k]  # Update moist static energy
-                    xq[i, j, k] = max(1.0e-16, (dellaq[i, j, k] + self.dellaqc.field[i, j, k]) * mbdt + qo[i, j, k])  # Update water vapor mixing ratio
+                    self.xhe.field[i, j, k] = dellah[i, j, k] * mbdt + self.heo.field[i, j, k]  # Update moist static energy
+                    self.xq.field[i, j, k] = max(1.0e-16, (dellaq[i, j, k] + self.dellaqc.field[i, j, k]) * mbdt + qo.field[i, j, k])  # Update water vapor mixing ratio
                     dellat[i, j, k] = (1.0 / CP) * (dellah[i, j, k] - XLV * dellaq[i, j, k])  # Update temperature tendency
-                    xt[i, j, k] = (-self.dellaqc.field[i, j, k] * XLV / CP + dellat[i, j, k]) * mbdt + tn[i, j, k]  # Update temperature
-                    xt[i, j, k] = max(190.0, xt[i, j, k])  # Ensure temperature is above a minimum threshold
+                    self.xt.field[i, j, k] = (-self.dellaqc.field[i, j, k] * XLV / CP + dellat[i, j, k]) * mbdt + tn.field[i, j, k]  # Update temperature
+                    self.xt.field[i, j, k] = max(190.0, self.xt.field[i, j, k])  # Ensure temperature is above a minimum threshold
 
         for i in range(its, itf + 1):  # Loop over horizontal grid points
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                if ierr[i, j] == 0:  # Check if there is no error
-                    xhe[i, j, ktf] = heo[i, j, ktf]  # Update moist static energy at the top level
-                    xq[i, j, ktf] = qo[i, j, ktf]  # Update water vapor mixing ratio at the top level
-                    xt[i, j, ktf] = tn[i, j, ktf]  # Update temperature at the top level
+                if ierr.field[i, j] == 0:  # Check if there is no error
+                    self.xhe.field[i, j, ktf] = self.heo.field[i, j, ktf]  # Update moist static energy at the top level
+                    self.xq.field[i, j, ktf] = qo.field[i, j, ktf]  # Update water vapor mixing ratio at the top level
+                    self.xt.field[i, j, ktf] = tn.field[i, j, ktf]  # Update temperature at the top level
 
         if make_calc_for_xk:  # Check if calculations for xk are enabled
             # Call cup_env() to calculate moist static energy, heights, and qes
-            cup_env(self.xz.field, xqes, xhe, xhes, xt, xq, po, z1,
-                    psur, ierr, tcrit, -1,
-                    itf, jtf, ktf,
-                    its, ite, jts, jte, kts, kte)
+            self._cup_env(
+                z=self.xz,
+                qes=self.xqes,
+                he=self.xhe,
+                hes=self.xhes,
+                t=self.xt,
+                q=self.xq,
+                p=po,
+                z1=z1,
+                psur=psur,
+                ierr=ierr,
+                itest=-1,
+            )
 
             # Call cup_env_clev() to calculate environmental values on cloud levels
-            cup_env_clev(xt, xqes, xq, xhe, xhes, self.xz.field, po, xqes_cup, xq_cup,
-                        xhe_cup, xhes_cup, xz_cup, po_cup, gamma_cup, xt_cup, psur,
-                        ierr, z1,
+            cup_env_clev(self.xt.field, self.xqes.field, self.xq.field, self.xhe.field, self.xhes.field, self.xz.field, po.field, xqes_cup, xq_cup,
+                        xhe_cup, xhes_cup, xz_cup, po_cup, gamma_cup, xt_cup, psur.field,
+                        ierr.field, z1.field,
                         itf, jtf, ktf,
                         its, ite, jts, jte, kts, kte)
 
@@ -756,9 +830,9 @@ class GFShallowConvection:
             # Parallel loop to calculate cloud base and initialize xhc
             for i in range(its, itf + 1):  # Loop over horizontal grid points
                 for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                    if ierr[i, j] == 0:  # Check if there is no error
+                    if ierr.field[i, j] == 0:  # Check if there is no error
                         x_add = XLV * self.zqexec.field[i, j] + CP * self.ztexec.field[i, j]  # Compute x_add
-                        xhkb[i, j] = get_cloud_bc(kte, xhe_cup[i, j, :kte + 1], xhkb[i, j], k22[i, j], x_add)
+                        xhkb[i, j] = get_cloud_bc(kte, xhe_cup[i, j, :kte + 1], xhkb[i, j], k22.field[i, j], x_add)
                         for k in range(start_level[i, j]):  # Loop up to start_level(i)-1
                             xhc[i, j, k] = xhe_cup[i, j, k]
                         k = start_level[i, j]
@@ -767,22 +841,22 @@ class GFShallowConvection:
             # Update xzu and calculate xhc and xdby
             for i in range(its, itf + 1):  # Loop over horizontal grid points
                 for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                    if ierr[i, j] == 0:  # Check if there is no error
-                        xzu[i, j, :ktf] = zuo[i, j, :ktf]  # Copy zuo to xzu
-                        for k in range(start_level[i, j] + 1, ktop[i, j] + 1):  # Loop from start_level(i)+1 to ktop(i)
+                    if ierr.field[i, j] == 0:  # Check if there is no error
+                        xzu[i, j, :ktf] = zuo.field[i, j, :ktf]  # Copy zuo.field to xzu
+                        for k in range(start_level[i, j] + 1, ktop.field[i, j] + 1):  # Loop from start_level(i)+1 to ktop.field(i)
                             xhc[i, j, k] = (xhc[i, j, k - 1] * xzu[i, j, k - 1] -
                                         0.5 * self.up_massdetro.field[i, j, k - 1] * xhc[i, j, k - 1] +
-                                        self.up_massentro.field[i, j, k - 1] * xhe[i, j, k - 1]) / \
+                                        self.up_massentro.field[i, j, k - 1] * self.xhe.field[i, j, k - 1]) / \
                                         (xzu[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] + self.up_massentro.field[i, j, k - 1])
                             xdby[i, j, k] = xhc[i, j, k] - xhes_cup[i, j, k]
-                        for k in range(ktop[i, j] + 1, ktf + 1):  # Loop from ktop(i)+1 to ktf
+                        for k in range(ktop.field[i, j] + 1, ktf + 1):  # Loop from ktop.field(i)+1 to ktf
                             xhc[i, j, k] = xhes_cup[i, j, k]
                             xdby[i, j, k] = 0.0
                             xzu[i, j, k] = 0.0
 
             # Call cup_up_aa0() to calculate workfunctions for updraft
             cup_up_aa0(xaa0, self.xz.field, xzu, xdby, gamma_cup, xt_cup,
-                    kbcon, ktop, ierr,
+                    kbcon.field, ktop.field, ierr.field,
                     itf, jtf, ktf,
                     its, ite, jts, jte, kts, kte)
 
@@ -791,7 +865,7 @@ class GFShallowConvection:
                 xmb[i, j] = 0.0  # Initialize xmb
                 xff_shal = [0.0, 0.0, 0.0]  # Initialize xff_shal array
 
-                if ierr[i, j] == 0:  # Check if there is no error
+                if ierr.field[i, j] == 0:  # Check if there is no error
                     xmbmax[i, j] = 1.0  # Set maximum base mass flux
 
                     # Stabilization closure
@@ -809,9 +883,9 @@ class GFShallowConvection:
                     # Boundary layer qe closure
                     blqe = 0.0
                     trash = 0.0
-                    for k in range(kbcon[i, j] + 1):  # Loop over levels up to kbcon(i)
-                        blqe += 100.0 * dhdt[i, j, k] * (po_cup[i, j, k] - po_cup[i, j, k + 1]) / G
-                    trash = max((hc[i, j, kbcon[i, j]] - he_cup[i, j, kbcon[i, j]]), 10.0)
+                    for k in range(kbcon.field[i, j] + 1):  # Loop over levels up to kbcon.field(i)
+                        blqe += 100.0 * dhdt.field[i, j, k] * (po_cup[i, j, k] - po_cup[i, j, k + 1]) / G
+                    trash = max((hc[i, j, kbcon.field[i, j]] - he_cup[i, j, kbcon.field[i, j]]), 10.0)
                     xff_shal[2] = max(0.0, blqe / trash)
                     xff_shal[2] = min(xmbmax[i, j], xff_shal[2])
 
@@ -821,53 +895,53 @@ class GFShallowConvection:
                     if ichoice > 0:
                         xmb[i, j] = min(xmbmax[i, j], xff_shal[ichoice - 1])
                     if xmb[i, j] <= 0.0:
-                        ierr[i, j] = 21
-                        # ierrc[i, j] = "21"
+                        ierr.field[i, j] = 21
+                        # ierrc.field[i, j] = "21"
 
-                if ierr[i, j] != 0:  # Handle error case
-                    k22[i, j] = -1
-                    kbcon[i, j] = -1
-                    ktop[i, j] = -1
+                if ierr.field[i, j] != 0:  # Handle error case
+                    k22.field[i, j] = -1
+                    kbcon.field[i, j] = -1
+                    ktop.field[i, j] = -1
                     xmb[i, j] = 0.0
-                    outt[i, j, :] = 0.0
-                    outu[i, j, :] = 0.0
-                    outv[i, j, :] = 0.0
-                    outq[i, j, :] = 0.0
-                    outqc[i, j, :] = 0.0
-                elif ierr[i, j] == 0:  # Handle no-error case
-                    xmb_out[i, j] = xmb[i, j]
+                    outt.field[i, j, :] = 0.0
+                    outu.field[i, j, :] = 0.0
+                    outv.field[i, j, :] = 0.0
+                    outq.field[i, j, :] = 0.0
+                    outqc.field[i, j, :] = 0.0
+                elif ierr.field[i, j] == 0:  # Handle no-error case
+                    xmb_out.field[i, j] = xmb[i, j]
 
                     # Final tendencies
-                    pre[i, j] = 0.0
-                    for k in range(1, ktop[i, j] + 1):  # Loop over levels from 2 to ktop(i)
-                        outt[i, j, k] = dellat[i, j, k] * xmb[i, j]
-                        outq[i, j, k] = dellaq[i, j, k] * xmb[i, j]
-                        outqc[i, j, k] = self.dellaqc.field[i, j, k] * xmb[i, j]
-                        pre[i, j] += self.pwo.field[i, j, k] * xmb[i, j]
+                    pre.field[i, j] = 0.0
+                    for k in range(1, ktop.field[i, j] + 1):  # Loop over levels from 2 to ktop.field(i)
+                        outt.field[i, j, k] = dellat[i, j, k] * xmb[i, j]
+                        outq.field[i, j, k] = dellaq[i, j, k] * xmb[i, j]
+                        outqc.field[i, j, k] = self.dellaqc.field[i, j, k] * xmb[i, j]
+                        pre.field[i, j] += self.pwo.field[i, j, k] * xmb[i, j]
 
-                    outt[i, j, 0] = dellat[i, j, 0] * xmb[i, j]
-                    outq[i, j, 0] = dellaq[i, j, 0] * xmb[i, j]
-                    outu[i, j, 0] = dellu[i, j, 0] * xmb[i, j]
-                    outv[i, j, 0] = dellv[i, j, 0] * xmb[i, j]
+                    outt.field[i, j, 0] = dellat[i, j, 0] * xmb[i, j]
+                    outq.field[i, j, 0] = dellaq[i, j, 0] * xmb[i, j]
+                    outu.field[i, j, 0] = dellu[i, j, 0] * xmb[i, j]
+                    outv.field[i, j, 0] = dellv[i, j, 0] * xmb[i, j]
 
-                    for k in range(kts + 1, ktop[i, j] + 1):  # Loop over levels from kts+1 to ktop(i)
-                        outu[i, j, k] = 0.25 * (dellu[i, j, k - 1] + 2.0 * dellu[i, j, k] + dellu[i, j, k + 1]) * xmb[i, j]
-                        outv[i, j, k] = 0.25 * (dellv[i, j, k - 1] + 2.0 * dellv[i, j, k] + dellv[i, j, k + 1]) * xmb[i, j]
+                    for k in range(kts + 1, ktop.field[i, j] + 1):  # Loop over levels from kts+1 to ktop.field(i)
+                        outu.field[i, j, k] = 0.25 * (dellu[i, j, k - 1] + 2.0 * dellu[i, j, k] + dellu[i, j, k + 1]) * xmb[i, j]
+                        outv.field[i, j, k] = 0.25 * (dellv[i, j, k - 1] + 2.0 * dellv[i, j, k] + dellv[i, j, k + 1]) * xmb[i, j]
 
         for i in range(its, itf + 1):  # Loop over horizontal grid points
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                if ierr[i, j] == 0:  # Check if there is no error
+                if ierr.field[i, j] == 0:  # Check if there is no error
                     dts = 0.0  # Initialize total kinetic energy dissipation
                     fpi = 0.0  # Initialize integrated potential energy conversion factor
 
-                    for k in range(kts, ktop[i, j] + 1):  # Loop over vertical levels
+                    for k in range(kts, ktop.field[i, j] + 1):  # Loop over vertical levels
                         dp = (po_cup[i, j, k] - po_cup[i, j, k + 1]) * 100.0  # Compute pressure difference
                         # Total kinetic energy dissipation estimate
-                        dts -= (outu[i, j, k] * us[i, j, k] + outv[i, j, k] * vs[i, j, k]) * dp / G
+                        dts -= (outu.field[i, j, k] * us.field[i, j, k] + outv.field[i, j, k] * vs.field[i, j, k]) * dp / G
                         # Compute fpi for conversion to potential energy
-                        fpi += np.sqrt(outu[i, j, k]**2 + outv[i, j, k]**2) * dp
+                        fpi += np.sqrt(outu.field[i, j, k]**2 + outv.field[i, j, k]**2) * dp
 
                     if fpi > 0.0:  # Check if fpi is positive
-                        for k in range(kts, ktop[i, j] + 1):  # Loop over vertical levels
-                            fp = np.sqrt(outu[i, j, k]**2 + outv[i, j, k]**2) / fpi  # Compute fp
-                            outt[i, j, k] += fp * dts * G / CP  # Update temperature tendency
+                        for k in range(kts, ktop.field[i, j] + 1):  # Loop over vertical levels
+                            fp = np.sqrt(outu.field[i, j, k]**2 + outv.field[i, j, k]**2) / fpi  # Compute fp
+                            outt.field[i, j, k] += fp * dts * G / CP  # Update temperature tendency
