@@ -10,4 +10,5 @@ TCRF = 1.0 / (TCR - TF)  # Scaling factor for temperature conversion
 G = 9.81 # Gravitational acceleration (m/s^2)
 CP = 1004.0  # Specific heat of dry air at constant pressure (J/(kg*K))
 XLV = 2.50e6  # Latent heat of vaporization (J/kg)
+R_V = 461.0  # Specific gas constant for water vapor (J / kg / K)
 TINY = np.finfo(float).tiny

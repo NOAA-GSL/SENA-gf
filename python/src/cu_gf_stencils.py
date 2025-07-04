@@ -240,7 +240,8 @@ def cup_env_stencil(
     itest: int,
 ):
     """
-    Compute cup environment variables
+    Calculates environmental moist static energy, saturation moist static energy,
+    heights, and saturation mixing ratio.
     """
 
     with computation(PARALLEL), interval(...):
@@ -315,3 +316,61 @@ def satvap(
         ewlog4 = ewlog3 + (log(1013.246) / log(10.0))
         satvap = 10.0 ** ewlog4
     return satvap
+
+def cup_env_clev_stencil(
+    t: FloatField, # type: ignore
+    qes: FloatField, # type: ignore
+    q: FloatField, # type: ignore
+    he: FloatField, # type: ignore
+    hes: FloatField, # type: ignore
+    z: FloatField, # type: ignore
+    p: FloatField, # type: ignore
+    qes_cup: FloatField, # type: ignore
+    q_cup: FloatField, # type: ignore
+    he_cup: FloatField, # type: ignore
+    hes_cup: FloatField, # type: ignore
+    z_cup: FloatField, # type: ignore
+    p_cup: FloatField, # type: ignore
+    gamma_cup: FloatField, # type: ignore
+    t_cup: FloatField, # type: ignore
+    psur: FloatFieldIJ, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    z1: FloatFieldIJ, # type: ignore
+):
+    
+    """
+    Calculates environmental values on cloud levels.
+    """
+    with computation(PARALLEL), interval(...):
+        qes_cup = 0.0
+        q_cup = 0.0
+        hes_cup = 0.0
+        he_cup = 0.0
+        z_cup = 0.0
+        p_cup = 0.0
+        t_cup = 0.0
+        gamma_cup = 0.0
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            qes_cup = 0.5 * (qes[0, 0, -1] + qes)
+            q_cup = 0.5 * (q[0, 0, -1] + q)
+            hes_cup = 0.5 * (hes[0, 0, -1] + hes)
+            he_cup = 0.5 * (he[0, 0, -1] + he)
+            if he_cup > hes_cup:
+                he_cup = hes_cup
+            z_cup = 0.5 * (z[0, 0, -1] + z)
+            p_cup = 0.5 * (p[0, 0, -1] + p)
+            t_cup = 0.5 * (t[0, 0, -1] + t)
+            gamma_cup = (constants.XLV / constants.CP) * (constants.XLV / (constants.R_V * t_cup ** 2.0)) * qes_cup
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            qes_cup = qes
+            q_cup = q
+            hes_cup = constants.G * z1 + constants.CP * t + constants.XLV * qes
+            he_cup = constants.G * z1 + constants.CP * t + constants.XLV * q
+            z_cup = z1
+            p_cup = psur
+            t_cup = t
+            gamma_cup = (constants.XLV / constants.CP) * (constants.XLV / (constants.R_V * t_cup ** 2.0)) * qes_cup
