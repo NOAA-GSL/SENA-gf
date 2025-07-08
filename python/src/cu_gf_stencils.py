@@ -1,7 +1,9 @@
 from ndsl.dsl.gt4py import PARALLEL, computation, interval, FORWARD, function
 from ndsl.dsl.typing import FloatField, IntFieldIJ32, FloatFieldIJ, IntFieldK32, BoolFieldIJ
 import cu_gf_constants as constants
-from ndsl.dsl.gt4py import log
+from ndsl.dsl.gt4py import log, floor
+from gt4py.cartesian.gtscript import THIS_K
+
 
 def initialize_driver(
     aod_gf: FloatFieldIJ, # type: ignore
@@ -337,7 +339,6 @@ def cup_env_clev_stencil(
     ierr: IntFieldIJ32, # type: ignore
     z1: FloatFieldIJ, # type: ignore
 ):
-    
     """
     Calculates environmental values on cloud levels.
     """
@@ -374,3 +375,167 @@ def cup_env_clev_stencil(
             p_cup = psur
             t_cup = t
             gamma_cup = (constants.XLV / constants.CP) * (constants.XLV / (constants.R_V * t_cup ** 2.0)) * qes_cup
+
+def initialize_cloud_winds_shallow(
+    us: FloatField, # type: ignore
+    vs: FloatField, # type: ignore
+    u_cup: FloatField, # type: ignore
+    v_cup: FloatField, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+):
+    """
+    Initializes cloud winds at the cloud base level.
+    """
+    with computation(PARALLEL), interval(0, 1):
+        if ierr == 0:
+            u_cup = us
+            v_cup = vs
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            u_cup = 0.5 * (us[0, 0, -1] + us)
+            v_cup = 0.5 * (vs[0, 0, -1] + vs)
+
+def find_max_cloud_base_index(
+    zo_cup: FloatField, # type: ignore
+    z1: FloatFieldIJ, # type: ignore
+    kbmax: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    kbmax_mask: BoolFieldIJ, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+):
+    """
+    Finds the maximum cloud base index based on the height of the cloud base.
+    """
+    from __externals__ import ( # type: ignore
+        k_end,
+    )
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if kbmax_mask:
+                if zo_cup > constants.ZKBMAX + z1:
+                    kbmax = k_mask
+                    kbmax_mask = False
+
+    with computation(FORWARD), interval(0,1):
+        if ierr == 0:
+            kbmax = min(kbmax, floor(float(k_end) / 2.0))
+
+def set_max_pressure_level(
+    kpbl: IntFieldIJ32, # type: ignore
+    cap_max: FloatFieldIJ, # type: ignore
+    po_cup: FloatField, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    heo_cup: FloatField, # type: ignore
+    kbmax: IntFieldIJ32, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+):
+    """
+    Sets the maximum pressure level based on the cloud base height.
+    """
+    with computation(FORWARD), interval(0,1):
+        if kpbl > 2:
+            cap_max = po_cup.at(K=kpbl)
+        if ierr == 0:
+            k22 = 1
+
+    with computation(FORWARD), interval(1, None):
+        if k_mask <= kbmax:
+            if ierr == 0:
+                if heo_cup > heo_cup.at(K=k22):
+                    k22 = k_mask
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            k22 -= 1
+            k22 = max(1, k22)
+            if k22 > kbmax:
+                ierr = 2
+                ktop = -1
+                k22 = -1
+                kbcon = -1
+
+def compute_cloud_base_properties(
+        zqexec: FloatFieldIJ, # type: ignore
+        ztexec: FloatFieldIJ, # type: ignore
+        he_cup: FloatField, # type: ignore
+        hkb: FloatFieldIJ, # type: ignore
+        heo_cup: FloatField, # type: ignore
+        hkbo: FloatFieldIJ, # type: ignore
+        k22: IntFieldIJ32, # type: ignore
+        x_add: FloatFieldIJ, # type: ignore
+        local_order_aver: IntFieldIJ32, # type: ignore
+        k_mask: IntFieldK32, # type: ignore
+        ierr: IntFieldIJ32, # type: ignore
+):
+    """
+    Computes cloud base properties based on the provided fields.
+    """
+    from __externals__ import ( # type: ignore
+        ORDER_AVER,
+    )
+
+    with computation(FORWARD), interval(0, 1):
+        local_order_aver = min(k22 + 1, ORDER_AVER)
+        if ierr == 0:
+            x_add = constants.XLV * zqexec + constants.CP * ztexec
+            hkb = 0.0
+            hkbo = 0.0
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if k_mask > k22 - local_order_aver and k_mask <= k22:
+                hkb += he_cup
+                hkbo += heo_cup
+
+    with computation(FORWARD), interval(0,1):
+        hkb /= float(local_order_aver)
+        hkbo /= float(local_order_aver)
+        hkb += x_add
+        hkbo += x_add
+
+
+# def cup_minimi_stencil(
+#     array: FloatFieldIJ, # type: ignore
+#     ks: IntFieldIJ32, # type: ignore
+#     kend: IntFieldIJ32, # type: ignore
+#     kt: IntFieldIJ32, # type: ignore
+#     ierr: IntFieldIJ32, # type: ignore
+# ):
+#     """
+#     Determines the level at which the minimum value in an array occurs.
+
+#     Parameters:
+#         array (ndarray): Input 2D array with dimensions (ite - its + 1, jte - jts + 1, kte - kts + 1).
+#         ks (ndarray): Starting level for the search (1D array).
+#         kend (ndarray): Ending level for each grid point (1D array).
+#         kt (ndarray): Output array of indices where the minimum value occurs for each grid point.
+#         ierr (ndarray): Error values for each grid point.
+
+#     Returns:
+#         None: The `kt` array is modified in place.
+#     """
+#     # Initialize local array x with zeros
+#     with computation(FORWARD), interval(0,1):
+#         x=0.0
+#         kt = ks
+#         if ierr == 0
+#             x = array.at(K=ks)  # Initialize x with the value at level ks[0, 0]
+#             kstop = max(ks + 1, kend)  # Determine the stopping level
+
+#     with computation(FORWARD), interval(1, None):
+
+#     for i in range(its, itf + 1):
+#         for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+#             kt[i, j] = ks[i, j]  # Initialize kt with the starting level ks
+#             if ierr[i, j] == 0:
+#                 x[i, j] = array[i, j, ks[i, j]]  # Initialize x[i, j] with the value at level ks[i, j]
+#                 kstop = max(ks[i, j] + 1, kend[i, j])  # Determine the stopping level
+#                 for k in range(ks[i, j] + 1, kstop + 1):  # Iterate from ks[i, j] + 1 to kstop
+#                     if array[i, j, k] < x[i, j]:
+#                         x[i, j] = array[i, j, k]
+#                         kt[i, j] = k

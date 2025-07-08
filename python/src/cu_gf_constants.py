@@ -11,4 +11,6 @@ G = 9.81 # Gravitational acceleration (m/s^2)
 CP = 1004.0  # Specific heat of dry air at constant pressure (J/(kg*K))
 XLV = 2.50e6  # Latent heat of vaporization (J/kg)
 R_V = 461.0  # Specific gas constant for water vapor (J / kg / K)
+ZKBMAX = 3000.0  # Maximum height for the boundary layer (m)
 TINY = np.finfo(float).tiny
+ORDER_AVER = 3  # Order of averaging for cloud base properties
