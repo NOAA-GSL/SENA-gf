@@ -499,6 +499,151 @@ def compute_cloud_base_properties(
         hkbo += x_add
 
 
+def cup_kbcon_stencil(
+    cap_inc: FloatFieldIJ, # type: ignore
+    iloop_in: int,
+    iloop: IntFieldIJ32, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    hcot: FloatFieldIJ, # type: ignore
+    dz: FloatField, # type: ignore
+    he_cup: FloatField, # type: ignore
+    hes_cup: FloatField, # type: ignore
+    hkb: FloatFieldIJ, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    kbmax: IntFieldIJ32, # type: ignore
+    p_cup: FloatField, # type: ignore
+    cap_max: FloatFieldIJ, # type: ignore
+    ztexec: FloatFieldIJ, # type: ignore
+    zqexec: FloatFieldIJ, # type: ignore
+    z_cup: FloatField, # type: ignore
+    entr_rate: FloatFieldIJ, # type: ignore
+    heo: FloatField, # type: ignore
+    imid: int,
+    adjustment_attempts: IntFieldIJ32, # type: ignore
+    tries: IntFieldIJ32, # type: ignore
+    k_index: IntFieldIJ32, # type: ignore
+    x_add: FloatFieldIJ, # type: ignore
+    pbcdif: FloatFieldIJ, # type: ignore
+    plus: FloatFieldIJ, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+    local_order_aver: IntFieldIJ32, # type: ignore
+    kbcon_m1: IntFieldIJ32, # type: ignore
+):
+    """
+    Calculates the level of convective cloud base.
+    """
+    from __externals__ import ( # type: ignore
+        k_end,
+    )
+
+    with computation(PARALLEL), interval(1, None):
+        dz = z_cup - z_cup[0, 0, -1]
+
+    with computation(FORWARD), interval(0, 1):
+        iloop = iloop_in
+        kbcon = 0
+        x_add = constants.XLV * zqexec + constants.CP * ztexec
+        adjustment_attempts = 0
+        found = False
+        if cap_max > 200 and imid == 1:
+            iloop = 5
+        plus = max(25.0, cap_max - float(int(iloop) - 1) * cap_inc)
+        if iloop == 4:
+            plus = cap_max
+        if iloop == 5:
+            plus = 150.0
+        if ierr == 0:
+            if iloop == 5:
+                kbcon = k22
+                hcot = hkb
+            else:
+                kbcon = k22 + 1
+                hcot = ((1. - 0.5 * entr_rate * dz.at(K=kbcon)) * hkb +
+                        entr_rate * dz.at(K=kbcon) * heo.at(K=k22)) / \
+                        (1. + 0.5 * entr_rate * dz.at(K=kbcon))
+
+    with computation(FORWARD), interval(0,1):
+        if ierr == 0:
+            adjustment_attempts = 0
+            found = False
+            while adjustment_attempts <= k_end and not found:
+                tries = k22
+                while tries < kbmax + 3:
+                    if hcot < hes_cup.at(K=kbcon):
+                        kbcon_m1 = kbcon
+                        kbcon += 1
+                        if kbcon > kbmax + 2:
+                            if iloop != 4:
+                                ierr = 3
+                            found = True
+                        hcot = ((1. - 0.5 * entr_rate * dz.at(K=kbcon)) * hcot +
+                                entr_rate * dz.at(K=kbcon) * heo.at(K=kbcon_m1)) / \
+                                (1. + 0.5 * entr_rate * dz.at(K=kbcon))
+                    else:
+                        # Cloud base pressure and max moist static energy pressure
+                        if kbcon - k22 == 1 and not found:
+                            found = True
+                        if iloop == 5 and (kbcon - k22) <= 2 and not found:
+                            found = True
+
+                        if not found:
+                            if iloop == 5 and cap_max > 200:
+                                pbcdif = cap_max - p_cup.at(K=kbcon)
+                            else:
+                                pbcdif = p_cup.at(K=k22) - p_cup.at(K=kbcon)
+                            if pbcdif <= plus:
+                                found = True
+                            else:
+                                k22 += 1
+                                # Recalculate hkb since k22 has changed
+                                hkb = get_cloud_bc(
+                                    array=he_cup,
+                                    x_aver=hkb,
+                                    k22=k22,
+                                    add_x=x_add,
+                                    local_order_aver=local_order_aver,
+                                    k_index=k_index,
+                                )
+                                if iloop == 5:
+                                    kbcon = k22
+                                    hcot = hkb
+                                else:
+                                    kbcon = k22 + 1
+                                    hcot = ((1. - 0.5 * entr_rate * dz.at(K=kbcon)) * hkb +
+                                            entr_rate * dz.at(K=kbcon) * heo.at(K=k22)) / \
+                                            (1. + 0.5 * entr_rate * dz.at(K=kbcon))
+
+                                if kbcon > kbmax + 2:
+                                    if iloop != 4:
+                                        ierr = 3
+        #                             # ierrc[i, j] = "could not find reasonable kbcon in cup_kbcon"
+                                    found = True
+
+
+@function
+def get_cloud_bc(
+    array: FloatField, # type: ignore
+    x_aver: FloatFieldIJ, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    add_x: FloatFieldIJ, # type: ignore
+    local_order_aver: IntFieldIJ32, # type: ignore
+    k_index: IntFieldIJ32, # type: ignore
+) -> FloatFieldIJ: # type: ignore
+    """
+    Calculate the cloud base height based on the cloud base index.
+    """
+    local_order_aver = min(k22 + 1, constants.ORDER_AVER)
+    x_aver = 0.0
+    k_index = 0
+    while k_index < local_order_aver:
+        x_aver += array.at(K=k22 - k_index)
+        k_index += 1
+    x_aver /= float(local_order_aver)
+    x_aver += add_x
+    return x_aver
+
+
 # def cup_minimi_stencil(
 #     array: FloatFieldIJ, # type: ignore
 #     ks: IntFieldIJ32, # type: ignore

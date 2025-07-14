@@ -6,8 +6,8 @@ This module contains the Grell-Freitas shallow convection scheme.
 
 import numpy as np
 from cu_gf_deep import (
-    cup_env, cup_env_clev, get_cloud_bc, cup_minimi,
-    get_inversion_layers, rates_up_pdf, cup_up_aa0, cup_kbcon,
+    get_cloud_bc, cup_minimi,
+    get_inversion_layers, rates_up_pdf, cup_up_aa0,
     get_lateral_massflux
 )
 from ndsl.constants import X_DIM, Y_DIM, Z_DIM
@@ -24,6 +24,7 @@ from cu_gf_stencils import (
     find_max_cloud_base_index,
     set_max_pressure_level,
     compute_cloud_base_properties,
+    cup_kbcon_stencil,
 )
 
 # Constants
@@ -347,17 +348,6 @@ class GFShallowConvection:
             units="none",
             dtype=state.rkind
         )
-        self.x_add: Quantity = state.quantity_factory.zeros(
-            dims=[X_DIM, Y_DIM],
-            units="none",
-            dtype=state.rkind
-        )
-        self.local_order_aver: Quantity = state.quantity_factory.zeros(
-            dims=[X_DIM, Y_DIM],
-            units="none",
-            dtype=state.ikind
-        )
-
 
         # Initialize a k-mask for selecting "this vertical level"
         self.k_mask: Quantity = state.quantity_factory.zeros(
@@ -374,6 +364,66 @@ class GFShallowConvection:
             dtype=bool,
         )
         self.kbmax_mask.field[:, :] = True
+        self.iloop: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.hcot: Quantity = state.quantity_factory.zeros( # Remove later
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.dz: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.adjustment_attempts: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.tries: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.k_index: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.x_add: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.local_order_aver: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind
+        )
+        self.kbcon_m1: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind
+        )
+        self.pbcdif: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.plus: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.found: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=bool,
+        )
 
 
         self._initialize_shallow_convection = state.stencil_factory.from_dims_halo(
@@ -424,6 +474,12 @@ class GFShallowConvection:
             externals={
                 "ORDER_AVER": constants.ORDER_AVER,
             },
+        )
+
+        self._cup_kbcon = state.stencil_factory.from_dims_halo(
+            func=cup_kbcon_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
         )
 
     # Define the main shallow convection function
@@ -683,14 +739,36 @@ class GFShallowConvection:
             ierr=ierr,
         )
 
-        # Call cup_kbcon() to determine the level of convective cloud base (kbcon)
-        cup_kbcon(
-            self.cap_max_increment.field, 5, k22.field, kbcon.field, self.heo_cup.field, self.heso_cup.field,
-            hkbo, ierr.field, self.kbmax.field, self.po_cup.field, self.cap_max.field,
-            self.ztexec.field, self.zqexec.field,
-            0, itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte,
-            self.z_cup.field, self.entr_rate.field, self.heo.field, 0
+        self._cup_kbcon(
+            cap_inc=self.cap_max_increment,
+            iloop_in=5,
+            iloop=self.iloop,
+            k22=k22,
+            kbcon=kbcon,
+            hcot=self.hcot,
+            dz=self.dz,
+            he_cup=self.heo_cup,
+            hes_cup=self.heso_cup,
+            hkb=hkbo,
+            ierr=ierr,
+            kbmax=self.kbmax,
+            p_cup=self.po_cup,
+            cap_max=self.cap_max,
+            ztexec=self.ztexec,
+            zqexec=self.zqexec,
+            z_cup=self.z_cup,
+            entr_rate=self.entr_rate,
+            heo=self.heo,
+            imid=0,
+            adjustment_attempts=self.adjustment_attempts,
+            tries=self.tries,
+            k_index=self.k_index,
+            x_add=self.x_add,
+            pbcdif=self.pbcdif,
+            plus=self.plus,
+            found=self.found,
+            local_order_aver=self.local_order_aver,
+            kbcon_m1=self.kbcon_m1,
         )
 
         # Call cup_minimi() to get inversion layers for cloud tops
