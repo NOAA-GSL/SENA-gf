@@ -644,43 +644,40 @@ def get_cloud_bc(
     return x_aver
 
 
-# def cup_minimi_stencil(
-#     array: FloatFieldIJ, # type: ignore
-#     ks: IntFieldIJ32, # type: ignore
-#     kend: IntFieldIJ32, # type: ignore
-#     kt: IntFieldIJ32, # type: ignore
-#     ierr: IntFieldIJ32, # type: ignore
-# ):
-#     """
-#     Determines the level at which the minimum value in an array occurs.
+def cup_minimi_stencil(
+    array: FloatField, # type: ignore
+    ks: IntFieldIJ32, # type: ignore
+    kend: IntFieldIJ32, # type: ignore
+    kt: IntFieldIJ32, # type: ignore
+    x: FloatFieldIJ, # type: ignore
+    kstop: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+):
+    """
+    Determines the level at which the minimum value in an array occurs.
 
-#     Parameters:
-#         array (ndarray): Input 2D array with dimensions (ite - its + 1, jte - jts + 1, kte - kts + 1).
-#         ks (ndarray): Starting level for the search (1D array).
-#         kend (ndarray): Ending level for each grid point (1D array).
-#         kt (ndarray): Output array of indices where the minimum value occurs for each grid point.
-#         ierr (ndarray): Error values for each grid point.
+    Parameters:
+        array (ndarray): Input 2D array with dimensions (ite - its + 1, jte - jts + 1, kte - kts + 1).
+        ks (ndarray): Starting level for the search (1D array).
+        kend (ndarray): Ending level for each grid point (1D array).
+        kt (ndarray): Output array of indices where the minimum value occurs for each grid point.
+        ierr (ndarray): Error values for each grid point.
 
-#     Returns:
-#         None: The `kt` array is modified in place.
-#     """
-#     # Initialize local array x with zeros
-#     with computation(FORWARD), interval(0,1):
-#         x=0.0
-#         kt = ks
-#         if ierr == 0
-#             x = array.at(K=ks)  # Initialize x with the value at level ks[0, 0]
-#             kstop = max(ks + 1, kend)  # Determine the stopping level
+    Returns:
+        None: The `kt` array is modified in place.
+    """
+    # Initialize local array x with zeros
+    with computation(FORWARD), interval(0,1):
+        x=0.0
+        kt = ks
+        if ierr == 0:
+            x = array.at(K=ks)  # Initialize x with the value at level ks[0, 0]
+            kstop = max(ks + 1, kend)  # Determine the stopping level
 
-#     with computation(FORWARD), interval(1, None):
-
-#     for i in range(its, itf + 1):
-#         for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-#             kt[i, j] = ks[i, j]  # Initialize kt with the starting level ks
-#             if ierr[i, j] == 0:
-#                 x[i, j] = array[i, j, ks[i, j]]  # Initialize x[i, j] with the value at level ks[i, j]
-#                 kstop = max(ks[i, j] + 1, kend[i, j])  # Determine the stopping level
-#                 for k in range(ks[i, j] + 1, kstop + 1):  # Iterate from ks[i, j] + 1 to kstop
-#                     if array[i, j, k] < x[i, j]:
-#                         x[i, j] = array[i, j, k]
-#                         kt[i, j] = k
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if k_mask > ks and k_mask <= kstop:
+                if array < x:
+                    x = array
+                    kt = k_mask

@@ -25,6 +25,7 @@ from cu_gf_stencils import (
     set_max_pressure_level,
     compute_cloud_base_properties,
     cup_kbcon_stencil,
+    cup_minimi_stencil,
 )
 
 # Constants
@@ -348,6 +349,11 @@ class GFShallowConvection:
             units="none",
             dtype=state.rkind
         )
+        self.kstabi: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind
+        )
 
         # Initialize a k-mask for selecting "this vertical level"
         self.k_mask: Quantity = state.quantity_factory.zeros(
@@ -424,7 +430,16 @@ class GFShallowConvection:
             units="none",
             dtype=bool,
         )
-
+        self.kstop: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
+        self.x: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
 
         self._initialize_shallow_convection = state.stencil_factory.from_dims_halo(
             func=initialize_shallow_convection,
@@ -478,6 +493,12 @@ class GFShallowConvection:
 
         self._cup_kbcon = state.stencil_factory.from_dims_halo(
             func=cup_kbcon_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        self._cup_minimi = state.stencil_factory.from_dims_halo(
+            func=cup_minimi_stencil,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
         )
@@ -565,7 +586,6 @@ class GFShallowConvection:
         uc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud x wind
         vc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud y wind
         xhkb = np.zeros((ite - its +1, jte - jts + 1))  # Cloud base moist static energy (alternative)
-        kstabi = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Stability index
         dtempdz = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Temperature gradient with height
         pmin_lev = np.zeros((ite - its +1, jte - jts + 1), dtype=int)
 
@@ -771,16 +791,20 @@ class GFShallowConvection:
             kbcon_m1=self.kbcon_m1,
         )
 
-        # Call cup_minimi() to get inversion layers for cloud tops
-        cup_minimi(
-            self.heso_cup.field, kbcon.field, self.kbmax.field, kstabi, ierr.field,
-            itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte
+        self._cup_minimi(
+            array=self.heso_cup,
+            ks=kbcon,
+            kend=self.kbmax,
+            kt=self.kstabi,
+            x=self.x,
+            kstop=self.kstop,
+            k_mask=self.k_mask,
+            ierr=ierr,
         )
 
         get_inversion_layers(
             ierr.field, self.p_cup.field, self.t_cup.field, self.z_cup.field, self.q_cup.field, self.qes_cup.field, k_inv_layers,
-            kbcon.field, kstabi, dtempdz, itf, jtf, ktf, its, ite, jts, jte, kts, kte
+            kbcon.field, self.kstabi.field, dtempdz, itf, jtf, ktf, its, ite, jts, jte, kts, kte
         )
 
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
@@ -813,7 +837,7 @@ class GFShallowConvection:
 
         rates_up_pdf(
             rand_vmas, ipr, 'shallow', ktop.field, ierr.field, self.po_cup.field, entr_rate_2d, hkbo, self.heo.field, self.heso_cup.field, self.zo_cup.field,
-            self.xland1.field, kstabi, k22.field, kbcon.field, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo.field, kpbl.field, self.ktopx.field, kbcon.field, pmin_lev
+            self.xland1.field, self.kstabi.field, k22.field, kbcon.field, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo.field, kpbl.field, self.ktopx.field, kbcon.field, pmin_lev
         )
     
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
