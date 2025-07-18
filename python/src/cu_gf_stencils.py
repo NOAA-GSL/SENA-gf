@@ -1,7 +1,7 @@
 from ndsl.dsl.gt4py import PARALLEL, computation, interval, FORWARD, function
-from ndsl.dsl.typing import FloatField, IntFieldIJ32, FloatFieldIJ, IntFieldK32, BoolFieldIJ
+from ndsl.dsl.typing import FloatField, IntField32, IntFieldIJ32, FloatFieldIJ, IntFieldK32, BoolFieldIJ
 import cu_gf_constants as constants
-from ndsl.dsl.gt4py import log, floor
+from ndsl.dsl.gt4py import log, floor, abs
 from gt4py.cartesian.gtscript import THIS_K
 
 
@@ -681,3 +681,166 @@ def cup_minimi_stencil(
                 if array < x:
                     x = array
                     kt = k_mask
+
+
+def get_inversion_layers_stencil(
+    ierr: IntFieldIJ32, # type: ignore
+    p_cup: FloatField, # type: ignore
+    t_cup: FloatField, # type: ignore
+    z_cup: FloatField, # type: ignore
+    k_inv_layers: IntField32, # type: ignore
+    kstart: IntFieldIJ32, # type: ignore
+    kend: IntFieldIJ32, # type: ignore
+    dtempdz: FloatField, # type: ignore
+    sec_deriv: FloatField, # type: ignore
+    offset: IntFieldIJ32, # type: ignore
+    ix: IntFieldIJ32, # type: ignore
+    ilev: IntFieldIJ32, # type: ignore
+    kadd: IntFieldIJ32, # type: ignore
+    ken: IntFieldIJ32, # type: ignore
+    max_k_inv_layer: IntFieldIJ32, # type: ignore
+    kk: IntFieldIJ32, # type: ignore
+    kk_p1: IntFieldIJ32, # type: ignore
+    kk_m1: IntFieldIJ32, # type: ignore
+    kj: IntFieldIJ32, # type: ignore
+    k800: IntFieldIJ32, # type: ignore
+    k550: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+    temporary: FloatField, # type: ignore
+    temporary_int: IntField32, # type: ignore
+):
+    """
+    Finds temperature inversions using the first and second derivatives of temperature.
+    """
+
+    with computation(PARALLEL), interval(...):
+        k_inv_layers = 0
+        sec_deriv = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        offset = 0
+        found = False
+
+    # Calculate first derivative of temperature
+    with computation(PARALLEL), interval(1, None):
+        if ierr == 0:
+            if k_mask < kend + 8:
+                dtempdz = (t_cup[0, 0, 1] - t_cup[0, 0, -1]) / (z_cup[0, 0, 1] - z_cup[0, 0, -1])
+
+    # Calculate second derivative of temperature
+    with computation(PARALLEL), interval(2, None):
+        if ierr == 0:
+            if k_mask < kend + 7:
+                sec_deriv = abs((dtempdz[0, 0, 1] - dtempdz[0, 0, -1]) / (z_cup[0, 0, 1] - z_cup[0, 0, -1]))
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            ilev = max(3, kstart + 1)  # Start level for inversion search
+            ix = 0  # Index for inversion layers
+
+    with computation(FORWARD), interval(3, None):
+        if ierr == 0:
+            if k_mask >= ilev and k_mask < kend + 2:
+                if (sec_deriv < sec_deriv[0, 0, 1]) and (sec_deriv < sec_deriv[0, 0, -1]):
+                    offset = ix - k_mask
+                    k_inv_layers[0, 0, offset] = k_mask
+                    ix = min(4, ix + 1)
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            if (k_mask >= kend + 2) and (k_mask < kend + 6) and not found:
+                if sec_deriv < sec_deriv[0, 0, 1] and sec_deriv < sec_deriv[0, 0, -1]:
+                    offset = ix - k_mask
+                    k_inv_layers[0, 0, offset] = k_mask
+                    ix = min(4, ix + 1)
+                    found = True  # Stop searching for more inversion layers
+
+    with computation(FORWARD), interval(0,1):
+        kadd = 0
+        ken = 0
+        found = False
+        kk = 0
+        kk_p1 = 0
+        kk_m1 = 0
+        kj = 0
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if k_inv_layers > k_inv_layers.at(K=ken):
+                ken = k_mask
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if k_mask < ken + 1 and not found:
+                kk = k_inv_layers[0, 0, kadd]
+                kk_p1 = kk + 1
+                kk_m1 = kk - 1
+                if kk == 0:
+                    found = True
+                if dtempdz.at(K=kk) < dtempdz.at(K=kk_m1) and dtempdz.at(K=kk) < dtempdz.at(K=kk_p1) and not found:
+                    kadd += 1
+                    kj = k_mask
+                    while kj < ken + 1:
+                        offset = kj - k_mask
+                        temporary_int = kj + kadd
+                        if k_inv_layers.at(K=temporary_int) > 0:
+                            temporary = k_inv_layers.at(K=temporary_int)
+                            k_inv_layers[0, 0, offset] = temporary
+                        if k_inv_layers.at(K=temporary_int) == 0:
+                            k_inv_layers[0, 0, offset] = 0
+                        kj += 1
+
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            sec_deriv = 1.0e9
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            k800 = 0
+            k550 = 0
+            max_k_inv_layer = 0
+
+    # Calculate np.argmax(k_inv_layers[i, j, :])
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if k_inv_layers > k_inv_layers.at(K=max_k_inv_layer):
+                max_k_inv_layer = k_mask
+
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            sec_deriv = 1.0e9
+            if k_mask < max_k_inv_layer + 1:
+                dp = p_cup.at(K=k_inv_layers) - p_cup.at(K=kstart)
+                sec_deriv = abs(dp) - constants.L_SHAL
+
+    # k800 = np.argmin(np.abs(sec_deriv))
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if sec_deriv < abs(sec_deriv.at(K=k800)):
+                k800 = k_mask
+
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            sec_deriv = 1.0e9
+            if k_mask < max_k_inv_layer + 1:
+                dp = p_cup.at(K=k_inv_layers) - p_cup.at(K=kstart)
+                sec_deriv = abs(dp) - constants.L_MID
+
+    # k550 = np.argmin(np.abs(sec_deriv))
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if sec_deriv < abs(sec_deriv.at(K=k550)):
+                k550 = k_mask
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            temporary = k_inv_layers.at(K=k800)
+            k_inv_layers = temporary
+    with computation(FORWARD), interval(1, 2):
+        if ierr == 0:
+            temporary = k_inv_layers.at(K=k550)
+            k_inv_layers = temporary
+    with computation(FORWARD), interval(2, None):
+        if ierr == 0:
+            k_inv_layers = -1

@@ -4544,6 +4544,8 @@ def get_inversion_layers(ierr, p_cup, t_cup, z_cup, qo_cup, qeso_cup, k_inv_laye
     l_mid = 300.0
     l_shal = 100.0
 
+    offset = np.zeros((itf - its + 1, jtf - jts + 1), dtype=int)  # Offset array for k_inv_layers
+
     # Initialize k_inv_layers
     k_inv_layers[:, :, :] = 0
 
@@ -4551,29 +4553,29 @@ def get_inversion_layers(ierr, p_cup, t_cup, z_cup, qo_cup, qeso_cup, k_inv_laye
         for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
             if ierr[i, j] == 0:
                 sec_deriv[:] = 0.0
-                kend_p3 = kend[i, j] + 3
 
                 # Calculate first derivative
-                for k in range(kts + 1, kend_p3 + 5):
+                for k in range(kts + 1, kend[i, j] + 8):
                     dtempdz[i, j, k] = (t_cup[i, j, k + 1] - t_cup[i, j, k - 1]) / (z_cup[i, j, k + 1] - z_cup[i, j, k - 1])
 
                 # Calculate second derivative
-                for k in range(kts + 2, kend_p3 + 4):
+                for k in range(kts + 2, kend[i, j] + 7):
                     sec_deriv[k] = abs((dtempdz[i, j, k + 1] - dtempdz[i, j, k - 1]) / (z_cup[i, j, k + 1] - z_cup[i, j, k - 1]))
 
                 # Find inversion layers
                 ilev = max(kts + 3, kstart[i, j] + 1)
                 ix = 0
-                k = ilev
-                while ilev < kend_p3:
-                    for kk in range(k, kend_p3 + 3):
-                        if sec_deriv[kk] < sec_deriv[kk + 1] and sec_deriv[kk] < sec_deriv[kk - 1]:
-                            k_inv_layers[i, j, ix] = kk
-                            ix = min(4, ix + 1)
-                            ilev = kk + 1
-                            break
-                        ilev = kk + 1
-                    k = ilev
+                for k in range(ilev, kend[i, j] + 2):
+                    offset[i, j] = ix - k
+                    if sec_deriv[k] < sec_deriv[k + 1] and sec_deriv[k] < sec_deriv[k - 1]:
+                        k_inv_layers[i, j, k + offset[i, j]] = k
+                        ix = min(4, ix + 1)
+                for k in range(kend[i, j] +2, kend[i, j] + 6):
+                    offset[i, j] = ix - k
+                    if sec_deriv[k] < sec_deriv[k + 1] and sec_deriv[k] < sec_deriv[k - 1]:
+                        k_inv_layers[i, j, k + offset[i, j]] = k
+                        ix = min(4, ix + 1)
+                        break
 
                 # Second criteria
                 kadd = 0
@@ -4585,35 +4587,37 @@ def get_inversion_layers(ierr, p_cup, t_cup, z_cup, qo_cup, qeso_cup, k_inv_laye
                     if dtempdz[i, j, kk] < dtempdz[i, j, kk - 1] and dtempdz[i, j, kk] < dtempdz[i, j, kk + 1]:
                         kadd += 1
                         for kj in range(k, ken + 1):
+                            offset[i, j] = kj - k
                             if k_inv_layers[i, j, kj + kadd] > 0:
-                                k_inv_layers[i, j, kj] = k_inv_layers[i, j, kj + kadd]
+                                k_inv_layers[i, j, k + offset[i, j]] = k_inv_layers[i, j, kj + kadd]
+                                # k_inv_layers[i, j, kj] = k_inv_layers[i, j, kj + kadd]
                             if k_inv_layers[i, j, kj + kadd] == 0:
-                                k_inv_layers[i, j, kj] = 0
+                                # k_inv_layers[i, j, kj] = 0
+                                k_inv_layers[i, j, k + offset[i, j]] = 0
 
     # Find locations of inversions around 800 and 550 hPa
     for i in range(its, itf + 1):
         for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-            if ierr[i, j] != 0:
-                continue
+            if ierr[i, j] == 0:
 
-            sec_deriv[:] = 1e9
-            for k in range(np.argmax(k_inv_layers[i, j, :]) + 1):
-                dp = p_cup[i, j, k_inv_layers[i, j, k]] - p_cup[i, j, kstart[i, j]]
-                sec_deriv[k] = abs(dp) - l_shal
-            k800 = np.argmin(np.abs(sec_deriv))
+                sec_deriv[:] = 1e9
+                for k in range(np.argmax(k_inv_layers[i, j, :]) + 1):
+                    dp = p_cup[i, j, k_inv_layers[i, j, k]] - p_cup[i, j, kstart[i, j]]
+                    sec_deriv[k] = abs(dp) - l_shal
+                k800 = np.argmin(np.abs(sec_deriv))
 
-            sec_deriv[:] = 1e9
-            for k in range(np.argmax(k_inv_layers[i, j, :]) + 1):
-                dp = p_cup[i, j, k_inv_layers[i, j, k]] - p_cup[i, j, kstart[i, j]]
-                sec_deriv[k] = abs(dp) - l_mid
-            k550 = np.argmin(np.abs(sec_deriv))
+                sec_deriv[:] = 1e9
+                for k in range(np.argmax(k_inv_layers[i, j, :]) + 1):
+                    dp = p_cup[i, j, k_inv_layers[i, j, k]] - p_cup[i, j, kstart[i, j]]
+                    sec_deriv[k] = abs(dp) - l_mid
+                k550 = np.argmin(np.abs(sec_deriv))
 
-            # Save k800 and k550 in k_inv_layers array
-            shal = 0
-            mid = 1
-            k_inv_layers[i, j, shal] = k_inv_layers[i, j, k800]
-            k_inv_layers[i, j, mid] = k_inv_layers[i, j, k550]
-            k_inv_layers[i, j, mid + 1:] = -1
+                # Save k800 and k550 in k_inv_layers array
+                shal = 0
+                mid = 1
+                k_inv_layers[i, j, shal] = k_inv_layers[i, j, k800]
+                k_inv_layers[i, j, mid] = k_inv_layers[i, j, k550]
+                k_inv_layers[i, j, mid + 1:] = -1
 
 
 def get_lateral_massflux(itf, jtf, ktf, its, ite, jts, jte, kts, kte, ierr, ktop, zo_cup, zuo, cd, entr_rate_2d,

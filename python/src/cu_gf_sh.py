@@ -26,6 +26,7 @@ from cu_gf_stencils import (
     compute_cloud_base_properties,
     cup_kbcon_stencil,
     cup_minimi_stencil,
+    get_inversion_layers_stencil,
 )
 
 # Constants
@@ -440,6 +441,91 @@ class GFShallowConvection:
             units="none",
             dtype=state.rkind,
         )
+        self.offset: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.k_inv_layers: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
+        self.dtempdz: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.sec_deriv: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.ix: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.ilev: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.kadd: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.ken: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.max_k_inv_layer: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.kk: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.kk_p1: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.kk_m1: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.kj: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.k800: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.k550: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.temporary: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.temporary_int: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
 
         self._initialize_shallow_convection = state.stencil_factory.from_dims_halo(
             func=initialize_shallow_convection,
@@ -499,6 +585,12 @@ class GFShallowConvection:
 
         self._cup_minimi = state.stencil_factory.from_dims_halo(
             func=cup_minimi_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        self._get_inversion_layers = state.stencil_factory.from_dims_halo(
+            func=get_inversion_layers_stencil,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
         )
@@ -575,7 +667,6 @@ class GFShallowConvection:
         hkb = np.zeros((ite - its +1, jte - jts + 1))  # Cloud base moist static energy
         hkbo = np.zeros((ite - its +1, jte - jts + 1))  # Environmental cloud base moist static energy
         dbyt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Buoyancy tendency
-        k_inv_layers = np.full((ite - its +1, jte - jts + 1, num_vertical_levels), -1, dtype=int)  # Inversion layers (10 is an assumed max number of layers)
 
         # Translate Fortran array allocations to Python
         start_level = np.zeros((ite - its +1, jte - jts + 1), dtype=int)  # Equivalent to "start_level(:)=0"
@@ -586,7 +677,6 @@ class GFShallowConvection:
         uc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud x wind
         vc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud y wind
         xhkb = np.zeros((ite - its +1, jte - jts + 1))  # Cloud base moist static energy (alternative)
-        dtempdz = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Temperature gradient with height
         pmin_lev = np.zeros((ite - its +1, jte - jts + 1), dtype=int)
 
         # Initialize arrays based on their usage in the code
@@ -802,9 +892,32 @@ class GFShallowConvection:
             ierr=ierr,
         )
 
-        get_inversion_layers(
-            ierr.field, self.p_cup.field, self.t_cup.field, self.z_cup.field, self.q_cup.field, self.qes_cup.field, k_inv_layers,
-            kbcon.field, self.kstabi.field, dtempdz, itf, jtf, ktf, its, ite, jts, jte, kts, kte
+        self._get_inversion_layers(
+            ierr=ierr,
+            p_cup=self.p_cup,
+            t_cup=self.t_cup,
+            z_cup=self.z_cup,
+            k_inv_layers=self.k_inv_layers,
+            kstart=kbcon,
+            kend=self.kstabi,
+            dtempdz=self.dtempdz,
+            sec_deriv=self.sec_deriv,
+            offset=self.offset,
+            ix = self.ix,
+            ilev = self.ilev,
+            kadd = self.kadd,
+            ken=self.ken,
+            max_k_inv_layer=self.max_k_inv_layer,
+            kk=self.kk,
+            kk_p1=self.kk_p1,
+            kk_m1=self.kk_m1,
+            kj=self.kj,
+            k800=self.k800,
+            k550=self.k550,
+            k_mask=self.k_mask,
+            found=self.found,
+            temporary=self.temporary,
+            temporary_int=self.temporary_int,
         )
 
         for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
@@ -827,8 +940,8 @@ class GFShallowConvection:
                     kstart = kpbl.field[i, j]
                     if kpbl.field[i, j] < 4:  # Check if kpbl is less than 4
                         kstart = kbcon.field[i, j]
-                    if k_inv_layers[i, j, 0] > -1 and (self.po_cup.field[i, j, kstart] - self.po_cup.field[i, j, k_inv_layers[i, j, 0]]) < 200.0:
-                        ktop.field[i, j] = k_inv_layers[i, j, 0]
+                    if self.k_inv_layers.field[i, j, 0] > -1 and (self.po_cup.field[i, j, kstart] - self.po_cup.field[i, j, self.k_inv_layers.field[i, j, 0]]) < 200.0:
+                        ktop.field[i, j] = self.k_inv_layers.field[i, j, 0]
                     else:
                         for k in range(kbcon.field[i, j] + 1, ktf + 1):  # Adjusted loop range
                             if (self.po_cup.field[i, j, kstart] - self.po_cup.field[i, j, k]) > 200.0:

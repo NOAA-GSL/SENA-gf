@@ -14,3 +14,5 @@ R_V = 461.0  # Specific gas constant for water vapor (J / kg / K)
 ZKBMAX = 3000.0  # Maximum height for the boundary layer (m)
 TINY = np.finfo(float).tiny
 ORDER_AVER = 3  # Order of averaging for cloud base properties
+L_MID = 300.0  # Mid-level length scale for inversion layer detection (m)
+L_SHAL = 100.0  # Shallow length scale for inversion layer detection (m)
