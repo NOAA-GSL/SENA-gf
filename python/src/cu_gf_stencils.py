@@ -844,3 +844,91 @@ def get_inversion_layers_stencil(
     with computation(FORWARD), interval(2, None):
         if ierr == 0:
             k_inv_layers = -1
+
+def compute_entrainment_and_shallow_convection_top(
+    entr_rate_2d: FloatField, # type: ignore
+    entr_rate: FloatFieldIJ, # type: ignore
+    start_level: IntFieldIJ32, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    x_add: FloatFieldIJ, # type: ignore
+    zqexec: FloatFieldIJ, # type: ignore
+    ztexec: FloatFieldIJ, # type: ignore
+    hkb: FloatFieldIJ, # type: ignore
+    he_cup: FloatField, # type: ignore
+    k_index: IntFieldIJ32, # type: ignore
+    local_order_aver: IntFieldIJ32, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    qo_cup: FloatField, # type: ignore
+    qeso_cup: FloatField, # type: ignore
+    cd: FloatField, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    kstart: IntFieldIJ32, # type: ignore
+    kpbl: IntFieldIJ32, # type: ignore
+    k_inv_layers: IntField32, # type: ignore
+    po_cup: FloatField, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+):
+    """
+    Calculates the entrainment rate and shallow convection top level.
+    """
+
+    from __externals__ import ( # type: ignore
+        k_end,
+    )
+
+    with computation(PARALLEL), interval(...):
+        entr_rate_2d = entr_rate
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            start_level = k22
+
+    with computation(FORWARD), interval(0, 1):
+        local_order_aver = min(k22 + 1, constants.ORDER_AVER)
+        if ierr == 0:
+            x_add = constants.XLV * zqexec + constants.CP * ztexec
+            hkb = 0.0
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if k_mask > k22 - local_order_aver and k_mask <= k22:
+                hkb += he_cup
+
+    with computation(FORWARD), interval(0,1):
+        hkb /= float(local_order_aver)
+        hkb += x_add
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            if kbcon > k_end - 4:
+                ierr = 231
+
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            frh = 2.0 * min(qo_cup / qeso_cup, 1.0)  # Calculate frh
+            entr_rate_2d = entr_rate  # Copy entr_rate to entr_rate_2d
+            cd = 0.75 * entr_rate_2d  # Calculate drag coefficient
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            ktop = 0
+            kstart = kpbl
+            if kpbl < 4:
+                kstart = kbcon
+            if k_inv_layers.at(K=0) > -1 and \
+               (po_cup.at(K=kstart) - po_cup.at(K=k_inv_layers.at(K=0))) < 200.0:
+                ktop = k_inv_layers.at(K=0)
+
+    with computation(FORWARD), interval(0, 1):
+        found = False
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if not(k_inv_layers.at(K=0) > -1 and \
+               (po_cup.at(K=kstart) - po_cup.at(K=k_inv_layers.at(K=0))) < 200.0):
+                if k_mask > kbcon and k_mask <= k_end and not found:
+                    if (po_cup.at(K=kstart) - po_cup) > 200.0:
+                        ktop = k_mask
+                        found = True
