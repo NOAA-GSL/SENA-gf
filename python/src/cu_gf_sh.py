@@ -7,7 +7,7 @@ This module contains the Grell-Freitas shallow convection scheme.
 import numpy as np
 from cu_gf_deep import (
     get_cloud_bc, cup_minimi,
-    get_inversion_layers, rates_up_pdf, cup_up_aa0,
+    get_inversion_layers, rates_up_pdf_shallow, cup_up_aa0,
     get_lateral_massflux
 )
 from ndsl.constants import X_DIM, Y_DIM, Z_DIM
@@ -28,6 +28,8 @@ from cu_gf_stencils import (
     cup_minimi_stencil,
     get_inversion_layers_stencil,
     compute_entrainment_and_shallow_convection_top,
+    rates_up_pdf_shallow_stencil,
+    copy_updraft_in_active_cloud_layers
 )
 
 # Constants
@@ -410,7 +412,7 @@ class GFShallowConvection:
         self.k_index: Quantity = state.quantity_factory.zeros(
             dims=[X_DIM, Y_DIM],
             units="none",
-            dtype=state.ikind,
+            dtype=int,
         )
         self.x_add: Quantity = state.quantity_factory.zeros(
             dims=[X_DIM, Y_DIM],
@@ -552,6 +554,96 @@ class GFShallowConvection:
             units="index",
             dtype=state.ikind,
         )
+        self.rand_vmas: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.pmin_lev: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
+        self.index: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
+        self.kb_adj: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
+        self.trash: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.tunning: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.beta_deep: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.alpha2: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.k1: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=int,
+        )
+        self.a: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.zu: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.xzu: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.argmax: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
+
+        # Lookup tables for constants
+        self.alpha: Quantity = state.quantity_factory_table.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.alpha.field[0, 0, :] = [
+        3.699999, 3.699999, 3.699999, 3.699999, 3.024999, 2.559999, 2.249999, 2.028571, 1.862500,
+        1.733333, 1.630000, 1.545454, 1.475000, 1.415385, 1.364286, 1.320000, 1.281250, 1.247059,
+        1.216667, 1.189474, 1.165000, 1.142857, 1.122727, 1.104348, 1.087500, 1.075000, 1.075000,
+        1.075000, 1.075000, 1.075000
+        ]
+        self.g_alpha: Quantity = state.quantity_factory_table.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.g_alpha.field[0, 0, :] = [
+        4.170645,  4.170645,  4.170645,  4.170645,  2.046925,  1.387837,  1.133003,  1.012418,
+        0.9494680, 0.9153771, 0.8972442, 0.8885444, 0.8856795, 0.8865333, 0.8897996, 0.8946404,
+        0.9005030, 0.9070138, 0.9139161, 0.9210315, 0.9282347, 0.9354376, 0.9425780, 0.9496124,
+        0.9565111, 0.9619183, 0.9619183, 0.9619183, 0.9619183, 0.9619183
+        ]
+
 
         self._initialize_shallow_convection = state.stencil_factory.from_dims_halo(
             func=initialize_shallow_convection,
@@ -598,9 +690,7 @@ class GFShallowConvection:
         self._compute_cloud_base_properties = state.stencil_factory.from_dims_halo(
             func=compute_cloud_base_properties,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
-            externals={
-                "ORDER_AVER": constants.ORDER_AVER,
-            },
+            externals={},
         )
 
         self._cup_kbcon = state.stencil_factory.from_dims_halo(
@@ -626,6 +716,22 @@ class GFShallowConvection:
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
         )
+
+        self._rates_up_pdf_shallow = state.stencil_factory.from_dims_halo(
+            func=rates_up_pdf_shallow_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={
+                "zustart": 0.1
+            },
+        )
+
+        self._copy_updraft_in_active_cloud_layers = state.stencil_factory.from_dims_halo(
+            func=copy_updraft_in_active_cloud_layers,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+
 
     # Define the main shallow convection function
     def cu_gf_sh_run(self,
@@ -688,8 +794,6 @@ class GFShallowConvection:
         hco = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Environmental moist static energy
         qco = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud water vapor mixing ratio
         dby = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Buoyancy term
-        zu = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Updraft normalized mass flux
-        xzu = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Alternative updraft normalized mass flux
         up_massentr = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Updraft mass entrainment
         up_massdetr = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Updraft mass detrainment
         c1d = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud liquid water detrainment coefficient
@@ -698,14 +802,12 @@ class GFShallowConvection:
         dbyt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Buoyancy tendency
 
         # Translate Fortran array allocations to Python
-        rand_vmas = np.zeros((ite - its +1, jte - jts + 1))  # Equivalent to "rand_vmas(:)=0."
         lambau = np.full((ite - its +1, jte - jts + 1), 2.0)  # Equivalent to "lambau(:)=2."
 
         # Initialize arrays based on their usage in the code
         uc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud x wind
         vc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud y wind
         xhkb = np.zeros((ite - its +1, jte - jts + 1))  # Cloud base moist static energy (alternative)
-        pmin_lev = np.zeros((ite - its +1, jte - jts + 1), dtype=int)
 
         # Initialize arrays based on their usage in the code
         xaa0 = np.zeros((ite - its +1, jte - jts + 1))  # Cloud work function for updraft
@@ -872,6 +974,7 @@ class GFShallowConvection:
             k22=k22,
             x_add=self.x_add,
             local_order_aver=self.local_order_aver,
+            k_index=self.k_index,
             k_mask=self.k_mask,
             ierr=ierr,
         )
@@ -973,37 +1076,55 @@ class GFShallowConvection:
             k_mask=self.k_mask,
         )
 
-        rates_up_pdf(
-            rand_vmas, ipr, 'shallow', ktop.field, ierr.field, self.po_cup.field, self.entr_rate_2d.field, self.hkbo.field, self.heo.field, self.heso_cup.field, self.zo_cup.field,
-            self.xland1.field, self.kstabi.field, k22.field, kbcon.field, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo.field, kpbl.field, self.ktopx.field, kbcon.field, pmin_lev
+        # rates_up_pdf(
+        #     self.rand_vmas.field, ipr, 'shallow', ktop.field, ierr.field, self.po_cup.field, self.entr_rate_2d.field, self.hkbo.field, self.heo.field, self.heso_cup.field, self.zo_cup.field,
+        #     self.xland1.field, self.kstabi.field, k22.field, kbcon.field, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo.field, kpbl.field, self.ktopx.field, kbcon.field, self.pmin_lev.field
+        # )
+
+        rates_up_pdf_shallow(
+            self.rand_vmas.field, ktop.field, ierr.field, self.po_cup.field, self.entr_rate_2d.field, self.zo_cup.field,
+            k22.field, kbcon.field, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo.field, kbcon.field
         )
+
+        # self._rates_up_pdf_shallow(
+        #     rand_vmas=self.rand_vmas,
+        #     ktop=ktop,
+        #     ierr=ierr,
+        #     p_cup=self.po_cup,
+        #     entr_rate_2d=self.entr_rate_2d,
+        #     z_cup=self.zo_cup,
+        #     k22=k22,
+        #     kbcon=kbcon,
+        #     zuo=zuo,
+        #     csum=kbcon,
+        #     k_mask=self.k_mask,
+        #     alpha=self.alpha.field[0, 0, :],
+        #     g_alpha=self.g_alpha.field[0, 0, :],
+        #     k_index=self.k_index,
+        #     index=self.index,
+        #     found=self.found,
+        #     kb_adj=self.kb_adj,
+        #     trash=self.trash,
+        #     tunning=self.tunning,
+        #     beta_deep=self.beta_deep,
+        #     alpha2=self.alpha2,
+        #     k1=self.k1,
+        #     a=self.a,
+        # )
     
-        for i in range(its, itf + 1):  # Adjusted to retain the same number of iterations
-            for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                if ierr.field[i, j] == 0:  # Equivalent to "if(ierr(i).eq.0)"
-                    if k22.field[i, j] > 0:  # Check if k22 is greater than 0
-                        for k in range(k22.field[i, j]):  # Loop from 1 to k22(i)-1
-                            zuo.field[i, j, k] = 0.0
-                            zu[i, j, k] = 0.0
-                            xzu[i, j, k] = 0.0
+        self._copy_updraft_in_active_cloud_layers(
+            ierr=ierr,
+            k22=k22,
+            ktop=ktop,
+            zuo=zuo,
+            xzu=self.xzu,
+            zu=self.zu,
+            found=self.found,
+            k_mask=self.k_mask,
+            argmax=self.argmax,
+        )
 
-                    for k in range(np.argmax(zuo.field[i, j, :]), ktop.field[i, j] + 1):  # Loop from maxloc(zuo(i,:)) to ktop(i)
-                        if zuo.field[i, j, k] < 1.0e-6:  # Check if zuo(i,k) is less than 1.e-6
-                            ktop.field[i, j] = k - 1
-                            break  # Exit the loop
-
-                    for k in range(k22.field[i, j], ktop.field[i, j] + 1):  # Loop from k22(i) to ktop(i)
-                        xzu[i, j, k] = zuo.field[i, j, k]
-                        zu[i, j, k] = zuo.field[i, j, k]
-
-                    for k in range(ktop.field[i, j] + 1, ktf + 1):  # Loop from ktop(i)+1 to ktf
-                        zuo.field[i, j, k] = 0.0
-                        zu[i, j, k] = 0.0
-                        xzu[i, j, k] = 0.0
-
-                    k22.field[i, j] = max(1, k22.field[i, j])  # Ensure k22 is at least 1
-
-        # Call get_lateral_massflux() to calculate mass entrainment and detrainment
+            # Call get_lateral_massflux() to calculate mass entrainment and detrainment
         get_lateral_massflux(
             itf, jtf, ktf, its, ite, jts, jte, kts, kte,
             ierr.field, ktop.field, self.zo_cup.field, zuo.field, self.cd.field, self.entr_rate_2d.field,
@@ -1043,15 +1164,15 @@ class GFShallowConvection:
 
                 # Sequential loop for levels from self.start_level.field(i)+1 to ktop(i)
                 for k in range(self.start_level.field[i, j] + 1, ktop.field[i, j] + 1):
-                    hc[i, j, k] = (hc[i, j, k - 1] * zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] * hc[i, j, k - 1] +
+                    hc[i, j, k] = (hc[i, j, k - 1] * self.zu.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] * hc[i, j, k - 1] +
                                 up_massentr[i, j, k - 1] * self.he.field[i, j, k - 1]) / \
-                            (zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
-                    uc[i, j, k] = (uc[i, j, k - 1] * zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] * uc[i, j, k - 1] +
+                            (self.zu.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
+                    uc[i, j, k] = (uc[i, j, k - 1] * self.zu.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] * uc[i, j, k - 1] +
                                 up_massentr[i, j, k - 1] * us.field[i, j, k - 1]) / \
-                            (zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
-                    vc[i, j, k] = (vc[i, j, k - 1] * zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] * vc[i, j, k - 1] +
+                            (self.zu.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
+                    vc[i, j, k] = (vc[i, j, k - 1] * self.zu.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] * vc[i, j, k - 1] +
                                 up_massentr[i, j, k - 1] * vs.field[i, j, k - 1]) / \
-                            (zu[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
+                            (self.zu.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
                     dby[i, j, k] = max(0.0, hc[i, j, k] - self.hes_cup.field[i, j, k])
                     hco[i, j, k] = (hco[i, j, k - 1] * zuo.field[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] * hco[i, j, k - 1] +
                                 self.up_massentro.field[i, j, k - 1] * self.heo.field[i, j, k - 1]) / \
@@ -1065,7 +1186,7 @@ class GFShallowConvection:
                 if ktop.field[i, j] > ki + 1:
                     ktop.field[i, j] = ki + 1
                     zuo.field[i, j, ktop.field[i, j] + 1:ktf + 1] = 0.0
-                    zu[i, j, ktop.field[i, j] + 1:ktf + 1] = 0.0
+                    self.zu.field[i, j, ktop.field[i, j] + 1:ktf + 1] = 0.0
                     self.cd.field[i, j, ktop.field[i, j] + 1:ktf + 1] = 0.0
                     self.up_massdetro.field[i, j, ktop.field[i, j]] = zuo.field[i, j, ktop.field[i, j]]
                     self.up_massentro.field[i, j, ktop.field[i, j]:ktf + 1] = 0.0
@@ -1133,13 +1254,13 @@ class GFShallowConvection:
                     self.qrco.field[i, j, k] = 0.0  # Reset cloud water mixing ratio
                     dby[i, j, k] = 0.0  # Reset buoyancy term
                     self.dbyo.field[i, j, k] = 0.0  # Reset buoyancy term for environment
-                    zu[i, j, k] = 0.0  # Reset updraft normalized mass flux
-                    xzu[i, j, k] = 0.0  # Reset updraft normalized mass flux (alternative)
+                    self.zu.field[i, j, k] = 0.0  # Reset updraft normalized mass flux
+                    self.xzu.field[i, j, k] = 0.0  # Reset updraft normalized mass flux (alternative)
                     zuo.field[i, j, k] = 0.0  # Reset updraft normalized mass flux for environment
 
         if make_calc_for_xk:  # Check if calculations for xk are enabled
             # Call cup_up_aa0() to calculate cloud work functions
-            cup_up_aa0(self.aa0.field, self.z.field, zu, dby, self.gamma_cup.field, self.t_cup.field,
+            cup_up_aa0(self.aa0.field, self.z.field, self.zu.field, dby, self.gamma_cup.field, self.t_cup.field,
                     kbcon.field, ktop.field, ierr.field,
                     itf, jtf, ktf, its, ite, jts, jte, kts, kte)
             cup_up_aa0(self.aa1.field, zo.field, zuo.field, self.dbyo.field, self.gammao_cup.field, self.tn_cup.field,
@@ -1284,20 +1405,20 @@ class GFShallowConvection:
             for i in range(its, itf + 1):  # Loop over horizontal grid points
                 for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
                     if ierr.field[i, j] == 0:  # Check if there is no error
-                        xzu[i, j, :ktf] = zuo.field[i, j, :ktf]  # Copy zuo.field to xzu
+                        self.xzu.field[i, j, :ktf] = zuo.field[i, j, :ktf]  # Copy zuo.field to xzu
                         for k in range(self.start_level.field[i, j] + 1, ktop.field[i, j] + 1):  # Loop from self.start_level.field(i)+1 to ktop.field(i)
-                            xhc[i, j, k] = (xhc[i, j, k - 1] * xzu[i, j, k - 1] -
+                            xhc[i, j, k] = (xhc[i, j, k - 1] * self.xzu.field[i, j, k - 1] -
                                         0.5 * self.up_massdetro.field[i, j, k - 1] * xhc[i, j, k - 1] +
                                         self.up_massentro.field[i, j, k - 1] * self.xhe.field[i, j, k - 1]) / \
-                                        (xzu[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] + self.up_massentro.field[i, j, k - 1])
+                                        (self.xzu.field[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] + self.up_massentro.field[i, j, k - 1])
                             xdby[i, j, k] = xhc[i, j, k] - self.xhes_cup.field[i, j, k]
                         for k in range(ktop.field[i, j] + 1, ktf + 1):  # Loop from ktop.field(i)+1 to ktf
                             xhc[i, j, k] = self.xhes_cup.field[i, j, k]
                             xdby[i, j, k] = 0.0
-                            xzu[i, j, k] = 0.0
+                            self.xzu.field[i, j, k] = 0.0
 
             # Call cup_up_aa0() to calculate workfunctions for updraft
-            cup_up_aa0(xaa0, self.xz.field, xzu, xdby, self.gamma_cup.field, self.xt_cup.field,
+            cup_up_aa0(xaa0, self.xz.field, self.xzu.field, xdby, self.gamma_cup.field, self.xt_cup.field,
                     kbcon.field, ktop.field, ierr.field,
                     itf, jtf, ktf,
                     its, ite, jts, jte, kts, kte)

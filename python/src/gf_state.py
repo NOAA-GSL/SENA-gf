@@ -944,6 +944,7 @@ class GFState:
 
         # Create the stencil and quantity factories
         self.stencil_factory, self.quantity_factory = get_factories_single_tile(self.im, self.jm, self.km, 0, backend=self.backend)
+        self.stencil_factory_table, self.quantity_factory_table = get_factories_single_tile(1, 1, 30, 0, backend=self.backend)
 
         # Get ntracer
         self.ntracer = _dataset.variables["ntracer"][:]

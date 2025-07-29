@@ -1,9 +1,21 @@
 from ndsl.dsl.gt4py import PARALLEL, computation, interval, FORWARD, function
-from ndsl.dsl.typing import FloatField, IntField32, IntFieldIJ32, FloatFieldIJ, IntFieldK32, BoolFieldIJ
+from ndsl.dsl.typing import (
+    FloatField,
+    IntField32,
+    IntFieldIJ,
+    IntFieldIJ32,
+    FloatFieldIJ,
+    IntFieldK32,
+    BoolFieldIJ,
+    Float,
+    # GlobalTable
+)
 import cu_gf_constants as constants
-from ndsl.dsl.gt4py import log, floor, abs
-from gt4py.cartesian.gtscript import THIS_K
+from ndsl.dsl.gt4py import log, floor, abs, gamma
+from ndsl.dsl.gt4py import GlobalTable
 
+
+GlobalTable_float = GlobalTable[(Float, 30)]
 
 def initialize_driver(
     aod_gf: FloatFieldIJ, # type: ignore
@@ -224,9 +236,11 @@ def estimate_convective_velocity_and_excesses(
             zws = 1.2 * zws ** 0.3333
             ztexec = max(flux_tun * hfx / (rho * zws * constants.CP), 0.0)
             zqexec = max(flux_tun * qfx / (rho * zws * constants.XLV), 0.0)
-        zws = max(0.0, flux_tun * 0.41 * buo_flux * zo.at(K=kpbl) * constants.G / t.at(K=kpbl))
+        # zws = max(0.0, flux_tun * 0.41 * buo_flux * zo.at(K=kpbl) * constants.G / t.at(K=kpbl))
+        zws = max(0.0, flux_tun * 0.41 * buo_flux * zo[0, 0, kpbl] * constants.G / t[0, 0, kpbl])
         zws = 1.2 * zws ** 0.3333
-        zws = zws * rho.at(K=kpbl)
+        # zws = zws * rho.at(K=kpbl)
+        zws = zws * rho[0, 0, kpbl]
 
 def cup_env_stencil(
     z: FloatField, # type: ignore
@@ -439,14 +453,16 @@ def set_max_pressure_level(
     """
     with computation(FORWARD), interval(0,1):
         if kpbl > 2:
-            cap_max = po_cup.at(K=kpbl)
+            # cap_max = po_cup.at(K=kpbl)
+            cap_max = po_cup[0, 0, kpbl]
         if ierr == 0:
             k22 = 1
 
     with computation(FORWARD), interval(1, None):
         if k_mask <= kbmax:
             if ierr == 0:
-                if heo_cup > heo_cup.at(K=k22):
+                # if heo_cup > heo_cup.at(K=k22):
+                if heo_cup > heo_cup[0, 0, k22 - k_mask]:
                     k22 = k_mask
 
     with computation(FORWARD), interval(0, 1):
@@ -469,18 +485,39 @@ def compute_cloud_base_properties(
         k22: IntFieldIJ32, # type: ignore
         x_add: FloatFieldIJ, # type: ignore
         local_order_aver: IntFieldIJ32, # type: ignore
+        k_index: IntFieldK32, # type: ignore
         k_mask: IntFieldK32, # type: ignore
         ierr: IntFieldIJ32, # type: ignore
 ):
     """
     Computes cloud base properties based on the provided fields.
     """
-    from __externals__ import ( # type: ignore
-        ORDER_AVER,
-    )
 
+    # This should work, but doesn't
+    # Gives: ValueError: Compute domain too large (provided: (4, 2, 127), maximum: (5, 3, 5))
+    # with computation(FORWARD), interval(0, 1):
+    #     if ierr == 0:
+    #         x_add = constants.XLV * zqexec + constants.CP * ztexec
+    #         hkb = get_cloud_bc(
+    #             array=he_cup,
+    #             x_aver=hkb,
+    #             k22=k22,
+    #             add_x=x_add,
+    #             local_order_aver=local_order_aver,
+    #             k_index=k_index,
+    #         )
+    #         hkbo= get_cloud_bc(
+    #             array=heo_cup,
+    #             x_aver=hkbo,
+    #             k22=k22,
+    #             add_x=x_add,
+    #             local_order_aver=local_order_aver,
+    #             k_index=k_index,
+    #         )
+
+    # # This does what the function calls would do and works fine
     with computation(FORWARD), interval(0, 1):
-        local_order_aver = min(k22 + 1, ORDER_AVER)
+        local_order_aver = min(k22 + 1, constants.ORDER_AVER)
         if ierr == 0:
             x_add = constants.XLV * zqexec + constants.CP * ztexec
             hkb = 0.0
@@ -522,7 +559,7 @@ def cup_kbcon_stencil(
     imid: int,
     adjustment_attempts: IntFieldIJ32, # type: ignore
     tries: IntFieldIJ32, # type: ignore
-    k_index: IntFieldIJ32, # type: ignore
+    k_index: IntFieldIJ, # type: ignore
     x_add: FloatFieldIJ, # type: ignore
     pbcdif: FloatFieldIJ, # type: ignore
     plus: FloatFieldIJ, # type: ignore
@@ -637,7 +674,8 @@ def get_cloud_bc(
     x_aver = 0.0
     k_index = 0
     while k_index < local_order_aver:
-        x_aver += array.at(K=k22 - k_index)
+        # x_aver += array.at(K=k22 - k_index) # This doesn't work for some reason
+        x_aver += array[0, 0, k22 - k_index]
         k_index += 1
     x_aver /= float(local_order_aver)
     x_aver += add_x
@@ -855,7 +893,7 @@ def compute_entrainment_and_shallow_convection_top(
     ztexec: FloatFieldIJ, # type: ignore
     hkb: FloatFieldIJ, # type: ignore
     he_cup: FloatField, # type: ignore
-    k_index: IntFieldIJ32, # type: ignore
+    k_index: IntFieldIJ, # type: ignore
     local_order_aver: IntFieldIJ32, # type: ignore
     kbcon: IntFieldIJ32, # type: ignore
     qo_cup: FloatField, # type: ignore
@@ -886,19 +924,17 @@ def compute_entrainment_and_shallow_convection_top(
             start_level = k22
 
     with computation(FORWARD), interval(0, 1):
-        local_order_aver = min(k22 + 1, constants.ORDER_AVER)
         if ierr == 0:
+            local_order_aver = min(k22 + 1, constants.ORDER_AVER)
             x_add = constants.XLV * zqexec + constants.CP * ztexec
-            hkb = 0.0
-
-    with computation(FORWARD), interval(...):
-        if ierr == 0:
-            if k_mask > k22 - local_order_aver and k_mask <= k22:
-                hkb += he_cup
-
-    with computation(FORWARD), interval(0,1):
-        hkb /= float(local_order_aver)
-        hkb += x_add
+            hkb = get_cloud_bc(
+                array=he_cup,
+                x_aver=hkb,
+                k22=k22,
+                add_x=x_add,
+                local_order_aver=local_order_aver,
+                k_index=k_index,
+            )
 
     with computation(FORWARD), interval(0, 1):
         if ierr == 0:
@@ -932,3 +968,607 @@ def compute_entrainment_and_shallow_convection_top(
                     if (po_cup.at(K=kstart) - po_cup) > 200.0:
                         ktop = k_mask
                         found = True
+
+
+
+def rates_up_pdf_shallow_stencil(
+    rand_vmas: FloatFieldIJ, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    p_cup: FloatField, # type: ignore
+    entr_rate_2d: FloatField, # type: ignore
+    z_cup: FloatField, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    zuo: FloatField, # type: ignore
+    csum: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    alpha: GlobalTable_float, # type: ignore
+    g_alpha: GlobalTable_float, # type: ignore
+    k_index: IntFieldIJ, # type: ignore
+    index: IntFieldIJ32, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+    kb_adj: IntFieldIJ32, # type: ignore
+    trash: FloatFieldIJ, # type: ignore
+    tunning: FloatFieldIJ, # type: ignore
+    beta_deep: FloatFieldIJ, # type: ignore
+    alpha2: FloatFieldIJ, # type: ignore
+    k1: IntFieldIJ, # type: ignore
+    a: FloatFieldIJ, # type: ignore
+):
+    """
+    Calculates a normalized mass-flux profile for updrafts and downdrafts.
+    """
+
+    from __externals__ import ( # type: ignore
+        zustart,
+        k_start,
+        k_end,
+    )
+
+    with computation(PARALLEL), interval(...):
+        dz = 0.0
+        massent = 0.0
+        massdetr = 0.0
+        zux = 0.0
+        zuo = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr <= 0:
+            kbcon = max(kbcon, 1)
+
+    with computation(FORWARD), interval(...):
+        if ierr <= 0:
+            zuo[0, 0, k22 - k_mask] = zustart
+            zux[0, 0, k22 - k_mask] = zustart
+
+    with computation(FORWARD), interval(1, None):
+        if ierr <= 0:
+            if k_mask > k22 and k_mask <= kbcon:
+                dz = z_cup - z_cup[0, 0, -1]
+                massent = dz * entr_rate_2d[0, 0, -1] * zuo[0, 0, -1]
+                massdetr = dz * 0.1 * entr_rate_2d.at(K=k_start) * zuo[0, 0, -1]
+                zuo = zuo[0, 0, -1] + massent - massdetr
+                zux = zuo
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr <= 0:
+            if ktop <= kbcon + 2:
+                ierr = 41
+                ktop = -1
+            else:
+                # Get the updraft and downdraft profiles
+                get_zu_zd_pdf_fim(
+                    kklev=kbcon,
+                    p=p_cup,
+                    rand_vmas=rand_vmas,
+                    zubeg=zustart,
+                    draft=2,
+                    kb=k22,
+                    kt=ktop + 2,
+                    zu=zuo,
+                    kpbli=kbcon,
+                    alpha=alpha,
+                    g_alpha=g_alpha,
+                    k_index=k_index,
+                    index=index,
+                    found=found,
+                    kb_adj=kb_adj,
+                    trash=trash,
+                    tunning=tunning,
+                    beta_deep=beta_deep,
+                    alpha2=alpha2,
+                    k1=k1,
+                    a=a,
+                )
+
+# def rates_up_pdf_mid(
+#     rand_vmas: FloatFieldIJ, # type: ignore
+#     ktop: IntFieldIJ32, # type: ignore
+#     ierr: IntFieldIJ32, # type: ignore
+#     p_cup: FloatField, # type: ignore
+#     entr_rate_2d: FloatField, # type: ignore
+#     hkbo: FloatFieldIJ, # type: ignore
+#     heo: FloatField, # type: ignore
+#     heso_cup: FloatField, # type: ignore
+#     z_cup: FloatField, # type: ignore
+#     xland: IntFieldIJ32, # type: ignore
+#     kstabi: IntFieldIJ32, # type: ignore
+#     k22: IntFieldIJ32, # type: ignore
+#     kbcon: IntFieldIJ32, # type: ignore
+#     zuo: FloatField, # type: ignore
+#     kpbl: IntFieldIJ32, # type: ignore
+#     ktopdby: IntFieldIJ32, # type: ignore
+#     csum: IntFieldIJ32, # type: ignore
+#     pmin_lev: IntFieldIJ32, # type: ignore
+# ):
+#     """
+#     Calculates a normalized mass-flux profile for updrafts and downdrafts.
+#     """
+
+    # # Local variables
+    # hcot = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))  # Cloud top height
+    # entr_init = beta_u = dz = dbythresh = dzh2 = zustart = zubeg = massent = massdetr = 0.0
+    # dby = np.zeros(kte - kts + 1)  # Buoyancy
+    # dbm = np.zeros(kte - kts + 1)  # Buoyancy difference
+    # zux = np.zeros(kte - kts + 1)  # Updraft mass flux
+    # zuh2 = np.zeros(40)  # Placeholder array
+    # zh2 = np.zeros(40)  # Placeholder array
+
+    # kklev = i = kk = kbegin = k = kfinalzu = 0  # Integer variables
+    # start_level = np.zeros((ite - its + 1, jte - jts + 1), dtype=int)  # Starting level
+    # is_deep = is_mid = is_shallow = False  # Logical flags
+
+    # zustart = 0.1
+    # dbythresh = 1.0
+
+    # # Parallel loop over the range of indices
+    # for i in range(its, itf + 1):
+    #     for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+    #         if ierr[i, j] > 0:
+    #             continue
+
+    #         zux[:] = 0.0
+    #         beta_u = max(0.1, 0.2 - float(csum[i, j]) * 0.01)
+    #         zuo[i, j, :] = 0.0  # Reset zuo array
+    #         dby[:] = 0.0
+    #         dbm[:] = 0.0
+    #         kbcon[i, j] = max(kbcon[i, j], 1)
+    #         start_level[i, j] = k22[i, j]
+    #         zuo[i, j, start_level[i, j]] = zustart
+    #         zux[start_level[i, j]] = zustart
+    #         entr_init = entr_rate_2d[i, j, kts]
+
+    #         # Sequential loop over levels
+    #         for k in range(start_level[i, j] + 1, kbcon[i, j] + 1):
+    #             dz = z_cup[i, j, k] - z_cup[i, j, k - 1]
+    #             massent = dz * entr_rate_2d[i, j, k - 1] * zuo[i, j, k - 1]
+    #             massdetr = dz * 0.1 * entr_init * zuo[i, j, k - 1]
+    #             zuo[i, j, k] = zuo[i, j, k - 1] + massent - massdetr
+    #             zux[k] = zuo[i, j, k]
+
+    #         zubeg = zustart
+
+    #         if is_mid:
+    #             if ktop[i, j] <= kbcon[i, j] + 2:
+    #                 ierr[i, j] = 41
+    #                 ktop[i, j] = -1
+    #             else:
+    #                 kfinalzu = ktop[i, j]
+    #                 ktopdby[i, j] = ktop[i, j] + 1
+    #                 get_zu_zd_pdf_fim(
+    #                     kklev, p_cup[i, j, :], rand_vmas[i, j], zubeg, ipr, xland[i, j], zuh2, 3, ierr[i, j],
+    #                     k22[i, j], ktopdby[i, j] + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, beta_u, kbcon[i, j], csum[i, j], pmin_lev[i, j]
+    #                 )
+
+
+# def rates_up_pdf_deep(
+#     rand_vmas: FloatFieldIJ, # type: ignore
+#     ktop: IntFieldIJ32, # type: ignore
+#     ierr: IntFieldIJ32, # type: ignore
+#     p_cup: FloatField, # type: ignore
+#     entr_rate_2d: FloatField, # type: ignore
+#     hkbo: FloatFieldIJ, # type: ignore
+#     heo: FloatField, # type: ignore
+#     heso_cup: FloatField, # type: ignore
+#     z_cup: FloatField, # type: ignore
+#     xland: IntFieldIJ32, # type: ignore
+#     kstabi: IntFieldIJ32, # type: ignore
+#     k22: IntFieldIJ32, # type: ignore
+#     kbcon: IntFieldIJ32, # type: ignore
+#     zuo: FloatField, # type: ignore
+#     kpbl: IntFieldIJ32, # type: ignore
+#     ktopdby: IntFieldIJ32, # type: ignore
+#     csum: IntFieldIJ32, # type: ignore
+#     pmin_lev: IntFieldIJ32, # type: ignore
+# ):
+#     """
+#     Calculates a normalized mass-flux profile for updrafts and downdrafts.
+#     """
+
+    # # Local variables
+    # hcot = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))  # Cloud top height
+    # entr_init = beta_u = dz = dbythresh = dzh2 = zustart = zubeg = massent = massdetr = 0.0
+    # dby = np.zeros(kte - kts + 1)  # Buoyancy
+    # dbm = np.zeros(kte - kts + 1)  # Buoyancy difference
+    # zux = np.zeros(kte - kts + 1)  # Updraft mass flux
+    # zuh2 = np.zeros(40)  # Placeholder array
+    # zh2 = np.zeros(40)  # Placeholder array
+
+    # kklev = i = kk = kbegin = k = kfinalzu = 0  # Integer variables
+    # start_level = np.zeros((ite - its + 1, jte - jts + 1), dtype=int)  # Starting level
+    # is_deep = is_mid = is_shallow = False  # Logical flags
+
+    # zustart = 0.1
+    # dbythresh = 0.8  # Default threshold
+
+    # # Parallel loop over the range of indices
+    # for i in range(its, itf + 1):
+    #     for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+    #         if ierr[i, j] > 0:
+    #             continue
+
+    #         zux[:] = 0.0
+    #         beta_u = max(0.1, 0.2 - float(csum[i, j]) * 0.01)
+    #         zuo[i, j, :] = 0.0  # Reset zuo array
+    #         dby[:] = 0.0
+    #         dbm[:] = 0.0
+    #         kbcon[i, j] = max(kbcon[i, j], 1)
+    #         start_level[i, j] = k22[i, j]
+    #         zuo[i, j, start_level[i, j]] = zustart
+    #         zux[start_level[i, j]] = zustart
+    #         entr_init = entr_rate_2d[i, j, kts]
+
+    #         # Sequential loop over levels
+    #         for k in range(start_level[i, j] + 1, kbcon[i, j] + 1):
+    #             dz = z_cup[i, j, k] - z_cup[i, j, k - 1]
+    #             massent = dz * entr_rate_2d[i, j, k - 1] * zuo[i, j, k - 1]
+    #             massdetr = dz * 0.1 * entr_init * zuo[i, j, k - 1]
+    #             zuo[i, j, k] = zuo[i, j, k - 1] + massent - massdetr
+    #             zux[k] = zuo[i, j, k]
+
+    #         zubeg = zustart
+
+    #         if is_deep:
+    #             ktop[i, j] = -1
+    #             hcot[i, j, start_level[i, j]] = hkbo[i, j]
+    #             dz = z_cup[i, j, start_level[i, j]] - z_cup[i, j, start_level[i, j] - 1]
+
+    #             for k in range(start_level[i, j] + 1, ktf - 1):
+    #                 dz = z_cup[i, j, k] - z_cup[i, j, k - 1]
+    #                 hcot[i, j, k] = ((1.0 - 0.5 * entr_rate_2d[i, j, k - 1] * dz) * hcot[i, j, k - 1] +
+    #                             entr_rate_2d[i, j, k - 1] * dz * heo[i, j, k - 1]) / \
+    #                             (1.0 + 0.5 * entr_rate_2d[i, j, k - 1] * dz)
+    #                 if k >= kbcon[i, j]:
+    #                     dby[k] = dby[k - 1] + (hcot[i, j, k] - heso_cup[i, j, k]) * dz
+    #                     dbm[k] = hcot[i, j, k] - heso_cup[i, j, k]
+
+    #             ktopdby[i, j] = np.argmax(dby)
+    #             kklev = np.argmax(dbm)
+
+    #             for k in range(np.argmax(dby) + 1, ktf - 1):
+    #                 if dby[k] < dbythresh * np.max(dby):
+    #                     kfinalzu = k - 1
+    #                     ktop[i, j] = kfinalzu
+    #                     break
+
+    #             if dby[k] >= dbythresh * np.max(dby):
+    #                 kfinalzu = ktf - 2
+    #                 ktop[i, j] = kfinalzu
+
+    #             ktop[i, j] = ktopdby[i, j]  # HCB
+    #             kklev = min(kklev + 3, ktop[i, j] - 2)
+
+    #             if kfinalzu <= kbcon[i, j] + 2:
+    #                 ierr[i, j] = 41
+    #                 ktop[i, j] = -1
+    #             else:
+    #                 get_zu_zd_pdf_fim(
+    #                     kklev, p_cup[i, j, :], rand_vmas[i, j], zubeg, ipr, xland[i, j], zuh2, 1, ierr[i, j],
+    #                     k22[i, j], kfinalzu + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, beta_u, kbcon[i, j], csum[i, j], pmin_lev[i, j]
+    #                 )
+
+
+@function
+def get_zu_zd_pdf_fim(
+    kklev: IntFieldIJ32, # type: ignore
+    p: FloatField, # type: ignore
+    rand_vmas: FloatFieldIJ, # type: ignore
+    zubeg: float,
+    draft: int,
+    kb: IntFieldIJ32, # type: ignore
+    kt: IntFieldIJ32, # type: ignore
+    zu: FloatField, # type: ignore
+    kpbli: IntFieldIJ32, # type: ignore
+    alpha: GlobalTable_float, # type: ignore
+    g_alpha: GlobalTable_float, # type: ignore
+    k_index: IntFieldIJ, # type: ignore
+    index: IntFieldIJ32, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+    kb_adj: IntFieldIJ32, # type: ignore
+    trash: FloatFieldIJ, # type: ignore
+    tunning: FloatFieldIJ, # type: ignore
+    beta_deep: FloatFieldIJ, # type: ignore
+    alpha2: FloatFieldIJ, # type: ignore
+    k1: IntFieldIJ, # type: ignore
+    a: FloatFieldIJ, # type: ignore
+) -> FloatField: # type: ignore
+    """
+    Generates a normalized mass-flux profile for updrafts and downdrafts using the beta function.
+    """
+
+    # from __externals__ import ( # type: ignore
+    #     k_start,
+    #     k_end,
+    # )
+
+    # # Local variables
+    # trash = 0.0
+    # beta_deep = 0.0
+
+    k1 = 0
+    # k = 0
+    # kb_adj = 0
+
+    # maxlim = 0.0
+    # kratio = 0.0
+    # tunning = 0.0
+    # fzu = 0.0
+    # rand_vmas = 0.0
+
+    a = 0.0
+    # b = 0.0
+    # x1 = 0.0
+    # g_a = 0.0
+    # g_b = 0.0
+    # alpha2 = 0.0
+    # g_alpha2 = 0.0
+
+    # Initialize arrays and variables
+    zu = 0.0
+    kb_adj = max(kb, 1)
+    k_index = 0
+    k1 = 0
+    found = False
+
+    # if draft == 1:
+    #     kb_adj = max(kb, 1)
+
+    #     trash = -p[0,0, kt] + p[0, 0, kb_adj]
+    #     tunning = p[0, 0, kklev]
+    #     if rand_vmas != 0.0:
+    #         tunning = p[0, 0, kklev - 1] + 0.1 * rand_vmas * trash
+    #     beta_deep = 1.3 + (1.0 - trash / 1200.0)
+    #     tunning = min(0.95, (tunning - p[0, 0, kb_adj]) / (p[0, 0, kt] - p[0, 0, kb_adj]))
+    #     tunning = max(0.02, tunning)
+    #     alpha2 = (tunning * (beta_deep - 2.0) + 1.0) / (1.0 - tunning)
+
+#         for k in range(26, 1, -1):
+#             if alpha[k] >= alpha2:
+#                 break
+#         k1 = k + 1
+
+#         if alpha[k1] != alpha[k1 - 1]:
+#             a = alpha[k1] - alpha[k1 - 1]
+#             b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
+#             x1 = (alpha2 - b) / a
+#             g_a = g_alpha[k1] - g_alpha[k1 - 1]
+#             g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
+#             g_alpha2 = g_a * x1 + g_b
+#         else:
+#             g_alpha2 = g_alpha[k1]
+
+#         fzu = math.gamma(alpha2 + beta_deep) / (math.gamma(alpha2) * math.gamma(beta_deep))
+#         zu[kb_adj] = zubeg
+
+#         for k in range(kb_adj + 1, min(kte, kt - 1) + 1):
+#             kratio = (p[k] - p[kb_adj]) / (p[kt] - p[kb_adj])
+#             zu[k] = zubeg + fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(beta_deep - 1.0)
+
+#         if zu[kpbli] > 0.0:
+#             zu[kts:min(ktf, kt - 1) + 1] = zu[kts:min(ktf, kt - 1) + 1] / zu[kpbli]
+
+#         for k in range(np.argmax(zu), -1, -1):
+#             if zu[k] < 1e-6:
+#                 kb_adj = k + 1
+#                 break
+
+#         kb_adj = max(1, kb_adj)
+
+#         for k in range(kts, kb_adj):
+#             zu[k] = 0.0
+
+#         maxlim = 1.2
+#         a = np.max(zu) - zu[kb_adj]
+
+#         for k in range(kb_adj, kt + 1):
+#             trash = zu[k]
+#             if a > maxlim:
+#                 zu[k] = (zu[k] - zu[kb_adj]) * maxlim / a + zu[kb_adj]
+
+    # # # elif draft == 2:
+    if draft == 2:
+        # k_index = kklev
+        # if kpbli > 4:
+        #     k_index = kpbli
+        tunning = p[0, 0, kklev]
+        tunning = min(0.95, (tunning - p[0, 0, kb_adj]) / (p[0, 0, kt] - p[0, 0, kb_adj]))
+        tunning = max(0.02, tunning)
+        alpha2 = (tunning * (constants.BETA_SH - 2.0) + 1.0) / (1.0 - tunning)
+
+        k_index = 26
+        found = False
+        k1 = 0
+        while k_index > 1 and found == False:
+            if alpha2 <= alpha.A[k_index + k1]:
+                found = True
+            k_index -= 1
+        k1 = k_index + 1
+
+        k_index = 26
+        if alpha.A[k_index + 0] != 0:
+            a = 0 #alpha.A[k_index + 1] - alpha.A[k1 - 1]
+        return zu
+        #     a = alpha.A[3]
+        #     b = alpha.A[k1 - 1] * k1 - (k1 - 1) * alpha.A[k1 + 0]
+        #     x1 = (alpha2 - b) / a
+        #     g_a = g_alpha.A[k1 + 0] - g_alpha.A[k1 - 1]
+        #     g_b = g_alpha.A[k1 - 1] * k1 - (k1 - 1) * g_alpha.A[k1 + 0]
+        #     g_alpha2 = g_a * x1 + g_b
+        # else:
+        #     g_alpha2 = g_alpha.A[k1 + 0]
+
+        # fzu = gamma(alpha2 + constants.BETA_SH) / (g_alpha2 * constants.G_BETA_SH)
+        # zu[0, 0,kb_adj] = zubeg
+
+        # k_index = kb_adj + 1
+        # while k_index <= min(k_end, kt - 1):
+        #     kratio = (p - p[0, 0, kb_adj]) / (p[0, 0, kt] - p[0, 0, kb_adj])
+        #     zu = zubeg + fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(constants.BETA_SH - 1.0)
+        #     k_index += 1
+
+        # if zu[0, 0, kpbli] > 0.0:
+        #     k_index = k_start
+        #     while k_index <= min(k_end, kt - 1):
+        #         zu[0, 0, k_index] /= zu[0, 0, kpbli]
+        #     k_index += 1
+
+        # index = 0
+        # k_index = 0
+        # while index <= k_end:
+        #     if zu[0, 0, index] > zu[0, 0, k_index]:
+        #         k_index = index
+        #     index += 1
+
+        # found = False
+        # while k_index >= 0 and not found:
+        #     if zu[k_index] < 1e-6:
+        #         kb_adj = k_index + 1
+        #         found = True
+        #     k_index -= 1
+
+        # maxlim = 1.0
+        # a = max(zu) - zu[0, 0, kb_adj]
+
+        # k_index = k_start
+        # while k_index <= kt:
+        #     if a > maxlim:
+        #         zu = (zu - zu[0, 0, kb_adj]) * maxlim / a + zu[0, 0, kb_adj]
+        #     k_index += 1
+
+#     elif draft == 3:
+#         kb_adj = max(kb, 1)
+#         tunning = 0.5 * (p[kt] + p[kpbli])
+#         tunning = min(0.95, (tunning - p[kb_adj]) / (p[kt] - p[kb_adj]))
+#         tunning = max(0.02, tunning)
+#         alpha2 = (tunning * (BETA_MID - 2.0) + 1.0) / (1.0 - tunning)
+
+#         for k in range(26, 1, -1):
+#             if alpha[k] >= alpha2:
+#                 break
+#         k1 = k + 1
+
+#         if alpha[k1] != alpha[k1 - 1]:
+#             a = alpha[k1] - alpha[k1 - 1]
+#             b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
+#             x1 = (alpha2 - b) / a
+#             g_a = g_alpha[k1] - g_alpha[k1 - 1]
+#             g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
+#             g_alpha2 = g_a * x1 + g_b
+#         else:
+#             g_alpha2 = g_alpha[k1]
+
+#         fzu = math.gamma(alpha2 + BETA_MID) / (math.gamma(alpha2) * math.gamma(BETA_MID))
+#         zu[kb_adj] = zubeg
+
+#         for k in range(kb_adj + 1, min(kte, kt - 1) + 1):
+#             kratio = (p[k] - p[kb_adj]) / (p[kt] - p[kb_adj])
+#             zu[k] = zubeg + fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(BETA_MID - 1.0)
+
+#         if zu[kpbli] > 0.0:
+#             zu[kts:min(ktf, kt - 1) + 1] = zu[kts:min(ktf, kt - 1) + 1] / zu[kpbli]
+
+#         for k in range(np.argmax(zu), -1, -1):
+#             if zu[k] < 1e-6:
+#                 kb_adj = k + 1
+#                 break
+
+#         kb_adj = max(1, kb_adj)
+
+#         for k in range(kts, kb_adj):
+#             zu[k] = 0.0
+
+#         maxlim = 1.5
+#         a = np.max(zu) - zu[kb_adj]
+
+#         for k in range(kts, kt + 1):
+#             if a > maxlim:
+#                 zu[k] = (zu[k] - zu[kb_adj]) * maxlim / a + zu[kb_adj]
+
+#     elif draft == 4 or draft == 5:
+#         tunning = p[kb]
+#         tunning = min(0.95, (tunning - p[0]) / (p[kt] - p[0]))
+#         tunning = max(0.02, tunning)
+#         alpha2 = (tunning * (BETA_DD - 2.0) + 1.0) / (1.0 - tunning)
+
+#         for k in range(26, 1, -1):
+#             if alpha[k] >= alpha2:
+#                 break
+#         k1 = k + 1
+#         if alpha[k1] != alpha[k1 - 1]:
+#             a = alpha[k1] - alpha[k1 - 1]
+#             b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
+#             x1 = (alpha2 - b) / a
+#             g_a = g_alpha[k1] - g_alpha[k1 - 1]
+#             g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
+#             g_alpha2 = g_a * x1 + g_b
+#         else:
+#             g_alpha2 = g_alpha[k1]
+
+#         fzu = math.gamma(alpha2 + BETA_DD) / (g_alpha2 * G_BETA_DD)
+#         zu[:] = 0.0
+
+#         for k in range(1, min(kte, kt - 1) + 1):
+#             kratio = (p[k] - p[0]) / (p[kt] - p[0])
+#             zu[k] = fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(BETA_DD - 1.0)
+
+#         fzu = np.max(zu[kts:min(ktf, kt - 1) + 1])
+#         if fzu > 0.0:
+#             zu[kts:min(ktf, kt - 1) + 1] = zu[kts:min(ktf, kt - 1) + 1] / fzu
+
+#         zu[0] = 0.0
+#         for k in range(1, kb):
+#             zu[kb - k] = zu[kb - k + 1] - zu[kb] * (p[kb - k] - p[kb - k + 1]) / (p[0] - p[kb])
+
+#         zu[0] = 0.0
+
+def copy_updraft_in_active_cloud_layers(
+        ierr: IntFieldIJ32, # type: ignore
+        k22: IntFieldIJ32, # type: ignore
+        ktop: IntFieldIJ32, # type: ignore
+        zuo: FloatField, # type: ignore
+        xzu: FloatField, # type: ignore
+        zu: FloatField, # type: ignore
+        found: BoolFieldIJ, # type: ignore
+        k_mask: IntFieldK32, # type: ignore
+        argmax: IntFieldIJ32, # type: ignore
+):
+    """
+    Copy the updraft values from the active layers to the output array.
+    """
+
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            if k22 > 0:
+                if k_mask < k22:
+                    zuo = 0.0
+                    zu = 0.0
+                    xzu = 0.0
+
+    with computation(FORWARD), interval(0,1):
+        found = False
+        argmax = 0
+
+    with computation(FORWARD), interval(...):
+        if zuo > zuo.at(K=argmax):
+            argmax = k_mask
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if k_mask >= argmax and k_mask <= ktop and not found:
+                if zuo < 1.0e-6:
+                    ktop = k_mask - 1
+                    found = True
+
+            if k_mask >= k22 and k_mask <= ktop:
+                xzu = zuo
+                zu = zuo
+
+            if k_mask > ktop:
+                zuo = 0.0
+                zu = 0.0
+                xzu = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            k22 = max(1, k22)

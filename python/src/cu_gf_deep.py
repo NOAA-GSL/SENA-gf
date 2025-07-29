@@ -1415,9 +1415,13 @@ def cu_gf_deep_run(
             #     print(f"{zuh2[k]:>20.12E}")
 
             # Call to get_zu_zd_pdf_fim (assumed to be a Python function)
+            # get_zu_zd_pdf_fim(
+            #     -1, po_cup[i, j, :], rand_vmas[i, j], 0.0, ipr, xland1[i, j], zuh2, 4,
+            #     ierr[i, j], kdet[i, j], jmin[i, j] + 1, zdo[i, j, :], kts, kte, ktf, beta, kpbl[i, j], csum[i, j], pmin_lev[i, j]
+            # )
             get_zu_zd_pdf_fim(
-                -1, po_cup[i, j, :], rand_vmas[i, j], 0.0, ipr, xland1[i, j], zuh2, 4,
-                ierr[i, j], kdet[i, j], jmin[i, j] + 1, zdo[i, j, :], kts, kte, ktf, beta, kpbl[i, j], csum[i, j], pmin_lev[i, j]
+                -1, po_cup[i, j, :], rand_vmas[i, j], 0.0, 4,
+                kdet[i, j], jmin[i, j] + 1, zdo[i, j, :], kts, kte, ktf, kpbl[i, j]
             )
 
             # Output variable match
@@ -4168,9 +4172,13 @@ def rates_up_pdf(rand_vmas, ipr, name, ktop, ierr, p_cup, entr_rate_2d,
                     ierr[i, j] = 41
                     ktop[i, j] = -1
                 else:
+                    # get_zu_zd_pdf_fim(
+                    #     kklev, p_cup[i, j, :], rand_vmas[i, j], zubeg, ipr, xland[i, j], zuh2, 1, ierr[i, j],
+                    #     k22[i, j], kfinalzu + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, beta_u, kbcon[i, j], csum[i, j], pmin_lev[i, j]
+                    # )
                     get_zu_zd_pdf_fim(
-                        kklev, p_cup[i, j, :], rand_vmas[i, j], zubeg, ipr, xland[i, j], zuh2, 1, ierr[i, j],
-                        k22[i, j], kfinalzu + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, beta_u, kbcon[i, j], csum[i, j], pmin_lev[i, j]
+                        kklev, p_cup[i, j, :], rand_vmas[i, j], zubeg, 1,
+                        k22[i, j], kfinalzu + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, kbcon[i, j]
                     )
 
             if is_mid:
@@ -4180,9 +4188,13 @@ def rates_up_pdf(rand_vmas, ipr, name, ktop, ierr, p_cup, entr_rate_2d,
                 else:
                     kfinalzu = ktop[i, j]
                     ktopdby[i, j] = ktop[i, j] + 1
+                    # get_zu_zd_pdf_fim(
+                    #     kklev, p_cup[i, j, :], rand_vmas[i, j], zubeg, ipr, xland[i, j], zuh2, 3, ierr[i, j],
+                    #     k22[i, j], ktopdby[i, j] + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, beta_u, kbcon[i, j], csum[i, j], pmin_lev[i, j]
+                    # )
                     get_zu_zd_pdf_fim(
-                        kklev, p_cup[i, j, :], rand_vmas[i, j], zubeg, ipr, xland[i, j], zuh2, 3, ierr[i, j],
-                        k22[i, j], ktopdby[i, j] + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, beta_u, kbcon[i, j], csum[i, j], pmin_lev[i, j]
+                        kklev, p_cup[i, j, :], rand_vmas[i, j], zubeg, 3,
+                        k22[i, j], ktopdby[i, j] + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, kbcon[i, j]
                     )
 
             if is_shallow:
@@ -4192,13 +4204,99 @@ def rates_up_pdf(rand_vmas, ipr, name, ktop, ierr, p_cup, entr_rate_2d,
                 else:
                     kfinalzu = ktop[i, j]
                     ktopdby[i, j] = ktop[i, j] + 1
+                    # get_zu_zd_pdf_fim(
+                    #     kbcon[i, j], p_cup[i, j, :], rand_vmas[i, j], zubeg, ipr, xland[i, j], zuh2, 2, ierr[i, j],
+                    #     k22[i, j], ktopdby[i, j] + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, beta_u, kbcon[i, j], csum[i, j], pmin_lev[i, j]
+                    # )
                     get_zu_zd_pdf_fim(
-                        kbcon[i, j], p_cup[i, j, :], rand_vmas[i, j], zubeg, ipr, xland[i, j], zuh2, 2, ierr[i, j],
-                        k22[i, j], ktopdby[i, j] + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, beta_u, kbcon[i, j], csum[i, j], pmin_lev[i, j]
+                        kbcon[i, j], p_cup[i, j, :], rand_vmas[i, j], zubeg, 2,
+                        k22[i, j], ktopdby[i, j] + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, kbcon[i, j]
                     )
 
-def get_zu_zd_pdf_fim(kklev, p, rand_vmas, zubeg, ipr, xland, zuh2, draft, ierr,
-                        kb, kt, zu, kts, kte, ktf, max_mass, kpbli, csum, pmin_lev):
+def rates_up_pdf_shallow(
+    rand_vmas, ktop, ierr, p_cup, entr_rate_2d,
+    z_cup, k22, kbcon,
+    its, ite, itf, jts, jte, jtf, kts, kte, ktf,
+    zuo, csum
+):
+    """
+    Calculates a normalized mass-flux profile for updrafts and downdrafts.
+
+    Parameters:
+        rand_vmas (array): Random variable for mass flux.
+        ipr (int): Print control flag.
+        name (str): Type of convection ('deep', 'mid', 'shallow').
+        ktop (array): Top level of convection.
+        ierr (array): Error flags.
+        p_cup (array): Pressure on cloud levels.
+        entr_rate_2d (array): Entrainment rate.
+        hkbo (array): Boundary layer height.
+        heo (array): Environmental moist static energy.
+        heso_cup (array): Saturation moist static energy on cloud levels.
+        z_cup (array): Heights on cloud levels.
+        xland (array): Land-sea mask.
+        kstabi (array): Stability index.
+        k22 (array): Updraft originating level.
+        kbcon (array): Convective base level.
+        its, ite, itf, kts, kte, ktf (int): Loop bounds.
+        zuo (array): Updraft mass flux.
+        kpbl (array): Planetary boundary layer height.
+        ktopdby (array): Top level determined by buoyancy.
+        csum (array): Cumulative sum of some property.
+        pmin_lev (array): Minimum pressure level.
+
+    Returns:
+        None
+    """
+    dz = 0.0
+    massent = massdetr = 0.0
+    zux = np.zeros(kte - kts + 1)  # Updraft mass flux
+
+    zustart = 0.1
+
+    # Parallel loop over the range of indices
+    for i in range(its, itf + 1):
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            if ierr[i, j] > 0:
+                continue
+
+            zux[:] = 0.0
+            zuo[i, j, :] = 0.0  # Reset zuo array
+            kbcon[i, j] = max(kbcon[i, j], 1)
+            zuo[i, j, k22[i, j]] = zustart
+            zux[k22[i, j]] = zustart
+
+            # Sequential loop over levels
+            for k in range(k22[i, j] + 1, kbcon[i, j] + 1):
+                dz = z_cup[i, j, k] - z_cup[i, j, k - 1]
+                massent = dz * entr_rate_2d[i, j, k - 1] * zuo[i, j, k - 1]
+                massdetr = dz * 0.1 * entr_rate_2d[i, j, kts] * zuo[i, j, k - 1]
+                zuo[i, j, k] = zuo[i, j, k - 1] + massent - massdetr
+                zux[k] = zuo[i, j, k]
+
+            if ktop[i, j] <= kbcon[i, j] + 2:
+                ierr[i, j] = 41
+                ktop[i, j] = -1
+            else:
+                get_zu_zd_pdf_fim(
+                    kbcon[i, j],
+                    p_cup[i, j, :],
+                    rand_vmas[i, j],
+                    zustart,
+                    2,
+                    k22[i, j],
+                    ktop[i, j] + 2,
+                    zuo[i, j, kts:kte + 1],
+                    kts, kte, ktf,
+                    kbcon[i, j],
+                    # csum[i, j],
+                )
+
+
+# def get_zu_zd_pdf_fim(kklev, p, rand_vmas, zubeg, ipr, xland, zuh2, draft, ierr,
+#                         kb, kt, zu, kts, kte, ktf, max_mass, kpbli, csum, pmin_lev):
+def get_zu_zd_pdf_fim(kklev, p, rand_vmas, zubeg, draft,
+                        kb, kt, zu, kts, kte, ktf, kpbli):
     """
     Calculates a normalized mass-flux profile for updrafts and downdrafts using the beta function.
 
@@ -4232,7 +4330,7 @@ def get_zu_zd_pdf_fim(kklev, p, rand_vmas, zubeg, ipr, xland, zuh2, draft, ierr,
     BETA_SH = 2.2
     G_BETA_SH = 0.8974707
     BETA_MID = 1.3
-    G_BETA_MID = 0.8974707
+    # G_BETA_MID = 0.8974707
     BETA_DD = 4.0
     G_BETA_DD = 6.0
 
@@ -4243,24 +4341,24 @@ def get_zu_zd_pdf_fim(kklev, p, rand_vmas, zubeg, ipr, xland, zuh2, draft, ierr,
     # zuh2 = np.zeros(40)            # Array of size (1:40)
 
     k1 = 0
-    kk = 0
+    # kk = 0
     k = 0
     kb_adj = 0
-    kpbli_adj = 0
-    kmax = 0
+    # kpbli_adj = 0
+    # kmax = 0
 
     maxlim = 0.0
-    krmax = 0.0
+    # krmax = 0.0
     kratio = 0.0
     tunning = 0.0
     fzu = 0.0
     rand_vmas = 0.0
-    lev_start = 0.0
+    # lev_start = 0.0
 
     a = 0.0
     b = 0.0
     x1 = 0.0
-    y1 = 0.0
+    # y1 = 0.0
     g_a = 0.0
     g_b = 0.0
     alpha2 = 0.0
@@ -4285,7 +4383,7 @@ def get_zu_zd_pdf_fim(kklev, p, rand_vmas, zubeg, ipr, xland, zuh2, draft, ierr,
     kb_adj = max(kb, 1)
 
     if draft == 1:
-        lev_start = min(0.9, 0.1 + csum * 0.013)
+        # lev_start = min(0.9, 0.1 + csum * 0.013)
         kb_adj = max(kb, 1)
         # kb_adj = max(kb, 1)  # CWH this might be wrong
 
@@ -4307,7 +4405,7 @@ def get_zu_zd_pdf_fim(kklev, p, rand_vmas, zubeg, ipr, xland, zuh2, draft, ierr,
             a = alpha[k1] - alpha[k1 - 1]
             b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
             x1 = (alpha2 - b) / a
-            y1 = a * x1 + b
+            # y1 = a * x1 + b
             g_a = g_alpha[k1] - g_alpha[k1 - 1]
             g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
             g_alpha2 = g_a * x1 + g_b
@@ -4343,9 +4441,9 @@ def get_zu_zd_pdf_fim(kklev, p, rand_vmas, zubeg, ipr, xland, zuh2, draft, ierr,
                 zu[k] = (zu[k] - zu[kb_adj]) * maxlim / a + zu[kb_adj]
 
     elif draft == 2:
-        k = kklev
-        if kpbli > 4:
-            k = kpbli
+        # k = kklev
+        # if kpbli > 4:
+        #     k = kpbli
         tunning = p[kklev]
         tunning = min(0.95, (tunning - p[kb_adj]) / (p[kt] - p[kb_adj]))
         tunning = max(0.02, tunning)
@@ -4360,7 +4458,7 @@ def get_zu_zd_pdf_fim(kklev, p, rand_vmas, zubeg, ipr, xland, zuh2, draft, ierr,
             a = alpha[k1] - alpha[k1 - 1]
             b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
             x1 = (alpha2 - b) / a
-            y1 = a * x1 + b
+            # y1 = a * x1 + b
             g_a = g_alpha[k1] - g_alpha[k1 - 1]
             g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
             g_alpha2 = g_a * x1 + g_b
@@ -4454,7 +4552,7 @@ def get_zu_zd_pdf_fim(kklev, p, rand_vmas, zubeg, ipr, xland, zuh2, draft, ierr,
             a = alpha[k1] - alpha[k1 - 1]
             b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
             x1 = (alpha2 - b) / a
-            y1 = a * x1 + b
+            # y1 = a * x1 + b
             g_a = g_alpha[k1] - g_alpha[k1 - 1]
             g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
             g_alpha2 = g_a * x1 + g_b
