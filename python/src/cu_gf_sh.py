@@ -29,7 +29,8 @@ from cu_gf_stencils import (
     get_inversion_layers_stencil,
     compute_entrainment_and_shallow_convection_top,
     rates_up_pdf_shallow_stencil,
-    copy_updraft_in_active_cloud_layers
+    copy_updraft_in_active_cloud_layers,
+    get_lateral_massflux_stencil,
 )
 
 # Constants
@@ -619,6 +620,22 @@ class GFShallowConvection:
             units="index",
             dtype=state.ikind,
         )
+        self.up_massentr: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.up_massdetr: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.lambau: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.lambau.field[:, :] = 2.0  # Equivalent to "lambau(:)=2."
 
         # Lookup tables for constants
         self.alpha: Quantity = state.quantity_factory_table.zeros(
@@ -731,6 +748,11 @@ class GFShallowConvection:
             externals={},
         )
 
+        self._get_lateral_massflux = state.stencil_factory.from_dims_halo(
+            func=get_lateral_massflux_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
 
 
     # Define the main shallow convection function
@@ -794,15 +816,10 @@ class GFShallowConvection:
         hco = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Environmental moist static energy
         qco = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud water vapor mixing ratio
         dby = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Buoyancy term
-        up_massentr = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Updraft mass entrainment
-        up_massdetr = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Updraft mass detrainment
         c1d = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud liquid water detrainment coefficient
 
         # Initialize arrays based on their usage in the code
         dbyt = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Buoyancy tendency
-
-        # Translate Fortran array allocations to Python
-        lambau = np.full((ite - its +1, jte - jts + 1), 2.0)  # Equivalent to "lambau(:)=2."
 
         # Initialize arrays based on their usage in the code
         uc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud x wind
@@ -1124,12 +1141,26 @@ class GFShallowConvection:
             argmax=self.argmax,
         )
 
-            # Call get_lateral_massflux() to calculate mass entrainment and detrainment
-        get_lateral_massflux(
-            itf, jtf, ktf, its, ite, jts, jte, kts, kte,
-            ierr.field, ktop.field, self.zo_cup.field, zuo.field, self.cd.field, self.entr_rate_2d.field,
-            self.up_massentro.field, self.up_massdetro.field, up_massentr, up_massdetr,
-            2, kbcon.field, k22.field, self.up_massentru.field, self.up_massdetru.field, lambau
+        # Call get_lateral_massflux() to calculate mass entrainment and detrainment
+        self._get_lateral_massflux(
+            ierr=ierr,
+            ktop=ktop,
+            zo_cup=self.zo_cup,
+            zuo=zuo,
+            cd=self.cd,
+            entr_rate_2d=self.entr_rate_2d,
+            up_massentro=self.up_massentro,
+            up_massdetro=self.up_massdetro,
+            up_massentr=self.up_massentr,
+            up_massdetr=self.up_massdetr,
+            draft=2,
+            kbcon=kbcon,
+            k22=k22,
+            up_massentru=self.up_massentru,
+            up_massdetru=self.up_massdetru,
+            lambau=self.lambau,
+            k_mask=self.k_mask,
+            argmax=self.argmax,
         )
 
         for k in range(kts, ktf + 1):  # Adjusted to retain the same number of iterations
@@ -1164,15 +1195,15 @@ class GFShallowConvection:
 
                 # Sequential loop for levels from self.start_level.field(i)+1 to ktop(i)
                 for k in range(self.start_level.field[i, j] + 1, ktop.field[i, j] + 1):
-                    hc[i, j, k] = (hc[i, j, k - 1] * self.zu.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] * hc[i, j, k - 1] +
-                                up_massentr[i, j, k - 1] * self.he.field[i, j, k - 1]) / \
-                            (self.zu.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
-                    uc[i, j, k] = (uc[i, j, k - 1] * self.zu.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] * uc[i, j, k - 1] +
-                                up_massentr[i, j, k - 1] * us.field[i, j, k - 1]) / \
-                            (self.zu.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
-                    vc[i, j, k] = (vc[i, j, k - 1] * self.zu.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] * vc[i, j, k - 1] +
-                                up_massentr[i, j, k - 1] * vs.field[i, j, k - 1]) / \
-                            (self.zu.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
+                    hc[i, j, k] = (hc[i, j, k - 1] * self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetr.field[i, j, k - 1] * hc[i, j, k - 1] +
+                                self.up_massentr.field[i, j, k - 1] * self.he.field[i, j, k - 1]) / \
+                            (self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetr.field[i, j, k - 1] + self.up_massentr.field[i, j, k - 1])
+                    uc[i, j, k] = (uc[i, j, k - 1] * self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetr.field[i, j, k - 1] * uc[i, j, k - 1] +
+                                self.up_massentr.field[i, j, k - 1] * us.field[i, j, k - 1]) / \
+                            (self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetr.field[i, j, k - 1] + self.up_massentr.field[i, j, k - 1])
+                    vc[i, j, k] = (vc[i, j, k - 1] * self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetr.field[i, j, k - 1] * vc[i, j, k - 1] +
+                                self.up_massentr.field[i, j, k - 1] * vs.field[i, j, k - 1]) / \
+                            (self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetr.field[i, j, k - 1] + self.up_massentr.field[i, j, k - 1])
                     dby[i, j, k] = max(0.0, hc[i, j, k] - self.hes_cup.field[i, j, k])
                     hco[i, j, k] = (hco[i, j, k - 1] * zuo.field[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] * hco[i, j, k - 1] +
                                 self.up_massentro.field[i, j, k - 1] * self.heo.field[i, j, k - 1]) / \
@@ -1213,13 +1244,13 @@ class GFShallowConvection:
                 for k in range(self.start_level.field[i, j] + 1, ktop.field[i, j] + 1):
                     trash = self.qeso_cup.field[i, j, k] + (1.0 / XLV) * (self.gammao_cup.field[i, j, k] / (1.0 + self.gammao_cup.field[i, j, k])) * self.dbyo.field[i, j, k]
                     trash2 = qco[i, j, k - 1]
-                    qco[i, j, k] = (trash2 * (zuo.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1]) +
-                                up_massentr[i, j, k - 1] * qo.field[i, j, k - 1]) / \
-                                (zuo.field[i, j, k - 1] - 0.5 * up_massdetr[i, j, k - 1] + up_massentr[i, j, k - 1])
+                    qco[i, j, k] = (trash2 * (zuo.field[i, j, k - 1] - 0.5 * self.up_massdetr.field[i, j, k - 1]) +
+                                self.up_massentr.field[i, j, k - 1] * qo.field[i, j, k - 1]) / \
+                                (zuo.field[i, j, k - 1] - 0.5 * self.up_massdetr.field[i, j, k - 1] + self.up_massentr.field[i, j, k - 1])
 
                     if qco[i, j, k] >= trash:
                         dz = self.z_cup.field[i, j, k] - self.z_cup.field[i, j, k - 1]
-                        c1d[i, j, k] = 0.02 * up_massdetr[i, j, k - 1]
+                        c1d[i, j, k] = 0.02 * self.up_massdetr.field[i, j, k - 1]
                         self.qrco.field[i, j, k] = (qco[i, j, k] - trash) / (1.0 + (C0_SHAL + c1d[i, j, k]) * dz)
                         if self.qrco.field[i, j, k] < 0.0:
                             self.qrco.field[i, j, k] = 0.0

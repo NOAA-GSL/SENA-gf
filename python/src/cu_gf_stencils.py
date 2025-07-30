@@ -1572,3 +1572,101 @@ def copy_updraft_in_active_cloud_layers(
     with computation(FORWARD), interval(0, 1):
         if ierr == 0:
             k22 = max(1, k22)
+
+def get_lateral_massflux_stencil(
+    ierr: IntFieldIJ32, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    zo_cup: FloatField, # type: ignore
+    zuo: FloatField, # type: ignore
+    cd: FloatField, # type: ignore
+    entr_rate_2d: FloatField, # type: ignore
+    up_massentro: FloatField, # type: ignore
+    up_massdetro: FloatField, # type: ignore
+    up_massentr: FloatField, # type: ignore
+    up_massdetr: FloatField, # type: ignore
+    draft: int,
+    kbcon: IntFieldIJ32, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    up_massentru: FloatField, # type: ignore
+    up_massdetru: FloatField, # type: ignore
+    lambau: FloatFieldIJ, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    argmax: IntFieldIJ32, # type: ignore
+):
+
+    """
+        Calculates mass entrainment and detrainment rates.
+    """
+
+    with computation(PARALLEL), interval(...):
+        up_massentro = 0.0
+        up_massdetro = 0.0
+        up_massentr = 0.0
+        up_massdetr = 0.0
+        up_massentru = 0.0
+        up_massdetru = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        argmax = 0
+
+    with computation(FORWARD), interval(...):
+        if zuo > zuo[0, 0, argmax - k_mask]:
+            argmax = k_mask
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            if k_mask >= max(1, k22 + 1) and k_mask <= argmax:
+                dz = zo_cup - zo_cup[0, 0, -1]
+                up_massdetro[0, 0, -1] = cd[0, 0, -1] * dz * zuo[0, 0, -1]
+                up_massentro[0, 0, -1] = zuo - zuo[0, 0, -1] + up_massdetro[0, 0, -1]
+
+                if up_massentro[0, 0, -1] < 0.0:
+                    up_massentro[0, 0, -1] = 0.0
+                    up_massdetro[0, 0, -1] = zuo[0, 0, -1] - zuo
+                    if zuo[0, 0, -1] > 0.0:
+                        cd[0, 0, -1] = up_massdetro[0, 0, -1] / (dz * zuo[0, 0, -1])
+                if zuo[0, 0, -1] > 0.0:
+                    entr_rate_2d[0, 0, -1] = up_massentro[0, 0, -1] / (dz * zuo[0, 0, -1])
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            if k_mask > argmax and k_mask <= ktop:
+                dz = zo_cup - zo_cup[0, 0, -1]
+                up_massentro[0, 0, -1] = entr_rate_2d[0, 0, -1] * dz * zuo[0, 0, -1]
+                up_massdetro[0, 0, -1] = zuo[0, 0, -1] + up_massentro[0, 0, -1] - zuo
+                if up_massdetro[0, 0, -1] < 0.0:
+                    up_massdetro[0, 0, -1] = 0.0
+                    up_massentro[0, 0, -1] = zuo - zuo[0, 0, -1]
+                    if zuo[0, 0, -1] > 0.0:
+                        entr_rate_2d[0, 0, -1] = up_massentro[0, 0, -1] / (dz * zuo[0, 0, -1])
+                if zuo[0, 0, -1] > 0.0:
+                    cd[0, 0, -1] = up_massdetro[0, 0, -1] / (dz * zuo[0, 0, -1])
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            up_massdetro[0, 0, ktop] = zuo[0, 0, ktop]
+            up_massentro[0, 0, ktop] = 0.0
+
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            if k_mask > ktop:
+                cd = 0.0
+                entr_rate_2d = 0.0
+                up_massentro = 0.0
+                up_massdetro = 0.0
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            up_massentr[0, 0, -1] = up_massentro[0, 0, -1]
+            up_massdetr[0, 0, -1] = up_massdetro[0, 0, -1]
+
+            if draft == 1:
+                up_massentru[0, 0, -1] = up_massentro[0, 0, -1] + lambau * up_massdetro[0, 0, -1]
+                up_massdetru[0, 0, -1] = up_massdetro[0, 0, -1] + lambau * up_massdetro[0, 0, -1]
+            elif draft == 2:
+                up_massentru[0, 0, -1] = up_massentro[0, 0, -1] + lambau * up_massdetro[0, 0, -1]
+                up_massdetru[0, 0, -1] = up_massdetro[0, 0, -1] + lambau * up_massdetro[0, 0, -1]
+            elif draft == 3:
+                lambau = 0.0
+                up_massentru[0, 0, -1] = up_massentro[0, 0, -1] + lambau * up_massdetro[0, 0, -1]
+                up_massdetru[0, 0, -1] = up_massdetro[0, 0, -1] + lambau * up_massdetro[0, 0, -1]
