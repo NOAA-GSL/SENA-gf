@@ -22,3 +22,4 @@ G_BETA_SH = 0.8974707
 BETA_MID = 1.3
 BETA_DD = 4.0
 G_BETA_DD = 6.0
+C0_SHAL = 0.001  # Parameter for shallow convection

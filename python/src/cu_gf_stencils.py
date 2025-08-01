@@ -1585,7 +1585,6 @@ def get_lateral_massflux_stencil(
     up_massentr: FloatField, # type: ignore
     up_massdetr: FloatField, # type: ignore
     draft: int,
-    kbcon: IntFieldIJ32, # type: ignore
     k22: IntFieldIJ32, # type: ignore
     up_massentru: FloatField, # type: ignore
     up_massdetru: FloatField, # type: ignore
@@ -1670,3 +1669,214 @@ def get_lateral_massflux_stencil(
                 lambau = 0.0
                 up_massentru[0, 0, -1] = up_massentro[0, 0, -1] + lambau * up_massdetro[0, 0, -1]
                 up_massdetru[0, 0, -1] = up_massdetro[0, 0, -1] + lambau * up_massdetro[0, 0, -1]
+
+def calculate_water_and_evolve_updraft(
+    hc: FloatField, # type: ignore
+    qco: FloatField, # type: ignore
+    qrco: FloatField, # type: ignore
+    dby: FloatField, # type: ignore
+    hco: FloatField, # type: ignore
+    dbyo: FloatField, # type: ignore
+    uc: FloatField, # type: ignore
+    vc: FloatField, # type: ignore
+    u_cup: FloatField, # type: ignore
+    v_cup: FloatField, # type: ignore
+    he_cup: FloatField, # type: ignore
+    heo_cup: FloatField, # type: ignore
+    start_level: IntFieldIJ32, # type: ignore
+    hkb: FloatFieldIJ, # type: ignore
+    hkbo: FloatFieldIJ, # type: ignore
+    dbyt: FloatField, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    up_massdetr: FloatField, # type: ignore
+    up_massentr: FloatField, # type: ignore
+    he: FloatField, # type: ignore
+    us: FloatField, # type: ignore
+    vs: FloatField, # type: ignore
+    zu: FloatField, # type: ignore
+    hes_cup: FloatField, # type: ignore
+    zuo: FloatField, # type: ignore
+    up_massdetro: FloatField, # type: ignore
+    up_massentro: FloatField, # type: ignore
+    heo: FloatField, # type: ignore
+    heso_cup: FloatField, # type: ignore
+    zo_cup: FloatField, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    cd: FloatField, # type: ignore
+    entr_rate_2d: FloatField, # type: ignore
+    qo_cup: FloatField, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    zqexec: FloatFieldIJ, # type: ignore
+    qaver: FloatFieldIJ, # type: ignore
+    qeso_cup: FloatField, # type: ignore
+    gammao_cup: FloatField, # type: ignore
+    qo: FloatField, # type: ignore
+    z_cup: FloatField, # type: ignore
+    c1d: FloatField, # type: ignore
+    pwo: FloatField, # type: ignore
+    cupclw: FloatField, # type: ignore
+    po_cup: FloatField, # type: ignore
+    cnvwt: FloatField, # type: ignore
+    xzu: FloatField, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    argmax: IntFieldIJ32, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+    k_index: IntFieldIJ, # type: ignore
+    local_order_aver: IntFieldIJ32, # type: ignore
+):
+    """
+    Calculates the water content and evolves the updraft based on the mass flux.
+    """
+    from __externals__ import ( # type: ignore
+        k_end
+    )
+
+    with computation(PARALLEL), interval(...):
+        hc = 0.0
+        qco = 0.0
+        qrco = 0.0
+        dby = 0.0
+        hco = 0.0
+        dbyo = 0.0
+        uc = 0.0
+        vc = 0.0
+        dbyt = 0.0
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if k_mask <= start_level:
+                uc = u_cup
+                vc = v_cup
+            if k_mask < start_level:
+                hc = he_cup
+                hco = heo_cup
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            hc[0, 0, start_level] = hkb
+            hco[0, 0, start_level] = hkbo
+            argmax = 0
+            found = False
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            if k_mask > start_level and k_mask <= ktop:
+                hc = (hc[0, 0, -1] * zu[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1] * hc[0, 0, -1] +
+                    up_massentr[0, 0, -1] * he[0, 0, -1]) / \
+                    (zu[0, 0, -1] - 0.5 * up_massdetr[0, 0,-1] + up_massentr[0, 0, -1])
+                uc = (uc[0, 0, -1] * zu[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1] * uc[0, 0, -1] +
+                            up_massentr[0, 0, -1] * us[0, 0, -1]) / \
+                        (zu[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1] + up_massentr[0, 0, -1])
+                vc = (vc[0, 0, -1] * zu[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1] * vc[0, 0, -1] +
+                            up_massentr[0, 0, -1] * vs[0, 0, -1]) / \
+                        (zu[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1] + up_massentr[0, 0, -1])
+                dby = max(0.0, hc - hes_cup)
+                hco = (hco[0, 0, -1] * zuo[0, 0, -1] - 0.5 * up_massdetro[0, 0, -1] * hco[0, 0, -1] +
+                            up_massentro[0, 0, -1] * heo[0, 0, -1]) / \
+                            (zuo[0, 0, -1] - 0.5 * up_massdetro[0, 0, -1] + up_massentro[0,0, -1])
+                dbyo = hco - heso_cup
+                dz = zo_cup[0, 0, 1] - zo_cup
+                if k_mask >= kbcon:
+                    dbyt = dbyt[0, 0, -1] + dbyo * dz
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if dbyt > dbyt[0, 0, argmax - k_mask]:
+                argmax = k_mask
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if ktop > argmax + 1:
+                if k_mask == argmax + 1:
+                    up_massdetro = zuo
+                if k_mask >= argmax + 1:
+                    up_massentro = 0.0
+                if k_mask > argmax + 1:
+                    zuo = 0.0
+                    zu = 0.0
+                    cd = 0.0
+                    up_massdetro = 0.0
+                    entr_rate_2d = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            if ktop > argmax + 1:
+                ktop = argmax + 1
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            if ktop < kbcon + 1:
+                ierr = 5
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            if ktop > k_end - 2:
+                ierr = 5
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            qaver = get_cloud_bc(
+                array=qo_cup,
+                x_aver=qaver,
+                k22=k22,
+                add_x=zqexec,
+                local_order_aver=local_order_aver,
+                k_index=k_index,
+            )
+            qco[0, 0, start_level] = qaver
+
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            trash = 0.0
+            trash2 = 0.0
+            if k_mask < start_level:
+                qco = qo_cup
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            if k_mask > start_level and k_mask <= ktop:
+                trash = qeso_cup + (1.0 / constants.XLV) * (gammao_cup / (1.0 + gammao_cup)) * dbyo
+                trash2 = qco[0, 0, -1]
+                qco = (trash2 * (zuo[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1]) +
+                        up_massentr[0, 0, -1] * qo[0, 0, -1]) / \
+                        (zuo[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1] + up_massentr[0, 0, -1])
+                if qco >= trash:
+                    dz = z_cup - z_cup[0, 0, -1]
+                    c1d = 0.02 * up_massdetr[0, 0, -1]
+                    qrco = (qco - trash) / (1.0 + (constants.C0_SHAL + c1d) * dz)
+                    if qrco < 0.0:
+                        qrco = 0.0
+                        c1d = 0.0
+                    pwo = constants.C0_SHAL * dz * qrco * zuo
+                    qco = trash + qrco
+                else:
+                    qrco = 0.0
+                cupclw = qrco
+
+    with computation(PARALLEL), interval(0, -1):
+        if ierr == 0:
+            trash = 0.0
+            trash2 = 0.0
+
+            if k_mask > k22 and k_mask <= ktop:
+                dp = 100.0 * (po_cup - po_cup[0, 0, 1])
+                cnvwt = zuo * cupclw * constants.G / dp
+                trash2 += entr_rate_2d
+                qco = qco - qrco
+
+            if k_mask > k22 and k_mask <= max(kbcon, k22 + 1):
+                trash += entr_rate_2d
+
+            if k_mask > ktop:
+                hc = hes_cup
+                hco = heso_cup
+                qco = qeso_cup
+                uc = u_cup
+                vc = v_cup
+                qrco = 0.0
+                dby = 0.0
+                dbyo = 0.0
+                zu = 0.0
+                xzu = 0.0
+                zuo = 0.0
