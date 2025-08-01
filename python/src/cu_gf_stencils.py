@@ -1880,3 +1880,35 @@ def calculate_water_and_evolve_updraft(
                 zu = 0.0
                 xzu = 0.0
                 zuo = 0.0
+
+def cup_up_aa0_stencil(
+    aa0: FloatFieldIJ, # type: ignore
+    z: FloatField, # type: ignore
+    zu: FloatField, # type: ignore
+    dby: FloatField, # type: ignore
+    gamma_cup: FloatField, # type: ignore
+    t_cup: FloatField, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+):
+    """
+    Calculates the cloud work function for updrafts.
+    """
+
+    # Initialize aa0
+    with computation(FORWARD), interval(0, 1):
+        aa0 = 0.0
+
+    # Calculate cloud work function
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            if k_mask >= kbcon:
+                if k_mask <= ktop:
+                    dz = z - z[0, 0, -1]
+                    da = zu * dz * (9.81 / (1004. * t_cup)) * dby[0, 0, -1] / \
+                        (1. + gamma_cup)
+                    aa0 += max(0.0, da)
+                    if aa0 < 0.0:
+                        aa0 = 0.0

@@ -32,6 +32,7 @@ from cu_gf_stencils import (
     copy_updraft_in_active_cloud_layers,
     get_lateral_massflux_stencil,
     calculate_water_and_evolve_updraft,
+    cup_up_aa0_stencil,
 )
 
 # Constants
@@ -697,6 +698,16 @@ class GFShallowConvection:
             units="none",
             dtype=state.rkind,
         )
+        self.xaa0: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.xdby: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
 
         # Lookup tables for constants
         self.alpha: Quantity = state.quantity_factory_table.zeros(
@@ -821,6 +832,12 @@ class GFShallowConvection:
             externals={},
         )
 
+        self._cup_up_aa0 = state.stencil_factory.from_dims_halo(
+            func=cup_up_aa0_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
     # Define the main shallow convection function
     def cu_gf_sh_run(self,
         us, vs, zo, t, q, z1, tn, qo, po, psur, dhdt, kpbl, rho,
@@ -881,9 +898,7 @@ class GFShallowConvection:
         xhkb = np.zeros((ite - its +1, jte - jts + 1))  # Cloud base moist static energy (alternative)
 
         # Initialize arrays based on their usage in the code
-        xaa0 = np.zeros((ite - its +1, jte - jts + 1))  # Cloud work function for updraft
         xhc = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Cloud moist static energy
-        xdby = np.zeros((ite - its +1, jte - jts + 1, num_vertical_levels))  # Buoyancy term
 
         # Initialize scalar variables
         fp = 0.0  # Fractional potential energy
@@ -1270,12 +1285,30 @@ class GFShallowConvection:
 
         if make_calc_for_xk:  # Check if calculations for xk are enabled
             # Call cup_up_aa0() to calculate cloud work functions
-            cup_up_aa0(self.aa0.field, self.z.field, self.zu.field, self.dby.field, self.gamma_cup.field, self.t_cup.field,
-                    kbcon.field, ktop.field, ierr.field,
-                    itf, jtf, ktf, its, ite, jts, jte, kts, kte)
-            cup_up_aa0(self.aa1.field, zo.field, zuo.field, self.dbyo.field, self.gammao_cup.field, self.tn_cup.field,
-                    kbcon.field, ktop.field, ierr.field,
-                    itf, jtf, ktf, its, ite, jts, jte, kts, kte)
+            self._cup_up_aa0(
+                aa0=self.aa0,
+                z=self.z,
+                zu=self.zu,
+                dby=self.dby,
+                gamma_cup=self.gamma_cup,
+                t_cup=self.t_cup,
+                kbcon=kbcon,
+                ktop=ktop,
+                ierr=ierr,
+                k_mask=self.k_mask,
+            )
+            self._cup_up_aa0(
+                aa0=self.aa1,
+                z=zo,
+                zu=zuo,
+                dby=self.dbyo,
+                gamma_cup=self.gammao_cup,
+                t_cup=self.tn_cup,
+                kbcon=kbcon,
+                ktop=ktop,
+                ierr=ierr,
+                k_mask=self.k_mask,
+            )
 
             for i in range(its, itf + 1):  # Loop over horizontal grid points
                 for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
@@ -1398,7 +1431,7 @@ class GFShallowConvection:
                 for i in range(its, itf + 1):  # Loop over horizontal grid points
                     for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
                         xhc[i, j, k] = 0.0  # Reset cloud moist static energy
-                        xdby[i, j, k] = 0.0  # Reset buoyancy term
+                        self.xdby.field[i, j, k] = 0.0  # Reset buoyancy term
 
             # Parallel loop to calculate cloud base and initialize xhc
             for i in range(its, itf + 1):  # Loop over horizontal grid points
@@ -1421,17 +1454,25 @@ class GFShallowConvection:
                                         0.5 * self.up_massdetro.field[i, j, k - 1] * xhc[i, j, k - 1] +
                                         self.up_massentro.field[i, j, k - 1] * self.xhe.field[i, j, k - 1]) / \
                                         (self.xzu.field[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] + self.up_massentro.field[i, j, k - 1])
-                            xdby[i, j, k] = xhc[i, j, k] - self.xhes_cup.field[i, j, k]
+                            self.xdby.field[i, j, k] = xhc[i, j, k] - self.xhes_cup.field[i, j, k]
                         for k in range(ktop.field[i, j] + 1, ktf + 1):  # Loop from ktop.field(i)+1 to ktf
                             xhc[i, j, k] = self.xhes_cup.field[i, j, k]
-                            xdby[i, j, k] = 0.0
+                            self.xdby.field[i, j, k] = 0.0
                             self.xzu.field[i, j, k] = 0.0
 
             # Call cup_up_aa0() to calculate workfunctions for updraft
-            cup_up_aa0(xaa0, self.xz.field, self.xzu.field, xdby, self.gamma_cup.field, self.xt_cup.field,
-                    kbcon.field, ktop.field, ierr.field,
-                    itf, jtf, ktf,
-                    its, ite, jts, jte, kts, kte)
+            self._cup_up_aa0(
+                aa0=self.xaa0,
+                z=self.xz,
+                zu=self.xzu,
+                dby=self.xdby,
+                gamma_cup=self.gamma_cup,
+                t_cup=self.xt_cup,
+                kbcon=kbcon,
+                ktop=ktop,
+                ierr=ierr,
+                k_mask=self.k_mask,
+            )
 
         for i in range(its, itf + 1):  # Loop over horizontal grid points
             for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
@@ -1442,7 +1483,7 @@ class GFShallowConvection:
                     xmbmax[i, j] = 1.0  # Set maximum base mass flux
 
                     # Stabilization closure
-                    xkshal = (xaa0[i, j] - self.aa1.field[i, j]) / mbdt
+                    xkshal = (self.xaa0.field[i, j] - self.aa1.field[i, j]) / mbdt
                     if xkshal <= 0.0 and xkshal > -0.01 * mbdt:
                         xkshal = -0.01 * mbdt
                     if xkshal > 0.0 and xkshal < 1.0e-2:
