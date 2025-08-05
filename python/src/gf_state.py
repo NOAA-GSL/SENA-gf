@@ -7,6 +7,7 @@ from ndsl.constants import X_DIM, Y_DIM, Z_DIM
 
 class GFState:
     def __init__(self, rkind=np.float64, ikind=np.int32, backend="numpy"):
+    # def __init__(self, rkind=np.float64, ikind=np.int32, backend="dace:cpu"):
         self.rkind=rkind
         self.ikind=ikind
         self.backend=backend
@@ -1383,13 +1384,13 @@ class GFState:
             self.do_mynnedmf = False
 
         # Get ichoice_in
-        self.ichoice_in = _dataset.variables["ichoice_in"][:]
+        self.ichoice_in = int(_dataset.variables["ichoice_in"][:])
 
         # Get ichoicem_in
-        self.ichoicem_in = _dataset.variables["ichoicem_in"][:]
+        self.ichoicem_in = int(_dataset.variables["ichoicem_in"][:])
 
         # Get ichoice_s_in
-        self.ichoice_s_in = _dataset.variables["ichoice_s_in"][:]
+        self.ichoice_s_in = int(_dataset.variables["ichoice_s_in"][:])
 
         # Get spp_cu_deep
         self.spp_cu_deep = _dataset.variables["spp_cu_deep"][:]

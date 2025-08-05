@@ -11,7 +11,7 @@ from ndsl.dsl.typing import (
     # GlobalTable
 )
 import cu_gf_constants as constants
-from ndsl.dsl.gt4py import log, floor, abs, gamma
+from ndsl.dsl.gt4py import log, floor, abs, gamma, sqrt
 from ndsl.dsl.gt4py import GlobalTable
 
 
@@ -236,11 +236,9 @@ def estimate_convective_velocity_and_excesses(
             zws = 1.2 * zws ** 0.3333
             ztexec = max(flux_tun * hfx / (rho * zws * constants.CP), 0.0)
             zqexec = max(flux_tun * qfx / (rho * zws * constants.XLV), 0.0)
-        # zws = max(0.0, flux_tun * 0.41 * buo_flux * zo.at(K=kpbl) * constants.G / t.at(K=kpbl))
-        zws = max(0.0, flux_tun * 0.41 * buo_flux * zo[0, 0, kpbl] * constants.G / t[0, 0, kpbl])
+        zws = max(0.0, flux_tun * 0.41 * buo_flux * zo.at(K=kpbl) * constants.G / t.at(K=kpbl))
         zws = 1.2 * zws ** 0.3333
-        # zws = zws * rho.at(K=kpbl)
-        zws = zws * rho[0, 0, kpbl]
+        zws = zws * rho.at(K=kpbl)
 
 def cup_env_stencil(
     z: FloatField, # type: ignore
@@ -453,16 +451,16 @@ def set_max_pressure_level(
     """
     with computation(FORWARD), interval(0,1):
         if kpbl > 2:
-            # cap_max = po_cup.at(K=kpbl)
-            cap_max = po_cup[0, 0, kpbl]
+            cap_max = po_cup.at(K=kpbl)
+            # cap_max = po_cup[0, 0, kpbl]
         if ierr == 0:
             k22 = 1
 
     with computation(FORWARD), interval(1, None):
         if k_mask <= kbmax:
             if ierr == 0:
-                # if heo_cup > heo_cup.at(K=k22):
-                if heo_cup > heo_cup[0, 0, k22 - k_mask]:
+                if heo_cup > heo_cup.at(K=k22):
+                # if heo_cup > heo_cup[0, 0, k22 - k_mask]:
                     k22 = k_mask
 
     with computation(FORWARD), interval(0, 1):
@@ -1912,3 +1910,344 @@ def cup_up_aa0_stencil(
                     aa0 += max(0.0, da)
                     if aa0 < 0.0:
                         aa0 = 0.0
+
+def check_cloud_work_function(
+        aa: FloatFieldIJ, # type: ignore
+        ierr: IntFieldIJ32, # type: ignore
+):
+    """
+    Checks the cloud work function and sets ierr if it is negative.
+    """
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            if aa <= 0.0:
+                ierr = 17
+
+def initialize_and_update_convective_tendencies(
+    dellah: FloatField, # type: ignore
+    dellaq: FloatField, # type: ignore
+    dellaqc: FloatField, # type: ignore
+    dellat: FloatField, # type: ignore
+    dellu: FloatField, # type: ignore
+    dellv: FloatField, # type: ignore
+    zuo: FloatField, # type: ignore
+    uc: FloatField, # type: ignore
+    vc: FloatField, # type: ignore
+    hco: FloatField, # type: ignore
+    qco: FloatField, # type: ignore
+    qrco: FloatField, # type: ignore
+    u_cup: FloatField, # type: ignore
+    v_cup: FloatField, # type: ignore
+    heo_cup: FloatField, # type: ignore
+    qo_cup: FloatField, # type: ignore
+    po_cup: FloatField, # type: ignore
+    zo_cup: FloatField, # type: ignore
+    pwo: FloatField, # type: ignore
+    up_massentro: FloatField, # type: ignore
+    up_massdetro: FloatField, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    c1d: FloatField, # type: ignore
+    xhe: FloatField, # type: ignore
+    heo: FloatField, # type: ignore
+    xq: FloatField, # type: ignore
+    qo: FloatField, # type: ignore
+    xt: FloatField, # type: ignore
+    tn: FloatField, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+):
+    """
+    Initializes and updates the convective tendencies.
+    This function is a placeholder for the actual implementation.
+    """
+
+    from __externals__ import ( # type: ignore
+        k_end,
+    )
+
+    with computation(PARALLEL), interval(...):
+        dellah = 0.0  # Reset change in moist static energy
+        dellaq = 0.0  # Reset change in water vapor mixing ratio
+        dellaqc = 0.0  # Reset change in cloud water mixing ratio
+        dellu = 0.0  # Reset change in x wind
+        dellv = 0.0  # Reset change in y wind
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            dp = 100.0 * (po_cup - po_cup[0, 0, 1])  # Compute pressure difference
+            dellu = -zuo[0, 0, 1] * (uc[0, 0, 1] - u_cup[0, 0, 1]) * constants.G / dp  # Compute change in x wind
+            dellv = -zuo[0, 0, 1] * (vc[0, 0, 1] - v_cup[0, 0, 1]) * constants.G / dp  # Compute change in y wind
+            dellah = -zuo[0, 0, 1] * (hco[0, 0, 1] - heo_cup[0, 0, 1]) * constants.G / dp  # Compute change in moist static energy
+            dellaq = -zuo[0, 0, 1] * (qco[0, 0, 1] - qo_cup[0, 0, 1]) * constants.G / dp  # Compute change in water vapor mixing ratio
+
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            if k_mask >= k22 and k_mask <= ktop:
+                entup = up_massentro
+                detup = up_massdetro
+                totmas = detup - entup + zuo[0, 0, 1] - zuo  # Total mass in the updraft
+                dp = 100.0 * (po_cup - po_cup[0, 0, 1])  # Compute pressure difference
+                dellah = -(zuo[0, 0, 1] * (hco[0, 0, 1] - heo_cup[0, 0, 1]) -
+                            zuo * (hco - heo_cup)) * constants.G / dp
+                dz = zo_cup[0, 0, 1] - zo_cup  # Compute height difference
+                if k_mask < ktop and c1d > 0:
+                    dellaqc = zuo * c1d * qrco * dz / dp * constants.G
+                else:
+                    dellaqc = detup * 0.5 * (qrco[0, 0, 1] + qrco) * constants.G / dp
+                c_up = dellaqc + (zuo[0, 0, 1] * qrco[0, 0, 1] - zuo * qrco) * constants.G / dp
+                dellaq = -(zuo[0, 0, 1] * (qco[0, 0, 1] - qo_cup[0, 0, 1]) -
+                            zuo * (qco - qo_cup)) * constants.G / dp - \
+                            c_up - 0.5 * (pwo + pwo[0, 0, 1]) * constants.G / dp
+                dellu = -(zuo[0, 0, 1] * (uc[0, 0, 1] - u_cup[0, 0, 1]) -
+                            zuo * (uc - u_cup)) * constants.G / dp
+                dellv = -(zuo[0, 0, 1] * (vc[0, 0, 1] - v_cup[0, 0, 1]) -
+                            zuo * (vc - v_cup)) * constants.G / dp
+
+    with computation(PARALLEL), interval(...):
+        dellat = 0.0  # Reset temperature tendency
+        if ierr == 0:
+            xhe = dellah * constants.MBDT + heo
+            xq = max(1.0e-16, (dellaq + dellaqc) * constants.MBDT + qo)
+            dellat = (1.0 / constants.CP) * (dellah - constants.XLV * dellaq)
+            xt = (-dellaqc * constants.XLV / constants.CP + dellat) * constants.MBDT + tn
+            xt = max(190.0, xt)
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            xhe[0, 0, k_end] = heo[0, 0, k_end]
+            xq[0, 0, k_end] = qo[0, 0, k_end]
+            xt[0, 0, k_end] = tn[0, 0, k_end]
+
+
+def evolve_cloud_energy_and_buoyancy(
+    xhc: FloatField, # type: ignore
+    xdby: FloatField, # type: ignore
+    zqexec: FloatFieldIJ, # type: ignore
+    ztexec: FloatFieldIJ, # type: ignore
+    xhe_cup: FloatField, # type: ignore
+    xhkb: FloatFieldIJ, # type: ignore
+    x_add: FloatFieldIJ, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    start_level: IntFieldIJ32, # type: ignore
+    xzu: FloatField, # type: ignore
+    zuo: FloatField, # type: ignore
+    up_massentro: FloatField, # type: ignore
+    up_massdetro: FloatField, # type: ignore
+    xhe: FloatField, # type: ignore
+    xhes_cup: FloatField, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    local_order_aver: IntFieldIJ32, # type: ignore
+    k_index: IntFieldIJ, # type: ignore
+):
+    """
+    Evolves the cloud energy and buoyancy based on the convective tendencies.
+    """
+
+    with computation(PARALLEL), interval(...):
+        # Initialize xhc and xdby
+        xhc = 0.0
+        xdby = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        # Initialize xhc and xdby at the start level
+        if ierr == 0:
+            x_add = constants.XLV * zqexec + constants.CP * ztexec  # Compute x_add
+            xhkb = get_cloud_bc(
+                array=xhe_cup,
+                x_aver=xhkb,
+                k22=k22,
+                add_x=x_add,
+                local_order_aver=local_order_aver,
+                k_index=k_index,
+            )
+
+    with computation(PARALLEL), interval(...):
+        # Initialize xhc and xdby at the start level
+        if ierr == 0:
+            if k_mask < start_level:
+                xhc = xhe_cup
+
+    with computation(FORWARD), interval(0, 1):
+            xhc[0, 0, start_level] = xhkb  # Set cloud base moist static energy
+
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            xzu = zuo
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            if k_mask > start_level and k_mask <= ktop:
+                xhc = (xhc[0, 0, -1] * xzu[0, 0, -1] - 0.5 * up_massdetro[0, 0, -1] * xhc[0, 0, -1] +
+                        up_massentro[0, 0, -1] * xhe[0, 0, -1]) / \
+                        (xzu[0, 0, -1] - 0.5 * up_massdetro[0, 0, -1] + up_massentro[0, 0, -1])
+                xdby = max(0.0, xhc - xhes_cup)
+
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            if k_mask > ktop:
+                xhc = xhes_cup
+                xdby = 0.0
+                xzu = 0.0
+
+def finalize_shallow_convection_tendencies(
+    xmb: FloatFieldIJ, # type: ignore
+    xff_shal0: FloatFieldIJ, # type: ignore
+    xff_shal1: FloatFieldIJ, # type: ignore
+    xff_shal2: FloatFieldIJ, # type: ignore
+    xmbmax: FloatFieldIJ, # type: ignore
+    xkshal: FloatFieldIJ, # type: ignore
+    xaa0: FloatFieldIJ, # type: ignore
+    aa0: FloatFieldIJ, # type: ignore
+    aa1: FloatFieldIJ, # type: ignore
+    dtime: float,
+    zws: FloatFieldIJ, # type: ignore
+    dhdt: FloatField, # type: ignore
+    po_cup: FloatField, # type: ignore
+    hc: FloatField, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    he_cup: FloatField, # type: ignore
+    blqe: FloatFieldIJ, # type: ignore
+    ichoice: int,
+    k22: IntFieldIJ32, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    outt: FloatField, # type: ignore
+    outu: FloatField, # type: ignore
+    outv: FloatField, # type: ignore
+    outq: FloatField, # type: ignore
+    outqc: FloatField, # type: ignore
+    xmb_out: FloatFieldIJ, # type: ignore
+    pre: FloatFieldIJ, # type: ignore
+    dellat: FloatField, # type: ignore
+    dellaq: FloatField, # type: ignore
+    dellaqc: FloatField, # type: ignore
+    dellu: FloatField, # type: ignore
+    dellv: FloatField, # type: ignore
+    pwo: FloatField, # type: ignore
+    us: FloatField, # type: ignore
+    vs: FloatField, # type: ignore
+    dts: FloatFieldIJ, # type: ignore
+    fpi: FloatFieldIJ, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    k_index: IntFieldIJ, # type: ignore
+):
+
+    with computation(FORWARD), interval(0,1):
+        xmb = 0.0
+        xff_shal0 = 0.0
+        xff_shal1 = 0.0
+        xff_shal2 = 0.0
+        if ierr == 0:
+            xmbmax = 1.0
+            xkshal = (xaa0 - aa1) / constants.MBDT  # Calculate stabilization closure
+            if xkshal <= 0.0 and xkshal > -0.01 * constants.MBDT:
+                xkshal = -0.01 * constants.MBDT
+            if xkshal > 0.0 and xkshal < 1.0e-2:
+                xkshal = 1.0e-2
+
+            xff_shal0 = max(0.0, -(aa1 - aa0) / (xkshal * dtime))  # Closure from Grant (2001)
+            xff_shal1 = 0.03 * zws  # Boundary layer qe closure
+
+    with computation(FORWARD), interval(0, 1):
+        blqe = 0.0
+        trash = 0.0
+        if ierr == 0:
+            k_index = 0
+            while k_index <= kbcon:
+                blqe += 100.0 * dhdt[0, 0, k_index] * (po_cup[0, 0, k_index] - po_cup[0, 0, k_index + 1]) / constants.G  # Calculate boundary layer qe closure
+                k_index += 1
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            trash = max((hc.at(K=kbcon) - he_cup.at(K=kbcon)), 10.0)
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            xff_shal2 = max(0.0, blqe / trash)
+            xff_shal2 = min(xmbmax, xff_shal2)  # Ensure xff_shal2 does not exceed xmbmax
+
+            xmb = (xff_shal0 + xff_shal1 + xff_shal2) / 3.0  # Average the fluxes
+            xmb = min(xmbmax, xmb)  # Ensure xmb does not exceed xmbmax
+            if ichoice == 1:
+                xmb = min(xmbmax, xff_shal0)
+            if ichoice == 2:
+                xmb = min(xmbmax, xff_shal1)
+            if ichoice == 3:
+                xmb = min(xmbmax, xff_shal2)
+            if xmb <= 0.0:
+                ierr = 21
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr != 0:
+            k22 = -1  # Set k22 to -1 if there is an error
+            kbcon = -1  # Set kbcon to -1 if there is an error
+            ktop = -1  # Set ktop to -1 if there is an error
+            xmb = 0.0  # Set xmb to 0.0 if there is an error
+            outt = 0.0  # Set outt to 0.0 if there is an error
+            outu = 0.0  # Set outu to 0.0 if there is an error
+            outv = 0.0  # Set outv to 0.0 if there is an error
+            outq = 0.0  # Set outq to 0.0 if there is an error
+            outqc = 0.0  # Set outqc to 0.0 if there is an error
+        elif ierr == 0:
+            xmb_out = xmb  # Set xmb_out to xmb if there is no error
+            pre = 0.0  # Initialize pre to 0.0 if there is no error
+
+    with computation(PARALLEL), interval(1, None):
+        # Finalize convective tendencies
+        if ierr == 0:
+            if k_mask <= ktop:
+                outt = dellat * xmb  # Final temperature tendency
+                outq = dellaq * xmb  # Final water vapor mixing ratio tendency
+                outqc = dellaqc * xmb  # Final cloud water mixing ratio tendency
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            k_index = 1
+            while k_index <= ktop:  # Loop over vertical levels up to ktop
+                pre += pwo[0, 0, k_index] * xmb
+                k_index += 1
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            # Initialize output fields
+            outt = dellat * xmb
+            outq = dellaq * xmb
+            outu = dellu * xmb  # Final x wind tendency
+            outv = dellv * xmb  # Final y wind tendency
+
+    with computation(FORWARD), interval(1, None):
+        # Finalize convective tendencies
+        if ierr == 0:
+            if k_mask <= ktop:
+                outu = 0.25 * (dellu[0, 0, -1] + 2.0 * dellu + dellu[0, 0, 1]) * xmb
+                outv = 0.25 * (dellv[0, 0, -1] + 2.0 * dellv + dellv[0, 0, 1]) * xmb
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            # Update temperature tendency based on convective tendencies
+            dts = 0.0
+            fpi = 0.0
+
+    with computation(PARALLEL), interval(...):
+        dp = 0.0
+        if ierr == 0:
+            if k_mask <= ktop:
+                dp = (po_cup - po_cup[0, 0, 1]) * 100.0  # Compute pressure difference
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            k_index = 0
+            while k_index <= ktop:
+                dts -= (outu[0, 0, k_index] * us[0, 0, k_index] + outv[0, 0, k_index] * vs[0, 0, k_index]) * dp[0, 0, k_index] / constants.G
+                fpi += sqrt(outu[0, 0, k_index]**2 + outv[0, 0, k_index]**2) * dp[0, 0, k_index]
+                k_index += 1
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if fpi > 0.0:  # Check if fpi is positive
+                if k_mask <= ktop:
+                    fp = sqrt(outu**2 + outv**2) / fpi  # Compute fp
+                    outt += fp * dts * constants.G / constants.CP
