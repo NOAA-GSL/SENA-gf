@@ -6,8 +6,8 @@ from ndsl.boilerplate import get_factories_single_tile
 from ndsl.constants import X_DIM, Y_DIM, Z_DIM
 
 class GFState:
-    def __init__(self, rkind=np.float64, ikind=np.int32, backend="numpy"):
-    # def __init__(self, rkind=np.float64, ikind=np.int32, backend="dace:cpu"):
+    # def __init__(self, rkind=np.float64, ikind=np.int32, backend="numpy"):
+    def __init__(self, rkind=np.float64, ikind=np.int32, backend="dace:cpu"):
         self.rkind=rkind
         self.ikind=ikind
         self.backend=backend

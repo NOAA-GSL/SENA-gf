@@ -1419,10 +1419,22 @@ def cu_gf_deep_run(
             #     -1, po_cup[i, j, :], rand_vmas[i, j], 0.0, ipr, xland1[i, j], zuh2, 4,
             #     ierr[i, j], kdet[i, j], jmin[i, j] + 1, zdo[i, j, :], kts, kte, ktf, beta, kpbl[i, j], csum[i, j], pmin_lev[i, j]
             # )
-            get_zu_zd_pdf_fim(
-                -1, po_cup[i, j, :], rand_vmas[i, j], 0.0, 4,
-                kdet[i, j], jmin[i, j] + 1, zdo[i, j, :], kts, kte, ktf, kpbl[i, j]
-            )
+
+            # get_zu_zd_pdf_fim(
+            #     -1, po_cup[i, j, :], rand_vmas[i, j], 0.0, 4,
+            #     kdet[i, j], jmin[i, j] + 1, zdo[i, j, :], kts, kte, ktf, kpbl[i, j], ierr[i, j],
+            # )
+
+    get_zu_zd_pdf_fim(
+        np.full((ite - its + 1, jte - jts + 1,), -1, dtype=int), po_cup, rand_vmas, 0.0, 4,
+        kdet, jmin + 1, zdo, its, itf, jts, jtf, kts, kte, ktf, kpbl, ierr,
+    )
+
+
+    for i in range(its, itf + 1):  # Adjust loop to start at zero
+        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+            if ierr[i, j] != 0:
+                continue
 
             # Output variable match
             # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
@@ -4100,6 +4112,8 @@ def rates_up_pdf(rand_vmas, ipr, name, ktop, ierr, p_cup, entr_rate_2d,
 
     kklev = i = kk = kbegin = k = kfinalzu = 0  # Integer variables
     start_level = np.zeros((ite - its + 1, jte - jts + 1), dtype=int)  # Starting level
+    kfinalzu = np.zeros((ite - its + 1, jte - jts + 1), dtype=int)
+    kklev = np.zeros((ite - its + 1, jte - jts + 1), dtype=int)
     is_deep = is_mid = is_shallow = False  # Logical flags
 
     zustart = 0.1
@@ -4153,65 +4167,80 @@ def rates_up_pdf(rand_vmas, ipr, name, ktop, ierr, p_cup, entr_rate_2d,
                         dbm[k] = hcot[i, j, k] - heso_cup[i, j, k]
 
                 ktopdby[i, j] = np.argmax(dby)
-                kklev = np.argmax(dbm)
+                kklev[i, j] = np.argmax(dbm)
 
                 for k in range(np.argmax(dby) + 1, ktf - 1):
                     if dby[k] < dbythresh * np.max(dby):
-                        kfinalzu = k - 1
-                        ktop[i, j] = kfinalzu
+                        kfinalzu[i, j] = k - 1
+                        ktop[i, j] = kfinalzu[i, j]
                         break
 
                 if dby[k] >= dbythresh * np.max(dby):
-                    kfinalzu = ktf - 2
-                    ktop[i, j] = kfinalzu
+                    kfinalzu[i, j] = ktf - 2
+                    ktop[i, j] = kfinalzu[i, j]
 
                 ktop[i, j] = ktopdby[i, j]  # HCB
-                kklev = min(kklev + 3, ktop[i, j] - 2)
+                kklev[i, j] = min(kklev[i, j] + 3, ktop[i, j] - 2)
 
-                if kfinalzu <= kbcon[i, j] + 2:
+                if kfinalzu[i, j] <= kbcon[i, j] + 2:
                     ierr[i, j] = 41
                     ktop[i, j] = -1
-                else:
-                    # get_zu_zd_pdf_fim(
-                    #     kklev, p_cup[i, j, :], rand_vmas[i, j], zubeg, ipr, xland[i, j], zuh2, 1, ierr[i, j],
-                    #     k22[i, j], kfinalzu + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, beta_u, kbcon[i, j], csum[i, j], pmin_lev[i, j]
-                    # )
-                    get_zu_zd_pdf_fim(
-                        kklev, p_cup[i, j, :], rand_vmas[i, j], zubeg, 1,
-                        k22[i, j], kfinalzu + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, kbcon[i, j]
-                    )
+                # else:
+                #     # get_zu_zd_pdf_fim(
+                #     #     kklev, p_cup[i, j, :], rand_vmas[i, j], zubeg, ipr, xland[i, j], zuh2, 1, ierr[i, j],
+                #     #     k22[i, j], kfinalzu + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, beta_u, kbcon[i, j], csum[i, j], pmin_lev[i, j]
+                #     # )
+                #     get_zu_zd_pdf_fim(
+                #         kklev, p_cup[i, j, :], rand_vmas[i, j], zubeg, 1,
+                #         k22[i, j], kfinalzu + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, kbcon[i, j], ierr[i, j],
+                #     )
 
             if is_mid:
                 if ktop[i, j] <= kbcon[i, j] + 2:
                     ierr[i, j] = 41
                     ktop[i, j] = -1
                 else:
-                    kfinalzu = ktop[i, j]
+                    kfinalzu[i, j] = ktop[i, j]
                     ktopdby[i, j] = ktop[i, j] + 1
                     # get_zu_zd_pdf_fim(
                     #     kklev, p_cup[i, j, :], rand_vmas[i, j], zubeg, ipr, xland[i, j], zuh2, 3, ierr[i, j],
                     #     k22[i, j], ktopdby[i, j] + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, beta_u, kbcon[i, j], csum[i, j], pmin_lev[i, j]
                     # )
-                    get_zu_zd_pdf_fim(
-                        kklev, p_cup[i, j, :], rand_vmas[i, j], zubeg, 3,
-                        k22[i, j], ktopdby[i, j] + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, kbcon[i, j]
-                    )
+                    # get_zu_zd_pdf_fim(
+                    #     kklev, p_cup[i, j, :], rand_vmas[i, j], zubeg, 3,
+                    #     k22[i, j], ktopdby[i, j] + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, kbcon[i, j], ierr[i, j],
+                    # )
 
             if is_shallow:
                 if ktop[i, j] <= kbcon[i, j] + 2:
                     ierr[i, j] = 41
                     ktop[i, j] = -1
                 else:
-                    kfinalzu = ktop[i, j]
+                    kfinalzu[i, j] = ktop[i, j]
                     ktopdby[i, j] = ktop[i, j] + 1
                     # get_zu_zd_pdf_fim(
                     #     kbcon[i, j], p_cup[i, j, :], rand_vmas[i, j], zubeg, ipr, xland[i, j], zuh2, 2, ierr[i, j],
                     #     k22[i, j], ktopdby[i, j] + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, beta_u, kbcon[i, j], csum[i, j], pmin_lev[i, j]
                     # )
-                    get_zu_zd_pdf_fim(
-                        kbcon[i, j], p_cup[i, j, :], rand_vmas[i, j], zubeg, 2,
-                        k22[i, j], ktopdby[i, j] + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, kbcon[i, j]
-                    )
+                    # get_zu_zd_pdf_fim(
+                    #     kbcon[i, j], p_cup[i, j, :], rand_vmas[i, j], zubeg, 2,
+                    #     k22[i, j], ktopdby[i, j] + 1, zuo[i, j, kts:kte + 1], kts, kte, ktf, kbcon[i, j], ierr[i, j],
+                    # )
+    if is_shallow:
+        get_zu_zd_pdf_fim(
+            kbcon, p_cup, rand_vmas, zubeg, 2,
+            k22, ktopdby + 1, zuo, its, itf, jts, jtf, kts, kte, ktf, kbcon, ierr,
+        )
+    elif is_mid:
+        get_zu_zd_pdf_fim(
+            kklev, p_cup, rand_vmas, zubeg, 3,
+            k22, ktopdby + 1, zuo, its, itf, jts, jtf, kts, kte, ktf, kbcon, ierr,
+        )
+    else:  # is_deep
+        get_zu_zd_pdf_fim(
+            kklev, p_cup, rand_vmas, zubeg, 1,
+            k22, kfinalzu + 1, zuo, its, itf, jts, jtf, kts, kte, ktf, kbcon, ierr,
+        )
 
 def rates_up_pdf_shallow(
     rand_vmas, ktop, ierr, p_cup, entr_rate_2d,
@@ -4277,26 +4306,41 @@ def rates_up_pdf_shallow(
             if ktop[i, j] <= kbcon[i, j] + 2:
                 ierr[i, j] = 41
                 ktop[i, j] = -1
-            else:
-                get_zu_zd_pdf_fim(
-                    kbcon[i, j],
-                    p_cup[i, j, :],
-                    rand_vmas[i, j],
-                    zustart,
-                    2,
-                    k22[i, j],
-                    ktop[i, j] + 2,
-                    zuo[i, j, kts:kte + 1],
-                    kts, kte, ktf,
-                    kbcon[i, j],
-                    # csum[i, j],
-                )
+            # else:
+            #     get_zu_zd_pdf_fim(
+            #         kbcon[i, j],
+            #         p_cup[i, j, :],
+            #         rand_vmas[i, j],
+            #         zustart,
+            #         2,
+            #         k22[i, j],
+            #         ktop[i, j] + 2,
+            #         zuo[i, j, kts:kte + 1],
+            #         kts, kte, ktf,
+            #         kbcon[i, j],
+            #         # csum[i, j],
+            #         ierr[i, j],
+            #     )
+    # get_zu_zd_pdf_fim(
+    #     kbcon,
+    #     p_cup,
+    #     rand_vmas,
+    #     zustart,
+    #     2,
+    #     k22,
+    #     ktop + 2,
+    #     zuo,
+    #     its, itf, jts, jtf, kts, kte, ktf,
+    #     kbcon,
+    #     # csum[i, j],
+    #     ierr,
+    # )
 
 
 # def get_zu_zd_pdf_fim(kklev, p, rand_vmas, zubeg, ipr, xland, zuh2, draft, ierr,
 #                         kb, kt, zu, kts, kte, ktf, max_mass, kpbli, csum, pmin_lev):
 def get_zu_zd_pdf_fim(kklev, p, rand_vmas, zubeg, draft,
-                        kb, kt, zu, kts, kte, ktf, kpbli):
+                        kb, kt, zu, its, itf, jts, jtf, kts, kte, ktf, kpbli, ierr):
     """
     Calculates a normalized mass-flux profile for updrafts and downdrafts using the beta function.
 
@@ -4334,36 +4378,6 @@ def get_zu_zd_pdf_fim(kklev, p, rand_vmas, zubeg, draft,
     BETA_DD = 4.0
     G_BETA_DD = 6.0
 
-    # Local variables
-    trash = 0.0
-    beta_deep = 0.0
-    # zuh = np.zeros(kte - kts + 1)  # Array of size (kts:kte)
-    # zuh2 = np.zeros(40)            # Array of size (1:40)
-
-    k1 = 0
-    # kk = 0
-    k = 0
-    kb_adj = 0
-    # kpbli_adj = 0
-    # kmax = 0
-
-    maxlim = 0.0
-    # krmax = 0.0
-    kratio = 0.0
-    tunning = 0.0
-    fzu = 0.0
-    rand_vmas = 0.0
-    # lev_start = 0.0
-
-    a = 0.0
-    b = 0.0
-    x1 = 0.0
-    # y1 = 0.0
-    g_a = 0.0
-    g_b = 0.0
-    alpha2 = 0.0
-    g_alpha2 = 0.0
-
     # Lookup tables
     alpha = np.array([
         3.699999, 3.699999, 3.699999, 3.699999, 3.024999, 2.559999, 2.249999, 2.028571, 1.862500,
@@ -4378,206 +4392,238 @@ def get_zu_zd_pdf_fim(kklev, p, rand_vmas, zubeg, draft,
         0.9619183, 0.9619183, 0.9619183, 0.9619183, 0.9619183
     ])
 
-    # Initialize arrays and variables
-    zu[:] = 0.0
-    kb_adj = max(kb, 1)
+    for i in range(its, itf + 1):
+        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
+            if ierr[i, j] > 0:
+                continue
+            # Local variables
+            trash = 0.0
+            beta_deep = 0.0
+            # zuh = np.zeros(kte - kts + 1)  # Array of size (kts:kte)
+            # zuh2 = np.zeros(40)            # Array of size (1:40)
 
-    if draft == 1:
-        # lev_start = min(0.9, 0.1 + csum * 0.013)
-        kb_adj = max(kb, 1)
-        # kb_adj = max(kb, 1)  # CWH this might be wrong
+            k1 = 0
+            # kk = 0
+            k = 0
+            kb_adj = 0
+            # kpbli_adj = 0
+            # kmax = 0
 
-        trash = -p[kt] + p[kb_adj]
-        tunning = p[kklev]
-        if rand_vmas != 0.0:
-            tunning = p[kklev - 1] + 0.1 * rand_vmas * trash
-        beta_deep = 1.3 + (1.0 - trash / 1200.0)
-        tunning = min(0.95, (tunning - p[kb_adj]) / (p[kt] - p[kb_adj]))
-        tunning = max(0.02, tunning)
-        alpha2 = (tunning * (beta_deep - 2.0) + 1.0) / (1.0 - tunning)
+            maxlim = 0.0
+            # krmax = 0.0
+            kratio = 0.0
+            tunning = 0.0
+            fzu = 0.0
+            rand_vmas[i, j] = 0.0
+            # lev_start = 0.0
 
-        for k in range(26, 1, -1):
-            if alpha[k] >= alpha2:
-                break
-        k1 = k + 1
+            a = 0.0
+            b = 0.0
+            x1 = 0.0
+            # y1 = 0.0
+            g_a = 0.0
+            g_b = 0.0
+            alpha2 = 0.0
+            g_alpha2 = 0.0
 
-        if alpha[k1] != alpha[k1 - 1]:
-            a = alpha[k1] - alpha[k1 - 1]
-            b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
-            x1 = (alpha2 - b) / a
-            # y1 = a * x1 + b
-            g_a = g_alpha[k1] - g_alpha[k1 - 1]
-            g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
-            g_alpha2 = g_a * x1 + g_b
-        else:
-            g_alpha2 = g_alpha[k1]
 
-        fzu = math.gamma(alpha2 + beta_deep) / (math.gamma(alpha2) * math.gamma(beta_deep))
-        zu[kb_adj] = zubeg
+            # Initialize arrays and variables
+            zu[i, j, :] = 0.0
+            kb_adj = max(kb[i, j], 1)
 
-        for k in range(kb_adj + 1, min(kte, kt - 1) + 1):
-            kratio = (p[k] - p[kb_adj]) / (p[kt] - p[kb_adj])
-            zu[k] = zubeg + fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(beta_deep - 1.0)
+            if draft == 1:
+                # lev_start = min(0.9, 0.1 + csum * 0.013)
+                kb_adj = max(kb[i, j], 1)
+                # kb_adj = max(kb[i, j], 1)  # CWH this might be wrong
 
-        if zu[kpbli] > 0.0:
-            zu[kts:min(ktf, kt - 1) + 1] = zu[kts:min(ktf, kt - 1) + 1] / zu[kpbli]
+                trash = -p[i, j, kt[i, j]] + p[i, j, kb_adj]
+                tunning = p[i, j, kklev[i, j]]
+                if rand_vmas[i, j] != 0.0:
+                    tunning = p[i, j, kklev[i, j] - 1] + 0.1 * rand_vmas[i, j] * trash
+                beta_deep = 1.3 + (1.0 - trash / 1200.0)
+                tunning = min(0.95, (tunning - p[i, j, kb_adj]) / (p[i, j, kt[i, j]] - p[i, j, kb_adj]))
+                tunning = max(0.02, tunning)
+                alpha2 = (tunning * (beta_deep - 2.0) + 1.0) / (1.0 - tunning)
 
-        for k in range(np.argmax(zu), -1, -1):
-            if zu[k] < 1e-6:
-                kb_adj = k + 1
-                break
+                for k in range(26, 1, -1):
+                    if alpha[k] >= alpha2:
+                        break
+                k1 = k + 1
 
-        kb_adj = max(1, kb_adj)
+                if alpha[k1] != alpha[k1 - 1]:
+                    a = alpha[k1] - alpha[k1 - 1]
+                    b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
+                    x1 = (alpha2 - b) / a
+                    # y1 = a * x1 + b
+                    g_a = g_alpha[k1] - g_alpha[k1 - 1]
+                    g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
+                    g_alpha2 = g_a * x1 + g_b
+                else:
+                    g_alpha2 = g_alpha[k1]
 
-        for k in range(kts, kb_adj):
-            zu[k] = 0.0
+                fzu = math.gamma(alpha2 + beta_deep) / (math.gamma(alpha2) * math.gamma(beta_deep))
+                zu[i, j, kb_adj] = zubeg
 
-        maxlim = 1.2
-        a = np.max(zu) - zu[kb_adj]
+                for k in range(kb_adj + 1, min(kte, kt[i, j] - 1) + 1):
+                    kratio = (p[i, j, k] - p[i, j, kb_adj]) / (p[i, j, kt[i, j]] - p[i, j, kb_adj])
+                    zu[i, j, k] = zubeg + fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(beta_deep - 1.0)
 
-        for k in range(kb_adj, kt + 1):
-            trash = zu[k]
-            if a > maxlim:
-                zu[k] = (zu[k] - zu[kb_adj]) * maxlim / a + zu[kb_adj]
+                if zu[i, j, kpbli[i, j]] > 0.0:
+                    zu[i, j, kts:min(ktf, kt[i, j] - 1) + 1] = zu[i, j, kts:min(ktf, kt[i, j] - 1) + 1] / zu[i, j, kpbli[i, j]]
 
-    elif draft == 2:
-        # k = kklev
-        # if kpbli > 4:
-        #     k = kpbli
-        tunning = p[kklev]
-        tunning = min(0.95, (tunning - p[kb_adj]) / (p[kt] - p[kb_adj]))
-        tunning = max(0.02, tunning)
-        alpha2 = (tunning * (BETA_SH - 2.0) + 1.0) / (1.0 - tunning)
+                for k in range(np.argmax(zu[i, j, :]), -1, -1):
+                    if zu[i, j, k] < 1e-6:
+                        kb_adj = k + 1
+                        break
 
-        for k in range(26, 1, -1):
-            if alpha[k] >= alpha2:
-                break
-        k1 = k + 1
+                kb_adj = max(1, kb_adj)
 
-        if alpha[k1] != alpha[k1 - 1]:
-            a = alpha[k1] - alpha[k1 - 1]
-            b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
-            x1 = (alpha2 - b) / a
-            # y1 = a * x1 + b
-            g_a = g_alpha[k1] - g_alpha[k1 - 1]
-            g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
-            g_alpha2 = g_a * x1 + g_b
-        else:
-            g_alpha2 = g_alpha[k1]
+                for k in range(kts, kb_adj):
+                    zu[i, j, k] = 0.0
 
-        fzu = math.gamma(alpha2 + BETA_SH) / (g_alpha2 * G_BETA_SH)
-        zu[kb_adj] = zubeg
+                maxlim = 1.2
+                a = np.max(zu) - zu[i, j, kb_adj]
 
-        for k in range(kb_adj + 1, min(kte, kt - 1) + 1):
-            kratio = (p[k] - p[kb_adj]) / (p[kt] - p[kb_adj])
-            zu[k] = zubeg + fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(BETA_SH - 1.0)
+                for k in range(kb_adj, kt[i, j] + 1):
+                    trash = zu[i, j, k]
+                    if a > maxlim:
+                        zu[i, j, k] = (zu[i, j, k] - zu[i, j, kb_adj]) * maxlim / a + zu[i, j, kb_adj]
 
-        if zu[kpbli] > 0.0:
-            zu[kts:min(ktf, kt - 1) + 1] = zu[kts:min(ktf, kt - 1) + 1] / zu[kpbli]
+            elif draft == 2:
+                tunning = p[i, j, kklev[i, j]]
+                tunning = min(0.95, (tunning - p[i, j, kb_adj]) / (p[i, j, kt[i, j]] - p[i, j, kb_adj]))
+                tunning = max(0.02, tunning)
+                alpha2 = (tunning * (BETA_SH - 2.0) + 1.0) / (1.0 - tunning)
 
-        for k in range(np.argmax(zu), -1, -1):
-            if zu[k] < 1e-6:
-                kb_adj = k + 1
-                break
+                for k in range(26, 1, -1):
+                    if alpha[k] >= alpha2:
+                        break
+                k1 = k + 1
 
-        maxlim = 1.0
-        a = np.max(zu) - zu[kb_adj]
+                if alpha[k1] != alpha[k1 - 1]:
+                    a = alpha[k1] - alpha[k1 - 1]
+                    b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
+                    x1 = (alpha2 - b) / a
+                    # y1 = a * x1 + b
+                    g_a = g_alpha[k1] - g_alpha[k1 - 1]
+                    g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
+                    g_alpha2 = g_a * x1 + g_b
+                else:
+                    g_alpha2 = g_alpha[k1]
 
-        for k in range(kts, kt + 1):
-            if a > maxlim:
-                zu[k] = (zu[k] - zu[kb_adj]) * maxlim / a + zu[kb_adj]
+                fzu = math.gamma(alpha2 + BETA_SH) / (g_alpha2 * G_BETA_SH)
+                zu[i, j, kb_adj] = zubeg
 
-    elif draft == 3:
-        kb_adj = max(kb, 1)
-        tunning = 0.5 * (p[kt] + p[kpbli])
-        tunning = min(0.95, (tunning - p[kb_adj]) / (p[kt] - p[kb_adj]))
-        tunning = max(0.02, tunning)
-        alpha2 = (tunning * (BETA_MID - 2.0) + 1.0) / (1.0 - tunning)
+                for k in range(kb_adj + 1, min(kte, kt[i, j] - 1) + 1):
+                    kratio = (p[i, j, k] - p[i, j, kb_adj]) / (p[i, j, kt[i, j]] - p[i, j, kb_adj])
+                    zu[i, j, k] = zubeg + fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(BETA_SH - 1.0)
 
-        for k in range(26, 1, -1):
-            if alpha[k] >= alpha2:
-                break
-        k1 = k + 1
+                if zu[i, j, kpbli[i, j]] > 0.0:
+                    zu[i, j, kts:min(ktf, kt[i, j] - 1) + 1] = zu[i, j, kts:min(ktf, kt[i, j] - 1) + 1] / zu[i, j, kpbli[i, j]]
 
-        if alpha[k1] != alpha[k1 - 1]:
-            a = alpha[k1] - alpha[k1 - 1]
-            b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
-            x1 = (alpha2 - b) / a
-            y1 = a * x1 + b
-            g_a = g_alpha[k1] - g_alpha[k1 - 1]
-            g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
-            g_alpha2 = g_a * x1 + g_b
-        else:
-            g_alpha2 = g_alpha[k1]
+                for k in range(np.argmax(zu[i, j, :]), -1, -1):
+                    if zu[i, j, k] < 1e-6:
+                        kb_adj = k + 1
+                        break
 
-        fzu = math.gamma(alpha2 + BETA_MID) / (math.gamma(alpha2) * math.gamma(BETA_MID))
-        zu[kb_adj] = zubeg
+                maxlim = 1.0
+                a = np.max(zu) - zu[i, j, kb_adj]
 
-        for k in range(kb_adj + 1, min(kte, kt - 1) + 1):
-            kratio = (p[k] - p[kb_adj]) / (p[kt] - p[kb_adj])
-            zu[k] = zubeg + fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(BETA_MID - 1.0)
+                for k in range(kts, kt[i, j] + 1):
+                    if a > maxlim:
+                        zu[i, j, k] = (zu[i, j, k] - zu[i, j, kb_adj]) * maxlim / a + zu[i, j, kb_adj]
 
-        if zu[kpbli] > 0.0:
-            zu[kts:min(ktf, kt - 1) + 1] = zu[kts:min(ktf, kt - 1) + 1] / zu[kpbli]
+            elif draft == 3:
+                kb_adj = max(kb[i, j], 1)
+                tunning = 0.5 * (p[i, j, kt[i, j]] + p[i, j, kpbli[i, j]])
+                tunning = min(0.95, (tunning - p[i, j, kb_adj]) / (p[i, j, kt[i, j]] - p[i, j, kb_adj]))
+                tunning = max(0.02, tunning)
+                alpha2 = (tunning * (BETA_MID - 2.0) + 1.0) / (1.0 - tunning)
 
-        for k in range(np.argmax(zu), -1, -1):
-            if zu[k] < 1e-6:
-                kb_adj = k + 1
-                break
+                for k in range(26, 1, -1):
+                    if alpha[k] >= alpha2:
+                        break
+                k1 = k + 1
 
-        kb_adj = max(1, kb_adj)
+                if alpha[k1] != alpha[k1 - 1]:
+                    a = alpha[k1] - alpha[k1 - 1]
+                    b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
+                    x1 = (alpha2 - b) / a
+                    y1 = a * x1 + b
+                    g_a = g_alpha[k1] - g_alpha[k1 - 1]
+                    g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
+                    g_alpha2 = g_a * x1 + g_b
+                else:
+                    g_alpha2 = g_alpha[k1]
 
-        for k in range(kts, kb_adj):
-            zu[k] = 0.0
+                fzu = math.gamma(alpha2 + BETA_MID) / (math.gamma(alpha2) * math.gamma(BETA_MID))
+                zu[i, j, kb_adj] = zubeg
 
-        maxlim = 1.5
-        a = np.max(zu) - zu[kb_adj]
+                for k in range(kb_adj + 1, min(kte, kt[i, j] - 1) + 1):
+                    kratio = (p[i, j, k] - p[i, j, kb_adj]) / (p[i, j, kt[i, j]] - p[i, j, kb_adj])
+                    zu[i, j, k] = zubeg + fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(BETA_MID - 1.0)
 
-        for k in range(kts, kt + 1):
-            if a > maxlim:
-                zu[k] = (zu[k] - zu[kb_adj]) * maxlim / a + zu[kb_adj]
+                if zu[i, j, kpbli[i, j]] > 0.0:
+                    zu[i, j, kts:min(ktf, kt[i, j] - 1) + 1] = zu[i, j, kts:min(ktf, kt[i, j] - 1) + 1] / zu[i, j, kpbli[i, j]]
 
-    elif draft == 4 or draft == 5:
-        tunning = p[kb]
-        tunning = min(0.95, (tunning - p[0]) / (p[kt] - p[0]))
-        tunning = max(0.02, tunning)
-        alpha2 = (tunning * (BETA_DD - 2.0) + 1.0) / (1.0 - tunning)
+                for k in range(np.argmax(zu[i, j, :]), -1, -1):
+                    if zu[i, j, k] < 1e-6:
+                        kb_adj = k + 1
+                        break
 
-        for k in range(26, 1, -1):
-            if alpha[k] >= alpha2:
-                break
-        k1 = k + 1
-        # print(f" k1 = {k1}")
-        if alpha[k1] != alpha[k1 - 1]:
-            a = alpha[k1] - alpha[k1 - 1]
-            b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
-            x1 = (alpha2 - b) / a
-            # y1 = a * x1 + b
-            g_a = g_alpha[k1] - g_alpha[k1 - 1]
-            g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
-            g_alpha2 = g_a * x1 + g_b
-        else:
-            g_alpha2 = g_alpha[k1]
+                kb_adj = max(1, kb_adj)
 
-        fzu = math.gamma(alpha2 + BETA_DD) / (g_alpha2 * G_BETA_DD)
-        zu[:] = 0.0
+                for k in range(kts, kb_adj):
+                    zu[i, j, k] = 0.0
 
-        for k in range(1, min(kte, kt - 1) + 1):
-            kratio = (p[k] - p[0]) / (p[kt] - p[0])
-            zu[k] = fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(BETA_DD - 1.0)
-            # print(f" zu[k] = {zu[k]}")
+                maxlim = 1.5
+                a = np.max(zu) - zu[i, j, kb_adj]
 
-        fzu = np.max(zu[kts:min(ktf, kt - 1) + 1])
-        if fzu > 0.0:
-            zu[kts:min(ktf, kt - 1) + 1] = zu[kts:min(ktf, kt - 1) + 1] / fzu
+                for k in range(kts, kt[i, j] + 1):
+                    if a > maxlim:
+                        zu[i, j, k] = (zu[i, j, k] - zu[i, j, kb_adj]) * maxlim / a + zu[i, j, kb_adj]
 
-        zu[0] = 0.0
-        # print(f"kb = {kb}")
-        for k in range(1, kb):
-            zu[kb - k] = zu[kb - k + 1] - zu[kb] * (p[kb - k] - p[kb - k + 1]) / (p[0] - p[kb])
-            # print(f" zu[kb - k] = {zu[kb - k]}")
+            elif draft == 4 or draft == 5:
+                tunning = p[i, j, kb[i, j]]
+                tunning = min(0.95, (tunning - p[i, j, 0]) / (p[i, j, kt[i, j]] - p[i, j, 0]))
+                tunning = max(0.02, tunning)
+                alpha2 = (tunning * (BETA_DD - 2.0) + 1.0) / (1.0 - tunning)
 
-        zu[0] = 0.0
+                for k in range(26, 1, -1):
+                    if alpha[k] >= alpha2:
+                        break
+                k1 = k + 1
+                # print(f" k1 = {k1}")
+                if alpha[k1] != alpha[k1 - 1]:
+                    a = alpha[k1] - alpha[k1 - 1]
+                    b = alpha[k1 - 1] * k1 - (k1 - 1) * alpha[k1]
+                    x1 = (alpha2 - b) / a
+                    # y1 = a * x1 + b
+                    g_a = g_alpha[k1] - g_alpha[k1 - 1]
+                    g_b = g_alpha[k1 - 1] * k1 - (k1 - 1) * g_alpha[k1]
+                    g_alpha2 = g_a * x1 + g_b
+                else:
+                    g_alpha2 = g_alpha[k1]
+
+                fzu = math.gamma(alpha2 + BETA_DD) / (g_alpha2 * G_BETA_DD)
+                zu[i, j, :] = 0.0
+
+                for k in range(1, min(kte, kt[i, j] - 1) + 1):
+                    kratio = (p[i, j, k] - p[i, j, 0]) / (p[i, j, kt[i, j]] - p[i, j, 0])
+                    zu[i, j, k] = fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(BETA_DD - 1.0)
+                    # print(f" zu[i, j, k] = {zu[i, j, k]}")
+
+                fzu = np.max(zu[i, j, kts:min(ktf, kt[i, j] - 1) + 1])
+                if fzu > 0.0:
+                    zu[i, j, kts:min(ktf, kt[i, j] - 1) + 1] = zu[i, j, kts:min(ktf, kt[i, j] - 1) + 1] / fzu
+
+                zu[i, j, 0] = 0.0
+                # print(f"kb[i, j] = {kb[i, j]}")
+                for k in range(1, kb[i, j]):
+                    zu[i, j, kb[i, j] - k] = zu[i, j, kb[i, j] - k + 1] - zu[i, j, kb[i, j]] * (p[i, j, kb[i, j] - k] - p[i, j, kb[i, j] - k + 1]) / (p[i, j, 0] - p[i, j, kb[i, j]])
+                    # print(f" zu[i, j, kb[i, j] - k] = {zu[i, j, kb[i, j] - k]}")
+
+                zu[i, j, 0] = 0.0
 
 def cup_up_aa1bl(aa0, t, tn, q, qo, dtime, z_cup, zu, dby, gamma_cup, t_cup, kbcon, ktop, ierr, 
                  itf, jtf, ktf, its, ite, jts, jte, kts, kte):

@@ -5,15 +5,10 @@ This module contains the Grell-Freitas shallow convection scheme.
 # Import necessary modules
 
 import numpy as np
-from cu_gf_deep import (
-    get_cloud_bc, cup_minimi,
-    get_inversion_layers, rates_up_pdf_shallow, cup_up_aa0,
-    get_lateral_massflux
-)
+
 from ndsl.constants import X_DIM, Y_DIM, Z_DIM
 from ndsl.quantity import Quantity
 from gf_state import GFState
-import cu_gf_constants as constants
 
 from cu_gf_stencils import (
     initialize_shallow_convection,
@@ -29,6 +24,7 @@ from cu_gf_stencils import (
     get_inversion_layers_stencil,
     compute_entrainment_and_shallow_convection_top,
     rates_up_pdf_shallow_stencil,
+    get_zu_zd_pdf_fim_stencil,
     copy_updraft_in_active_cloud_layers,
     get_lateral_massflux_stencil,
     calculate_water_and_evolve_updraft,
@@ -39,15 +35,7 @@ from cu_gf_stencils import (
     finalize_shallow_convection_tendencies,
 )
 
-# Constants
-C1_SHAL = 0.0  # Parameter for shallow convection
-G = 9.81       # Gravitational acceleration (m/s^2)
-CP = 1004.0    # Specific heat capacity of air at constant pressure (J/kg/K)
-XLV = 2.5e6    # Latent heat of vaporization (J/kg)
-R_V = 461.0    # Specific gas constant for water vapor (J/kg/K)
-C0_SHAL = 0.001  # Parameter for shallow convection
-FLUXTUNE = 1.5  # Flux tuning parameter
-ZERO = 0.0  # Equivalent to "real(kind=kind_phys), parameter :: zero = 0"
+import cu_gf_constants as constants
 
 class GFShallowConvection:
     """
@@ -179,7 +167,7 @@ class GFShallowConvection:
             units="none",
             dtype=state.rkind
         )
-        self.flux_tun.field[:,:] = FLUXTUNE  # Set flux tuning parameter
+        self.flux_tun.field[:,:] = constants.FLUXTUNE  # Set flux tuning parameter
         self.hkb: Quantity = state.quantity_factory.zeros(
             dims=[X_DIM, Y_DIM],
             units="none",
@@ -426,11 +414,6 @@ class GFShallowConvection:
             units="none",
             dtype=state.rkind,
         )
-        self.local_order_aver: Quantity = state.quantity_factory.zeros(
-            dims=[X_DIM, Y_DIM],
-            units="none",
-            dtype=state.ikind
-        )
         self.kbcon_m1: Quantity = state.quantity_factory.zeros(
             dims=[X_DIM, Y_DIM],
             units="none",
@@ -606,6 +589,21 @@ class GFShallowConvection:
             units="none",
             dtype=state.rkind,
         )
+        self.g_alpha2: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.fzu: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.zu_kpbli: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
         self.k1: Quantity = state.quantity_factory.zeros(
             dims=[X_DIM, Y_DIM],
             units="none",
@@ -630,6 +628,11 @@ class GFShallowConvection:
             dims=[X_DIM, Y_DIM],
             units="index",
             dtype=state.ikind,
+        )
+        self.maxval: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
         )
         self.up_massentr: Quantity = state.quantity_factory.zeros(
             dims=[X_DIM, Y_DIM, Z_DIM],
@@ -898,6 +901,15 @@ class GFShallowConvection:
             },
         )
 
+        self._get_zu_zd_pdf_fim = state.stencil_factory.from_dims_halo(
+            func=get_zu_zd_pdf_fim_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={
+                "zustart": 0.1,
+                "maxlim": 1.0,
+            },
+        )
+
         self._copy_updraft_in_active_cloud_layers = state.stencil_factory.from_dims_halo(
             func=copy_updraft_in_active_cloud_layers,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
@@ -1133,9 +1145,6 @@ class GFShallowConvection:
             hkbo=self.hkbo,
             k22=k22,
             x_add=self.x_add,
-            local_order_aver=self.local_order_aver,
-            k_index=self.k_index,
-            k_mask=self.k_mask,
             ierr=ierr,
         )
 
@@ -1162,12 +1171,10 @@ class GFShallowConvection:
             imid=0,
             adjustment_attempts=self.adjustment_attempts,
             tries=self.tries,
-            k_index=self.k_index,
             x_add=self.x_add,
             pbcdif=self.pbcdif,
             plus=self.plus,
             found=self.found,
-            local_order_aver=self.local_order_aver,
             kbcon_m1=self.kbcon_m1,
         )
 
@@ -1220,8 +1227,6 @@ class GFShallowConvection:
             ztexec=self.ztexec,
             hkb=self.hkb,
             he_cup=self.he_cup,
-            k_index=self.k_index,
-            local_order_aver=self.local_order_aver,
             kbcon=kbcon,
             qo_cup=self.qo_cup,
             qeso_cup=self.qeso_cup,
@@ -1236,41 +1241,40 @@ class GFShallowConvection:
             k_mask=self.k_mask,
         )
 
-        # rates_up_pdf(
-        #     self.rand_vmas.field, ipr, 'shallow', ktop.field, ierr.field, self.po_cup.field, self.entr_rate_2d.field, self.hkbo.field, self.heo.field, self.heso_cup.field, self.zo_cup.field,
-        #     self.xland1.field, self.kstabi.field, k22.field, kbcon.field, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo.field, kpbl.field, self.ktopx.field, kbcon.field, self.pmin_lev.field
-        # )
-
-        rates_up_pdf_shallow(
-            self.rand_vmas.field, ktop.field, ierr.field, self.po_cup.field, self.entr_rate_2d.field, self.zo_cup.field,
-            k22.field, kbcon.field, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo.field, kbcon.field
+        self._rates_up_pdf_shallow(
+            ktop=ktop,
+            ierr=ierr,
+            entr_rate_2d=self.entr_rate_2d,
+            z_cup=self.zo_cup,
+            k22=k22,
+            kbcon=kbcon,
+            zuo=zuo,
+            k_mask=self.k_mask,
         )
 
-        # self._rates_up_pdf_shallow(
-        #     rand_vmas=self.rand_vmas,
-        #     ktop=ktop,
-        #     ierr=ierr,
-        #     p_cup=self.po_cup,
-        #     entr_rate_2d=self.entr_rate_2d,
-        #     z_cup=self.zo_cup,
-        #     k22=k22,
-        #     kbcon=kbcon,
-        #     zuo=zuo,
-        #     csum=kbcon,
-        #     k_mask=self.k_mask,
-        #     alpha=self.alpha.field[0, 0, :],
-        #     g_alpha=self.g_alpha.field[0, 0, :],
-        #     k_index=self.k_index,
-        #     index=self.index,
-        #     found=self.found,
-        #     kb_adj=self.kb_adj,
-        #     trash=self.trash,
-        #     tunning=self.tunning,
-        #     beta_deep=self.beta_deep,
-        #     alpha2=self.alpha2,
-        #     k1=self.k1,
-        #     a=self.a,
-        # )
+        self._get_zu_zd_pdf_fim(
+            kklev=kbcon,
+            p=self.p_cup,
+            draft=2,
+            kb=k22,
+            kt=ktop,
+            zu=zuo,
+            kpbli=kbcon,
+            alpha=self.alpha.field[0,0,:],
+            g_alpha=self.g_alpha.field[0,0,:],
+            kb_adj=self.kb_adj,
+            tunning=self.tunning,
+            alpha2=self.alpha2,
+            g_alpha2=self.g_alpha2,
+            fzu= self.fzu,
+            zu_kpbli=self.zu_kpbli,
+            k_mask=self.k_mask,
+            k_index=self.k_index,
+            argmax=self.argmax,
+            maxval=self.maxval,
+            found=self.found,
+            ierr=ierr,
+        )
     
         self._copy_updraft_in_active_cloud_layers(
             ierr=ierr,
@@ -1284,7 +1288,6 @@ class GFShallowConvection:
             argmax=self.argmax,
         )
 
-        # Call get_lateral_massflux() to calculate mass entrainment and detrainment
         self._get_lateral_massflux(
             ierr=ierr,
             ktop=ktop,
@@ -1357,12 +1360,9 @@ class GFShallowConvection:
             k_mask=self.k_mask,
             argmax=self.argmax,
             found=self.found,
-            k_index=self.k_index,
-            local_order_aver=self.local_order_aver,
         )
 
         if make_calc_for_xk:  # Check if calculations for xk are enabled
-            # Call cup_up_aa0() to calculate cloud work functions
             self._cup_up_aa0(
                 aa0=self.aa0,
                 z=self.z,
@@ -1429,7 +1429,6 @@ class GFShallowConvection:
         )
 
         if make_calc_for_xk:  # Check if calculations for xk are enabled
-            # Call cup_env() to calculate moist static energy, heights, and qes
             self._cup_env(
                 z=self.xz,
                 qes=self.xqes,
@@ -1485,8 +1484,6 @@ class GFShallowConvection:
                 xhes_cup=self.xhes_cup,
                 ierr=ierr,
                 k_mask=self.k_mask,
-                local_order_aver=self.local_order_aver,
-                k_index=self.k_index,
             )
 
             # Call cup_up_aa0() to calculate workfunctions for updraft
