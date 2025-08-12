@@ -961,10 +961,9 @@ class GFShallowConvection:
     # Define the main shallow convection function
     def cu_gf_sh_run(self,
         us, vs, zo, t, q, z1, tn, qo, po, psur, dhdt, kpbl, rho,
-        hfx, qfx, xland, ichoice, tcrit, dtime,
+        hfx, qfx, xland, ichoice, dtime,
         zuo, xmb_out, kbcon, ktop, k22, ierr,
         outt, outq, outqc, outu, outv, cnvwt, pre, cupclw,
-        itf, jtf, ktf, its, ite, jts, jte, kts, kte, ipr, tropics
     ):
         """
         Grell-Freitas shallow convection scheme.
