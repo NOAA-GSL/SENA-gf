@@ -14,6 +14,7 @@ from cu_gf_stencils import (
     initialize_deep_convection,
     cup_env_stencil,
     cup_env_clev_stencil,
+    cup_kbcon_stencil,
 )
 
 # Constants
@@ -424,6 +425,91 @@ class GFDeepConvection:
             units="none",
             dtype=state.rkind,
         )
+        self.hkbo: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.kbmax: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.iloop: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.hcot: Quantity = state.quantity_factory.zeros( # Remove later
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.dz: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.adjustment_attempts: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.tries: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.k_index: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=int,
+        )
+        self.x_add: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.kbcon_m1: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind
+        )
+        self.pbcdif: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.plus: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.found: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=bool,
+        )
+        self.k22x: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.kbconx: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.ierr2: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.ierr3: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
 
         self._initialize_deep_convection = state.stencil_factory.from_dims_halo(
             func=initialize_deep_convection,
@@ -444,6 +530,11 @@ class GFDeepConvection:
             externals={},
         )
 
+        self._cup_kbcon = state.stencil_factory.from_dims_halo(
+            func=cup_kbcon_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
 
     def cu_gf_deep_run(self,
         itf, jtf, ktf, its, ite, jts, jte, kts, kte,  # Dimensions
@@ -514,7 +605,7 @@ class GFDeepConvection:
     ):
 
         # Integer variables
-        iloop = 0
+        iloop_in = 0
         nens3 = 0
         ki = 0
         kk = 0
@@ -667,7 +758,6 @@ class GFDeepConvection:
         xaa0 = np.zeros((ite - its + 1, jte - jts + 1,))
         xaa0_ens = np.zeros((ite - its + 1, jte - jts + 1, 1))
         hkb = np.zeros((ite - its + 1, jte - jts + 1,))
-        hkbo = np.zeros((ite - its + 1, jte - jts + 1,))
         xhkb = np.zeros((ite - its + 1, jte - jts + 1,))
         xmb = np.zeros((ite - its + 1, jte - jts + 1,))
         pwavo = np.zeros((ite - its + 1, jte - jts + 1,))
@@ -687,12 +777,7 @@ class GFDeepConvection:
         kzdown = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
         kdet = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
         kstabi = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
-        k22x = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
         ktopdby = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
-        kbconx = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
-        ierr2 = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
-        ierr3 = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
-        kbmax = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
         turn = 0
         pmin_lev = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
         ktopkeep = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
@@ -952,7 +1037,7 @@ class GFDeepConvection:
                     # Find kbmax
                     for k in range(kts, ktf + 1):  # Adjust loop to start at zero
                         if self.zo_cup.field[i, j, k] > zkbmax + z1[i, j]:
-                            kbmax[i, j] = k
+                            self.kbmax.field[i, j] = k
                             break
 
                     # Find kdet
@@ -969,8 +1054,8 @@ class GFDeepConvection:
             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                 if ierr[i, j] == 0:
                     # Find the level with the highest moist static energy content
-                    k22[i, j] = np.argmax(self.heo_cup.field[i, j, start_k22:kbmax[i, j] + 3]) + start_k22
-                    if k22[i, j] >= kbmax[i, j]:
+                    k22[i, j] = np.argmax(self.heo_cup.field[i, j, start_k22:self.kbmax.field[i, j] + 3]) + start_k22
+                    if k22[i, j] >= self.kbmax.field[i, j]:
                         ierr[i, j] = 2
                         # Handle error message if not using OpenACC
                         # ierrc[i, j] = "could not find k22"
@@ -985,36 +1070,43 @@ class GFDeepConvection:
                     x_add = XLV * self.zqexec.field[i, j] + CP * self.ztexec.field[i, j]
                     # Call get_cloud_bc to calculate cloud base properties
                     hkb[i, j] = get_cloud_bc(kte, self.he_cup.field[i, j, :kte + 1], hkb[i, j], k22[i, j], x_add)
-                    hkbo[i, j] = get_cloud_bc(kte, self.heo_cup.field[i, j, :kte + 1], hkbo[i, j], k22[i, j], x_add)
+                    self.hkbo.field[i, j] = get_cloud_bc(kte, self.heo_cup.field[i, j, :kte + 1], self.hkbo.field[i, j], k22[i, j], x_add)
 
         # Initialize loop parameters
-        jprnt = 0
-        iloop = 1
         if imid == 1:
-            iloop = 5
+            iloop_in = 5
+        else:
+            iloop_in = 1
 
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{k22[0]:>4}{kbcon[0]:>4}{kbmax[0]:>4}")
-        # print(f"{self.cap_max_increment.field[0]:>20.12E}{hkbo[0]:>20.12E}{self.cap_max.field[0]:>20.12E}{self.ztexec.field[0]:>20.12E}{self.zqexec.field[0]:>20.12E}{entr_rate[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{self.heo_cup.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{self.z_cup.field[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}")
-
-        # Call cup_kbcon to determine the level of convective cloud base (kbcon)
-        cup_kbcon(
-            self.cap_max_increment.field, iloop, k22, kbcon, self.heo_cup.field, self.heso_cup.field,
-            hkbo, ierr, kbmax, self.po_cup.field, self.cap_max.field,
-            self.ztexec.field, self.zqexec.field,
-            jprnt, itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte,
-            self.z_cup.field, self.entr_rate.field, self.heo.field, imid
+        self._cup_kbcon(
+            cap_inc=self.cap_max_increment,
+            iloop_in=iloop_in,
+            iloop=self.iloop,
+            k22=k22,
+            kbcon=kbcon,
+            hcot=self.hcot,
+            dz=self.dz,
+            he_cup=self.heo_cup,
+            hes_cup=self.heso_cup,
+            hkb=self.hkbo,
+            ierr=ierr,
+            kbmax=self.kbmax,
+            p_cup=self.po_cup,
+            cap_max=self.cap_max,
+            ztexec=self.ztexec,
+            zqexec=self.zqexec,
+            z_cup=self.z_cup,
+            entr_rate=self.entr_rate,
+            heo=self.heo,
+            imid=imid,
+            adjustment_attempts=self.adjustment_attempts,
+            tries=self.tries,
+            x_add=self.x_add,
+            pbcdif=self.pbcdif,
+            plus=self.plus,
+            found=self.found,
+            kbcon_m1=self.kbcon_m1,
         )
-
-        # Output variable match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{k22[0]:>4}{kbcon[0]:>4}{kbmax[0]:>4}")
-        # print(f"{self.cap_max_increment.field[0]:>20.12E}{hkbo[0]:>20.12E}{self.cap_max.field[0]:>20.12E}{self.ztexec.field[0]:>20.12E}{self.zqexec.field[0]:>20.12E}{entr_rate[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{self.heo_cup.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{self.z_cup.field[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}")
 
         # Call cup_minimi to increase detrainment in stable layers
         cup_minimi(
@@ -1022,7 +1114,6 @@ class GFDeepConvection:
             itf, jtf, ktf,
             its, ite, jts, jte, kts, kte
         )
-
 
         # Parallel loop to process updraft initialization
         for i in range(its, itf + 1):  # Adjust loop to start at zero
@@ -1107,38 +1198,38 @@ class GFDeepConvection:
         if imid == 1:
             # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
             # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{kstabi[0]:>4}{k22[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
-            # print(f"{rand_vmas[0]:>20.12E}{hkbo[0]:>20.12E}")
+            # print(f"{rand_vmas[0]:>20.12E}{self.hkbo.field[0]:>20.12E}")
             # for k in range(kte+1):
             #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
 
             rates_up_pdf(
-                rand_vmas, ipr, 'mid', ktop, ierr, self.po_cup.field, entr_rate_2d, hkbo, self.heo.field, self.heso_cup.field, self.zo_cup.field,
+                rand_vmas, ipr, 'mid', ktop, ierr, self.po_cup.field, entr_rate_2d, self.hkbo.field, self.heo.field, self.heso_cup.field, self.zo_cup.field,
                 self.xland1.field, kstabi, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kpbl, ktopdby, csum, pmin_lev
             )
 
             # Output variable match
             # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
             # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{kstabi[0]:>4}{k22[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
-            # print(f"{rand_vmas[0]:>20.12E}{hkbo[0]:>20.12E}")
+            # print(f"{rand_vmas[0]:>20.12E}{self.hkbo.field[0]:>20.12E}")
             # for k in range(kte+1):
             #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
 
         else:
             # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
             # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{kstabi[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
-            # print(f"{rand_vmas[0]:>20.12E}{hkbo[0]:>20.12E}")
+            # print(f"{rand_vmas[0]:>20.12E}{self.hkbo.field[0]:>20.12E}")
             # for k in range(kte+1):
             #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
 
             rates_up_pdf(
-                rand_vmas, ipr, 'deep', ktop, ierr, self.po_cup.field, entr_rate_2d, hkbo, self.heo.field, self.heso_cup.field, self.zo_cup.field,
+                rand_vmas, ipr, 'deep', ktop, ierr, self.po_cup.field, entr_rate_2d, self.hkbo.field, self.heo.field, self.heso_cup.field, self.zo_cup.field,
                 self.xland1.field, kstabi, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kbcon, ktopdby, csum, pmin_lev
             )
 
             # Output variable match
             # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
             # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{kstabi[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
-            # print(f"{rand_vmas[0]:>20.12E}{hkbo[0]:>20.12E}")
+            # print(f"{rand_vmas[0]:>20.12E}{self.hkbo.field[0]:>20.12E}")
             # for k in range(kte+1):
             #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
 
@@ -1241,7 +1332,7 @@ class GFDeepConvection:
 
                     k = self.start_level.field[i, j]  # Adjust for zero-based indexing
                     hc[i, j, k] = hkb[i, j]
-                    hco[i, j, k] = hkbo[i, j]
+                    hco[i, j, k] = self.hkbo.field[i, j]
 
         # Parallel loop to calculate moist static energy and buoyancy
         for i in range(its, itf + 1):  # Adjust loop to start at zero
@@ -2264,79 +2355,94 @@ class GFDeepConvection:
         # Initialize auxiliary variables for error handling and indices
         for i in range(its, itf + 1):  # Adjust loop to start at zero
             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                ierr2[i, j] = ierr[i, j]
-                ierr3[i, j] = ierr[i, j]
-                k22x[i, j] = k22[i, j]
+                self.ierr2.field[i, j] = ierr[i, j]
+                self.ierr3.field[i, j] = ierr[i, j]
+                self.k22x.field[i, j] = k22[i, j]
 
         # Call cup_maximi to determine maximum indices
         # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{kbmax[0]:>4}{k22x[0]:>4}")
+        # print(f"{self.kbmax.field[0]:>4}{self.k22x.field[0]:>4}")
         # print(f"")
         # for k in range(kte+1):
         #     print(f"{self.heo_cup.field[0,k]:>20.12E}")
 
         cup_maximi(
-            self.heo_cup.field, 1, kbmax, k22x, ierr,
+            self.heo_cup.field, 1, self.kbmax.field, self.k22x.field, ierr,
             itf, jtf, ktf,
             its, ite, jts, jte, kts, kte
         )
 
         # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{kbmax[0]:>4}{k22x[0]:>4}")
+        # print(f"{self.kbmax.field[0]:>4}{self.k22x.field[0]:>4}")
         # print(f"")
         # for k in range(kte+1):
         #     print(f"{self.heo_cup.field[0,k]:>20.12E}")
 
         # Set loop iteration and call cup_kbcon to determine convective cloud base
-        iloop = 2
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{iloop:>4}{imid:>4}{k22x[0]:>4}{kbconx[0]:>4}{kbmax[0]:>4}")
-        # print(f"{self.cap_max_increment.field[0]:>20.12E}{hkbo[0]:>20.12E}{self.cap_max.field[0]:>20.12E}{self.ztexec.field[0]:>20.12E}{self.zqexec.field[0]:>20.12E}{entr_rate[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{self.heo_cup.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{self.z_cup.field[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}")
+        iloop_in = 2
 
-        cup_kbcon(
-            self.cap_max_increment.field, iloop, k22x, kbconx, self.heo_cup.field,
-            self.heso_cup.field, hkbo, ierr2, kbmax, self.po_cup.field, self.cap_max.field,
-            self.ztexec.field, self.zqexec.field,
-            0, itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte,
-            self.z_cup.field, self.entr_rate.field, self.heo.field, imid
+        self._cup_kbcon(
+            cap_inc=self.cap_max_increment,
+            iloop_in=iloop_in,
+            iloop=self.iloop,
+            k22=self.k22x,
+            kbcon=self.kbconx,
+            hcot=self.hcot,
+            dz=self.dz,
+            he_cup=self.heo_cup,
+            hes_cup=self.heso_cup,
+            hkb=self.hkbo,
+            ierr=self.ierr2,
+            kbmax=self.kbmax,
+            p_cup=self.po_cup,
+            cap_max=self.cap_max,
+            ztexec=self.ztexec,
+            zqexec=self.zqexec,
+            z_cup=self.z_cup,
+            entr_rate=self.entr_rate,
+            heo=self.heo,
+            imid=imid,
+            adjustment_attempts=self.adjustment_attempts,
+            tries=self.tries,
+            x_add=self.x_add,
+            pbcdif=self.pbcdif,
+            plus=self.plus,
+            found=self.found,
+            kbcon_m1=self.kbcon_m1,
         )
-
-        # Output variables match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{iloop:>4}{imid:>4}{k22x[0]:>4}{kbconx[0]:>4}{kbmax[0]:>4}")
-        # print(f"{self.cap_max_increment.field[0]:>20.12E}{hkbo[0]:>20.12E}{self.cap_max.field[0]:>20.12E}{self.ztexec.field[0]:>20.12E}{self.zqexec.field[0]:>20.12E}{entr_rate[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{self.heo_cup.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{self.z_cup.field[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}")
 
         # Set loop iteration and call cup_kbcon for the third iteration
-        iloop = 3
+        iloop_in = 3
 
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{iloop:>4}{imid:>4}{k22x[0]:>4}{kbconx[0]:>4}{kbmax[0]:>4}")
-        # print(f"{self.cap_max_increment.field[0]:>20.12E}{hkbo[0]:>20.12E}{self.cap_max.field[0]:>20.12E}{self.ztexec.field[0]:>20.12E}{self.zqexec.field[0]:>20.12E}{entr_rate[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{self.heo_cup.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{self.z_cup.field[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}")
-
-        # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
-
-        cup_kbcon(
-            self.cap_max_increment.field, iloop, k22x, kbconx, self.heo_cup.field,
-            self.heso_cup.field, hkbo, ierr3, kbmax, self.po_cup.field, self.cap_max.field,
-            self.ztexec.field, self.zqexec.field,
-            0, itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte,
-            self.z_cup.field, self.entr_rate.field, self.heo.field, imid
+        self._cup_kbcon(
+            cap_inc=self.cap_max_increment,
+            iloop_in=iloop_in,
+            iloop=self.iloop,
+            k22=self.k22x,
+            kbcon=self.kbconx,
+            hcot=self.hcot,
+            dz=self.dz,
+            he_cup=self.heo_cup,
+            hes_cup=self.heso_cup,
+            hkb=self.hkbo,
+            ierr=self.ierr3,
+            kbmax=self.kbmax,
+            p_cup=self.po_cup,
+            cap_max=self.cap_max,
+            ztexec=self.ztexec,
+            zqexec=self.zqexec,
+            z_cup=self.z_cup,
+            entr_rate=self.entr_rate,
+            heo=self.heo,
+            imid=imid,
+            adjustment_attempts=self.adjustment_attempts,
+            tries=self.tries,
+            x_add=self.x_add,
+            pbcdif=self.pbcdif,
+            plus=self.plus,
+            found=self.found,
+            kbcon_m1=self.kbcon_m1,
         )
-
-        # Output variables match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{iloop:>4}{imid:>4}{k22x[0]:>4}{kbconx[0]:>4}{kbmax[0]:>4}")
-        # print(f"{self.cap_max_increment.field[0]:>20.12E}{hkbo[0]:>20.12E}{self.cap_max.field[0]:>20.12E}{self.ztexec.field[0]:>20.12E}{self.zqexec.field[0]:>20.12E}{entr_rate[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{self.heo_cup.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{self.z_cup.field[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}")
 
         # Calculate moisture convergence (mconv)
         for i in range(its, itf + 1):  # Adjust loop to start at zero
@@ -2366,7 +2472,7 @@ class GFDeepConvection:
         # Call cup_forcing_ens_3d to calculate cloud base mass flux
         cup_forcing_ens_3d(
             self.closure_n.field, self.xland1.field, aa0, aa1, xaa0_ens, mbdt, dtime,
-            ierr, ierr2, ierr3, xf_ens, axx, forcing,
+            ierr, self.ierr2.field, self.ierr3.field, xf_ens, axx, forcing,
             MAXENS3, mconv, rand_clos,
             self.po_cup.field, ktop, omeg, zdo, zdm, k22, zuo, pr_ens, edto, edtm, kbcon,
             ichoice,
@@ -2449,7 +2555,7 @@ class GFDeepConvection:
             xff_mid, xf_ens, ierr, dellat_ens, dellaq_ens,
             dellaqc_ens, outt, outq, outqc, dx,
             zuo, pre, pwo_ens, xmb, ktop,
-            edto, pwdo, 'deep', ierr2, ierr3,
+            edto, pwdo, 'deep', self.ierr2.field, self.ierr3.field,
             self.po_cup.field, pr_ens, MAXENS3,
             self.sig.field, self.closure_n.field, self.xland1.field, xmbm_in, xmbs_in,
             ichoice, imid, ipr, itf, jtf, ktf,
@@ -3124,139 +3230,6 @@ def cup_dd_moisture(
                     ierr[i, j] = 7
                     # ierrc[i, j] = "problem2 with buoy in cup_dd_moisture"
 
-def cup_env(z, qes, he, hes, t, q, p, z1, 
-            psur, ierr, tcrit, itest, 
-            itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte):
-    """
-    Calculates environmental moist static energy, saturation moist static energy,
-    heights, and saturation mixing ratio.
-    """
-
-    #before_z = z.copy()
-    #print("itest = ", itest)
-    #print(z)
-    # print(qes.sum())
-    #print(np.sum(z))
-    # print(he.sum())
-    # print(hes.sum())
-    # print(t.sum())
-    # print(q.sum())
-    # print(p.sum())
-
-
-
-    # Local variables
-    #import numpy as np
-
-    # Scalars
-    tcrit = 0.0
-    e = 0.0
-    tvbar = 0.0
-
-    # Arrays
-    tv = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))  # Virtual temperature array
-
-    for k in range(kts, ktf + 1):  # Zero-based indexing
-        for i in range(its, itf + 1):  # Zero-based indexing
-            for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                if ierr[i, j] == 0:
-                    e = satvap(t[i, j, k])  # Call the satvap function
-                    qes[i, j, k] = 0.622 * e / max(1.0e-8, (p[i, j, k] - e))
-                    if qes[i, j, k] <= 1.0e-16:
-                        qes[i, j, k] = 1.0e-16
-                    if qes[i, j, k] < q[i, j, k]:
-                        qes[i, j, k] = q[i, j, k]
-                    tv[i, j, k] = t[i, j, k] + 0.608 * q[i, j, k] * t[i, j, k]
-
-    if itest == 1 or itest == 0:
-        # Calculate heights for itest = 1 or 0
-        for i in range(its, itf + 1):  # Zero-based indexing
-            for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                if ierr[i, j] == 0:
-                    z[i, j, 0] = max(0.0, z1[i, j]) - (np.log(p[i, j, 0]) - np.log(psur[i, j])) * 287.0 * tv[i, j, 0] / 9.81
-
-        for k in range(kts + 1, ktf + 1):  # Zero-based indexing
-            for i in range(its, itf + 1):
-                for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                    if ierr[i, j] == 0:
-                        tvbar = 0.5 * tv[i, j, k] + 0.5 * tv[i, j, k - 1]
-                        z[i, j, k] = z[i, j, k - 1] - (np.log(p[i, j, k]) - np.log(p[i, j, k - 1])) * 287.0 * tvbar / 9.81
-
-    elif itest == 2:
-        # Calculate heights for itest = 2
-        for k in range(kts, ktf + 1):  # Zero-based indexing
-            for i in range(its, itf + 1):
-                for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                    if ierr[i, j] == 0:
-                        z[i, j, k] = (he[i, j, k] - 1004.0 * t[i, j, k] - 2.5e6 * q[i, j, k]) / 9.81
-                        z[i, j, k] = max(1.0e-3, z[i, j, k])
-
-    elif itest == -1:
-        # No operation for itest = -1
-        pass
-
-    for k in range(kts, ktf + 1):  # Zero-based indexing
-        for i in range(its, itf + 1):  # Zero-based indexing
-            for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                if ierr[i, j] == 0:
-                    he[i, j, k] = 9.81 * z[i, j, k] + 1004.0 * t[i, j, k] + 2.5e6 * q[i, j, k]
-                    hes[i, j, k] = 9.81 * z[i, j, k] + 1004.0 * t[i, j, k] + 2.5e6 * qes[i, j, k]
-                    if he[i, j, k] >= hes[i, j, k]:
-                        he[i, j, k] = hes[i, j, k]
-
-    #after_z = z.copy()
-    #print(after_z - before_z)
-
-def cup_env_clev(t, qes, q, he, hes, z, p, qes_cup, q_cup, 
-                 he_cup, hes_cup, z_cup, p_cup, gamma_cup, t_cup, 
-                 psur, ierr, z1, 
-                 itf, jtf, ktf, its, ite, jts, jte, kts, kte):
-    """
-    Calculates environmental values on cloud levels.
-    """
-
-    # Initialize arrays
-    for k in range(kts, ktf + 1):  # Zero-based indexing
-        for i in range(its, itf + 1):  # Zero-based indexing
-            for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                qes_cup[i, j, k] = 0.0
-                q_cup[i, j, k] = 0.0
-                hes_cup[i, j, k] = 0.0
-                he_cup[i, j, k] = 0.0
-                z_cup[i, j, k] = 0.0
-                p_cup[i, j, k] = 0.0
-                t_cup[i, j, k] = 0.0
-                gamma_cup[i, j, k] = 0.0
-
-    # Compute values for cloud levels
-    for k in range(kts + 1, ktf + 1):  # Zero-based indexing
-        for i in range(its, itf + 1):  # Zero-based indexing
-            for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                if ierr[i, j] == 0:
-                    qes_cup[i, j, k] = 0.5 * (qes[i, j, k - 1] + qes[i, j, k])
-                    q_cup[i, j, k] = 0.5 * (q[i, j, k - 1] + q[i, j, k])
-                    hes_cup[i, j, k] = 0.5 * (hes[i, j, k - 1] + hes[i, j, k])
-                    he_cup[i, j, k] = 0.5 * (he[i, j, k - 1] + he[i, j, k])
-                    if he_cup[i, j, k] > hes_cup[i, j, k]:
-                        he_cup[i, j, k] = hes_cup[i, j, k]
-                    z_cup[i, j, k] = 0.5 * (z[i, j, k - 1] + z[i, j, k])
-                    p_cup[i, j, k] = 0.5 * (p[i, j, k - 1] + p[i, j, k])
-                    t_cup[i, j, k] = 0.5 * (t[i, j, k - 1] + t[i, j, k])
-                    gamma_cup[i, j, k] = (XLV / CP) * (XLV / (R_V * t_cup[i, j, k] ** 2)) * qes_cup[i, j, k]
-
-    # Compute values for the first cloud level
-    for i in range(its, itf + 1):  # Zero-based indexing
-        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-            if ierr[i, j] == 0:
-                qes_cup[i, j, 0] = qes[i, j, 0]
-                q_cup[i, j, 0] = q[i, j, 0]
-                hes_cup[i, j, 0] = G * z1[i, j] + CP * t[i, j, 0] + XLV * qes[i, j, 0]
-                he_cup[i, j, 0] = G * z1[i, j] + CP * t[i, j, 0] + XLV * q[i, j, 0]
-                z_cup[i, j, 0] = z1[i, j]
-                p_cup[i, j, 0] = psur[i, j]
-                t_cup[i, j, 0] = t[i, j, 0]
-                gamma_cup[i, j, 0] = (XLV / CP) * (XLV / (R_V * t_cup[i, j, 0] ** 2)) * qes_cup[i, j, 0]
 
 def cup_forcing_ens_3d(closure_n, xland, aa0, aa1, xaa0, mbdt, dtime, ierr, ierr2, ierr3,
                        xf_ens, axx, forcing, maxens3, mconv, rand_clos,
