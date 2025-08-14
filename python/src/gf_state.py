@@ -1393,7 +1393,7 @@ class GFState:
         self.ichoice_s_in = int(_dataset.variables["ichoice_s_in"][:])
 
         # Get spp_cu_deep
-        self.spp_cu_deep = _dataset.variables["spp_cu_deep"][:]
+        self.spp_cu_deep = int(_dataset.variables["spp_cu_deep"][:])
 
         # Get spp_wts_cu_deep
         if _dataset.variables.get("spp_wts_cu_deep"):
@@ -1437,7 +1437,7 @@ class GFState:
             self.do_smoke_transport = False
 
         # Get kdt
-        self.kdt = _dataset.variables["kdt"][:]
+        self.kdt = float(_dataset.variables["kdt"][:])
 
         # Close the NetCDF file
         _dataset.close()

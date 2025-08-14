@@ -2027,3 +2027,147 @@ def finalize_shallow_convection_tendencies(
                 if k_mask <= ktop:
                     fp = sqrt(outu**2 + outv**2) / fpi  # Compute fp
                     outt += fp * dts * constants.G / constants.CP
+
+def initialize_deep_convection(
+    buo_flux: FloatFieldIJ, # type: ignore
+    hfx: FloatFieldIJ, # type: ignore
+    qfx: FloatFieldIJ, # type: ignore
+    t: FloatField, # type: ignore
+    rho: FloatField, # type: ignore
+    pgeoh: FloatFieldIJ, # type: ignore
+    zo: FloatField, # type: ignore
+    zws: FloatFieldIJ, # type: ignore
+    flux_tun: FloatFieldIJ, # type: ignore
+    ztexec: FloatFieldIJ, # type: ignore
+    zqexec: FloatFieldIJ, # type: ignore
+    kpbl: IntFieldIJ32, # type: ignore
+    lambau: FloatFieldIJ, # type: ignore
+    rand_mom: FloatFieldIJ, # type: ignore
+    c0: FloatFieldIJ, # type: ignore
+    xland: FloatFieldIJ, # type: ignore
+    xland1: IntFieldIJ32, # type: ignore
+    edto: FloatFieldIJ, # type: ignore
+    closure_n: FloatFieldIJ, # type: ignore
+    xmb_out: FloatFieldIJ, # type: ignore
+    cap_max: FloatFieldIJ, # type: ignore
+    cap_max_increment: FloatFieldIJ, # type: ignore
+    cap_suppress_j: FloatFieldIJ, # type: ignore
+    do_capsuppress: int,
+    imid: int,
+    nranflag: int,
+    entr_rate: FloatFieldIJ, # type: ignore
+    csum: IntFieldIJ32, # type: ignore
+    radius: FloatFieldIJ, # type: ignore
+    frh: FloatFieldIJ, # type: ignore
+    dx: FloatFieldIJ, # type: ignore
+    sig: FloatFieldIJ, # type: ignore
+    forcing: FloatField, # type: ignore
+    kdt: float,
+    dtime: float,
+    frh_out: FloatFieldIJ, # type: ignore
+    cnvwt: FloatField, # type: ignore
+    zuo: FloatField, # type: ignore
+    zdo: FloatField, # type: ignore
+    z: FloatField, # type: ignore
+    xz: FloatField, # type: ignore
+    cupclw: FloatField, # type: ignore
+    cd: FloatField, # type: ignore
+    cdd: FloatField, # type: ignore
+    edtmax: FloatFieldIJ, # type: ignore
+    edtmin: FloatFieldIJ, # type: ignore
+    kstabm: IntFieldIJ32, # type: ignore
+    start_level: IntFieldIJ32, # type: ignore
+):
+    """
+    Initializes the deep convection parameters.
+    """
+    from __externals__ import ( # type: ignore
+        cap_maxs,
+        k_end,
+    )
+
+    with computation(FORWARD), interval(0,1):
+        buo_flux = (hfx / constants.CP + 0.608 * t * qfx / constants.XLV) / rho
+        pgeoh = zo * constants.G
+        zws = max(0.0, flux_tun * 0.41 * buo_flux * zo[0, 0, 1] * constants.G / t)
+        if zws > constants.TINY * pgeoh:
+            zws = 1.2 * zws ** 0.3333
+            ztexec = max(flux_tun * hfx / (rho * zws * constants.CP), 0.0)
+            zqexec = max(flux_tun * qfx / (rho * zws * constants.XLV), 0.0)
+        zws = max(0.0, 0.001 - flux_tun * 0.41 * buo_flux * zo.at(K=kpbl) * constants.G / t.at(K=kpbl))
+        zws = 1.2 * zws ** 0.3333
+        zws = zws * rho.at(K=kpbl)
+
+        lambau = 2.0
+        if nranflag == 1:
+            lambau = 1.5 + rand_mom
+        c0 = 0.004
+        xland1 = int(xland + 0.0001)
+        if xland > 1.5 or xland < 0.5:
+            xland1 = 0
+        if xland1 == 1:
+            c0 = 0.002
+        if imid == 1:
+            c0 = 0.002
+        edto = 0.0
+        closure_n = 16.0
+        xmb_out = 0.0
+        cap_max = cap_maxs
+        cap_max_increment = 20.0
+        if xland1 != 0:
+            if ztexec > 0.0:
+                cap_max += 25.0
+            if ztexec < 0.0:
+                cap_max -= 25.0
+
+        if constants.USE_EXCESS == 0:
+            ztexec = 0.0
+            zqexec = 0.0
+
+        if do_capsuppress == 1:
+            if abs(cap_suppress_j - 1.0) < 0.1:
+                cap_max = cap_maxs + 75.0
+            elif abs(cap_suppress_j) < 0.1:
+                cap_max = 10.0
+
+        entr_rate = 7.0e-5 - min(20.0, float(csum)) * 3.0e-6
+        if xland1 == 0:
+            entr_rate = 7.0e-5
+        if dx < constants.DX_THRESH:
+            entr_rate = 2.0e-4
+        if imid == 1:
+            entr_rate = 3.0e-4
+
+        radius = 0.2 / entr_rate
+        frh = min(1.0, 3.14 * radius * radius / dx / dx)
+        if frh > constants.FRH_THRESH:
+            frh = constants.FRH_THRESH
+            radius = sqrt(frh * dx * dx / 3.14)
+            entr_rate = 0.2 / radius
+
+        sig = (1.0 - frh)**2
+        # frh_out[i, j] = frh
+        if forcing[0, 0, 6] == 0.0:  # Adjusted index for Python (Fortran index 7 -> Python index 6)
+            sig = 1.0
+        if kdt <= (3600.0 / dtime):
+            sig = 1.0
+        frh_out = frh * sig
+
+        edtmax = 1.0
+        edtmin = 0.1
+
+        kstabm = k_end - 1
+        start_level = k_end
+
+    with computation(PARALLEL), interval(...):
+        cnvwt = 0.0
+        zuo = 0.0
+        zdo = 0.0
+        z = zo
+        xz = zo
+        cupclw = 0.0
+        if imid == 1:
+            cd = 0.5 * entr_rate
+        else:
+            cd = 0.1 * entr_rate
+        cdd = 1.0e-9

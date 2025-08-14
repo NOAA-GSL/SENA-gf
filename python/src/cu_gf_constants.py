@@ -25,3 +25,6 @@ BETA_DD = 4.0
 G_BETA_DD = 6.0
 C0_SHAL = 0.001  # Parameter for shallow convection
 MBDT = 0.5  # Mass balance delta time (s)
+USE_EXCESS = 0  # Flag for shallow and mid convection tuning
+DX_THRESH = 6500.0 # Threshold for grid spacing (meters)
+FRH_THRESH = 0.9  # Maximum allowed fractional coverage
