@@ -16,6 +16,10 @@ from cu_gf_stencils import (
     cup_env_clev_stencil,
     cup_kbcon_stencil,
     get_partition_liq_ice_stencil,
+    initialize_cloud_winds,
+    find_max_cloud_base_index_deep,
+    set_max_pressure_level_deep,
+    compute_cloud_base_properties,
 )
 
 # Constants
@@ -523,6 +527,34 @@ class GFDeepConvection:
             units="none",
             dtype=state.rkind,
         )
+        self.hkb: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.u_cup: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.v_cup: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.kdet: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+
+        # Initialize a k-mask for selecting "this vertical level"
+        self.k_mask: Quantity = state.quantity_factory.zeros(
+            dims=[Z_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
+        self.k_mask.field[:] = np.arange(self.state.km)
 
         self._initialize_deep_convection = state.stencil_factory.from_dims_halo(
             func=initialize_deep_convection,
@@ -551,6 +583,30 @@ class GFDeepConvection:
 
         self._get_partition_liq_ice = state.stencil_factory.from_dims_halo(
             func=get_partition_liq_ice_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        self._initialize_cloud_winds = state.stencil_factory.from_dims_halo(
+            func=initialize_cloud_winds,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        self._find_max_cloud_base_index_deep = state.stencil_factory.from_dims_halo(
+            func=find_max_cloud_base_index_deep,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        self._compute_cloud_base_properties = state.stencil_factory.from_dims_halo(
+            func=compute_cloud_base_properties,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        self._set_max_pressure_level_deep = state.stencil_factory.from_dims_halo(
+            func=set_max_pressure_level_deep,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
         )
@@ -643,7 +699,6 @@ class GFDeepConvection:
         zcutdown = 0.0
         depth_min = 0.0
         zkbmax = 0.0
-        z_detr = 0.0
         zktop = 0.0
         dh = 0.0
         trash = 0.0
@@ -655,8 +710,6 @@ class GFDeepConvection:
         radius = 0.0
         zcutdown = 0.0
         depth_min = 0.0
-        zkbmax = 0.0
-        z_detr = 0.0
         zktop = 0.0
         dh = 0.0
         trash = 0.0
@@ -757,8 +810,6 @@ class GFDeepConvection:
         dellaq = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         dellat = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         dellaqc = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        u_cup = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        v_cup = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         uc = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         vc = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         ucd = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
@@ -776,7 +827,6 @@ class GFDeepConvection:
         aa0 = np.zeros((ite - its + 1, jte - jts + 1,))
         xaa0 = np.zeros((ite - its + 1, jte - jts + 1,))
         xaa0_ens = np.zeros((ite - its + 1, jte - jts + 1, 1))
-        hkb = np.zeros((ite - its + 1, jte - jts + 1,))
         xhkb = np.zeros((ite - its + 1, jte - jts + 1,))
         xmb = np.zeros((ite - its + 1, jte - jts + 1,))
         pwavo = np.zeros((ite - its + 1, jte - jts + 1,))
@@ -794,7 +844,6 @@ class GFDeepConvection:
 
         # Integer arrays for levels and indices
         kzdown = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
-        kdet = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
         kstabi = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
         ktopdby = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
         turn = 0
@@ -853,11 +902,11 @@ class GFDeepConvection:
         if imid == 1:
             cumulus = constants.CUMULUS_MID
             pmin = 75.0  # Minimum pressure for mid-level convection
-            zkbmax = 2000.0
+            zkbmax = constants.ZKBMAX_MID
         else:
             cumulus = constants.CUMULUS_DEEP
             pmin = 150.0
-            zkbmax = 4000.0
+            zkbmax = constants.ZKBMAX_DEEP
 
         # Initialize downdraft top levels
         ktopdby[:, :] = -1
@@ -878,9 +927,6 @@ class GFDeepConvection:
 
         # Set height (m) above which no downdrafts are allowed to originate
         zcutdown = 4000.0
-
-        # Set depth (m) over which downdraft detrains all its mass
-        z_detr = 500.0
 
         # Calculate the threshold for fractional cloud coverage
         sig_thresh = (1.0 - constants.FRH_THRESH)**2
@@ -1026,59 +1072,50 @@ class GFDeepConvection:
             norm=self.norm,
         )
 
-        # First loop: Initialize u_cup and v_cup, and calculate self.cap_max.field
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0:
-                    if kpbl[i, j] > 4 and imid == 1:
-                        self.cap_max.field[i, j] = self.po_cup.field[i, j, kpbl[i, j]]
-                    u_cup[i, j, kts] = us[i, j, kts]
-                    v_cup[i, j, kts] = vs[i, j, kts]
-                    for k in range(kts + 1, ktf + 1):  # Adjust loop to start at zero
-                        u_cup[i, j, k] = 0.5 * (us[i, j, k - 1] + us[i, j, k])
-                        v_cup[i, j, k] = 0.5 * (vs[i, j, k - 1] + vs[i, j, k])
+        self._initialize_cloud_winds(
+            us=us,
+            vs=vs,
+            u_cup=self.u_cup,
+            v_cup=self.v_cup,
+            ierr=ierr,
+        )
 
-        # Second loop: Determine kbmax and kdet levels
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0:
-                    # Find kbmax
-                    for k in range(kts, ktf + 1):  # Adjust loop to start at zero
-                        if self.zo_cup.field[i, j, k] > zkbmax + z1[i, j]:
-                            self.kbmax.field[i, j] = k
-                            break
+        self._find_max_cloud_base_index_deep(
+            zo_cup=self.zo_cup,
+            z1=z1,
+            zkbmax=zkbmax,
+            kbmax=self.kbmax,
+            kdet=self.kdet,
+            k_mask=self.k_mask,
+            found=self.found,
+            ierr=ierr,
+        )
 
-                    # Find kdet
-                    for k in range(kts, ktf + 1):  # Adjust loop to start at zero
-                        if self.zo_cup.field[i, j, k] > z_detr + z1[i, j]:
-                            kdet[i, j] = k
-                            break
+        self._set_max_pressure_level_deep(
+            kpbl=kpbl,
+            cap_max=self.cap_max,
+            po_cup=self.po_cup,
+            k22=k22,
+            heo_cup=self.heo_cup,
+            kbmax=self.kbmax,
+            ktop=ktop,
+            kbcon=kbcon,
+            k_mask=self.k_mask,
+            imid=imid,
+            ierr=ierr, 
+        )
 
-        # # Initialize starting level for k22
-        start_k22 = 1
-
-        # Parallel loop to determine k22 (level with highest moist static energy content)
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0:
-                    # Find the level with the highest moist static energy content
-                    k22[i, j] = np.argmax(self.heo_cup.field[i, j, start_k22:self.kbmax.field[i, j] + 3]) + start_k22
-                    if k22[i, j] >= self.kbmax.field[i, j]:
-                        ierr[i, j] = 2
-                        # Handle error message if not using OpenACC
-                        # ierrc[i, j] = "could not find k22"
-                        ktop[i, j] = -1
-                        k22[i, j] = -1
-                        kbcon[i, j] = -1
-
-        # Parallel loop to calculate cloud base properties
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0:
-                    x_add = XLV * self.zqexec.field[i, j] + CP * self.ztexec.field[i, j]
-                    # Call get_cloud_bc to calculate cloud base properties
-                    hkb[i, j] = get_cloud_bc(kte, self.he_cup.field[i, j, :kte + 1], hkb[i, j], k22[i, j], x_add)
-                    self.hkbo.field[i, j] = get_cloud_bc(kte, self.heo_cup.field[i, j, :kte + 1], self.hkbo.field[i, j], k22[i, j], x_add)
+        self._compute_cloud_base_properties(
+            zqexec=self.zqexec,
+            ztexec=self.ztexec,
+            he_cup=self.he_cup,
+            hkb=self.hkb,
+            heo_cup=self.heo_cup,
+            hkbo=self.hkbo,
+            k22=k22,
+            x_add=self.x_add,
+            ierr=ierr,
+        )
 
         # Initialize loop parameters
         if imid == 1:
@@ -1142,7 +1179,7 @@ class GFDeepConvection:
                     # Call get_cloud_bc to initialize conditions for updraft
                     self.start_level.field[i, j] = k22[i, j]
                     x_add = XLV * self.zqexec.field[i, j] + CP * self.ztexec.field[i, j]
-                    hkb[i, j] = get_cloud_bc(kte, self.he_cup.field[i, j, :kte + 1], hkb[i, j], k22[i, j], x_add)
+                    self.hkb.field[i, j] = get_cloud_bc(kte, self.he_cup.field[i, j, :kte + 1], self.hkb.field[i, j], k22[i, j], x_add)
 
         if imid == 1:
             # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
@@ -1331,15 +1368,15 @@ class GFDeepConvection:
             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                 if ierr[i, j] == 0:
                     for k in range(self.start_level.field[i, j] + 1):  # Adjust range for zero-based indexing
-                        uc[i, j, k] = u_cup[i, j, k]
-                        vc[i, j, k] = v_cup[i, j, k]
+                        uc[i, j, k] = self.u_cup.field[i, j, k]
+                        vc[i, j, k] = self.v_cup.field[i, j, k]
 
                     for k in range(self.start_level.field[i, j]):  # Adjust range for zero-based indexing
                         hc[i, j, k] = self.he_cup.field[i, j, k]
                         hco[i, j, k] = self.heo_cup.field[i, j, k]
 
                     k = self.start_level.field[i, j]  # Adjust for zero-based indexing
-                    hc[i, j, k] = hkb[i, j]
+                    hc[i, j, k] = self.hkb.field[i, j]
                     hco[i, j, k] = self.hkbo.field[i, j]
 
         # Parallel loop to calculate moist static energy and buoyancy
@@ -1411,8 +1448,8 @@ class GFDeepConvection:
                     keep_going = True
                     while keep_going:
                         keep_going = False
-                        if jmini - 1 < kdet[i, j]:
-                            kdet[i, j] = jmini - 1
+                        if jmini - 1 < self.kdet.field[i, j]:
+                            self.kdet.field[i, j] = jmini - 1
                         if jmini >= ktop[i, j] - 1:
                             jmini = ktop[i, j] - 2
                         ki = jmini
@@ -1537,13 +1574,13 @@ class GFDeepConvection:
                     uc[i, j, k] = (
                         (uc[i, j, k - 1] * zu[i, j, k - 1] - 0.5 * up_massdetru[i, j, k - 1] * uc[i, j, k - 1] +
                         up_massentru[i, j, k - 1] * us[i, j, k - 1] -
-                        pgcon * 0.5 * (zu[i, j, k] + zu[i, j, k - 1]) * (u_cup[i, j, k] - u_cup[i, j, k - 1])) /
+                        pgcon * 0.5 * (zu[i, j, k] + zu[i, j, k - 1]) * (self.u_cup.field[i, j, k] - self.u_cup.field[i, j, k - 1])) /
                         (zu[i, j, k - 1] - 0.5 * up_massdetru[i, j, k - 1] + up_massentru[i, j, k - 1])
                     )
                     vc[i, j, k] = (
                         (vc[i, j, k - 1] * zu[i, j, k - 1] - 0.5 * up_massdetru[i, j, k - 1] * vc[i, j, k - 1] +
                         up_massentru[i, j, k - 1] * vs[i, j, k - 1] -
-                        pgcon * 0.5 * (zu[i, j, k] + zu[i, j, k - 1]) * (v_cup[i, j, k] - v_cup[i, j, k - 1])) /
+                        pgcon * 0.5 * (zu[i, j, k] + zu[i, j, k - 1]) * (self.v_cup.field[i, j, k] - self.v_cup.field[i, j, k - 1])) /
                         (zu[i, j, k - 1] - 0.5 * up_massdetru[i, j, k - 1] + up_massentru[i, j, k - 1])
                     )
                     dby[i, j, k] = hc[i, j, k] - self.hes_cup.field[i, j, k]
@@ -1578,8 +1615,8 @@ class GFDeepConvection:
                     continue
                 for k in range(ktop[i, j] + 1, ktf + 1):  # Adjust range for zero-based indexing
                     hc[i, j, k] = self.hes_cup.field[i, j, k]
-                    uc[i, j, k] = u_cup[i, j, k]
-                    vc[i, j, k] = v_cup[i, j, k]
+                    uc[i, j, k] = self.u_cup.field[i, j, k]
+                    vc[i, j, k] = self.v_cup.field[i, j, k]
                     hco[i, j, k] = self.heso_cup.field[i, j, k]
                     dby[i, j, k] = 0.0
                     dbyo[i, j, k] = 0.0
@@ -1606,8 +1643,8 @@ class GFDeepConvection:
         for i in range(its, itf + 1):  # Adjust loop to start at zero
             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                 if ierr[i, j] == 0:
-                    if jmin[i, j] - 1 < kdet[i, j]:
-                        kdet[i, j] = jmin[i, j] - 1
+                    if jmin[i, j] - 1 < self.kdet.field[i, j]:
+                        self.kdet.field[i, j] = jmin[i, j] - 1
                     if -self.zo_cup.field[i, j, kbcon[i, j]] + self.zo_cup.field[i, j, ktop[i, j]] < depth_min:
                         ierr[i, j] = 6
                         # ierrc[i, j] = "cloud depth very shallow"
@@ -1623,8 +1660,8 @@ class GFDeepConvection:
                     dd_massentru[i, j, k] = 0.0
                     dd_massdetru[i, j, k] = 0.0
                     hcdo[i, j, k] = self.heso_cup.field[i, j, k]
-                    ucd[i, j, k] = u_cup[i, j, k]
-                    vcd[i, j, k] = v_cup[i, j, k]
+                    ucd[i, j, k] = self.u_cup.field[i, j, k]
+                    vcd[i, j, k] = self.v_cup.field[i, j, k]
                     dbydo[i, j, k] = 0.0
                     mentrd_rate_2d[i, j, k] = self.entr_rate.field[i, j]
 
@@ -1643,7 +1680,7 @@ class GFDeepConvection:
                 dd_massentro[i, j, :] = 0.0
 
                 # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-                # print(f"{kdet[0]:>4}{jmin[0]:>4}{kpbl[0]:>4}{ipr:>4}{xland1[0]:>4}{csum[0]:>4}{pmin_lev[0]:>4}")
+                # print(f"{self.kdet.field[0]:>4}{jmin[0]:>4}{kpbl[0]:>4}{ipr:>4}{xland1[0]:>4}{csum[0]:>4}{pmin_lev[0]:>4}")
                 # print(f"{rand_vmas[0]:>20.12E}{beta:>20.12E}")
                 # for k in range(kte+1):
                 #     print(f"{self.po_cup.field[0,k]:>20.12E}{zdo[0,k]:>20.12E}")
@@ -1653,17 +1690,17 @@ class GFDeepConvection:
                 # Call to get_zu_zd_pdf_fim (assumed to be a Python function)
                 # get_zu_zd_pdf_fim(
                 #     -1, self.po_cup.field[i, j, :], rand_vmas[i, j], 0.0, ipr, xland1[i, j], zuh2, 4,
-                #     ierr[i, j], kdet[i, j], jmin[i, j] + 1, zdo[i, j, :], kts, kte, ktf, beta, kpbl[i, j], csum[i, j], pmin_lev[i, j]
+                #     ierr[i, j], self.kdet.field[i, j], jmin[i, j] + 1, zdo[i, j, :], kts, kte, ktf, beta, kpbl[i, j], csum[i, j], pmin_lev[i, j]
                 # )
 
                 # get_zu_zd_pdf_fim(
                 #     -1, self.po_cup.field[i, j, :], rand_vmas[i, j], 0.0, 4,
-                #     kdet[i, j], jmin[i, j] + 1, zdo[i, j, :], kts, kte, ktf, kpbl[i, j], ierr[i, j],
+                #     self.kdet.field[i, j], jmin[i, j] + 1, zdo[i, j, :], kts, kte, ktf, kpbl[i, j], ierr[i, j],
                 # )
 
         get_zu_zd_pdf_fim(
             np.full((ite - its + 1, jte - jts + 1,), -1, dtype=int), self.po_cup.field, rand_vmas, 0.0, 4,
-            kdet, jmin + 1, zdo, its, itf, jts, jtf, kts, kte, ktf, kpbl, ierr,
+            self.kdet.field, jmin + 1, zdo, its, itf, jts, jtf, kts, kte, ktf, kpbl, ierr,
         )
 
 
@@ -1674,7 +1711,7 @@ class GFDeepConvection:
 
                 # Output variable match
                 # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-                # print(f"{kdet[0]:>4}{jmin[0]:>4}{kpbl[0]:>4}{ipr:>4}{xland1[0]:>4}{csum[0]:>4}{pmin_lev[0]:>4}")
+                # print(f"{self.kdet.field[0]:>4}{jmin[0]:>4}{kpbl[0]:>4}{ipr:>4}{xland1[0]:>4}{csum[0]:>4}{pmin_lev[0]:>4}")
                 # print(f"{rand_vmas[0]:>20.12E}{beta:>20.12E}")
                 # for k in range(kte+1):
                 #     print(f"{self.po_cup.field[0,k]:>20.12E}{zdo[0,k]:>20.12E}")
@@ -1730,7 +1767,7 @@ class GFDeepConvection:
 
                 dbydo[i, j, jmin[i, j]] = hcdo[i, j, jmin[i, j]] - self.heso_cup.field[i, j, jmin[i, j]]
                 bud[i, j] = dbydo[i, j, jmin[i, j]] * (self.zo_cup.field[i, j, jmin[i, j] + 1] - self.zo_cup.field[i, j, jmin[i, j]])
-                ucd[i, j, jmin[i, j] + 1] = 0.5 * (uc[i, j, jmin[i, j] + 1] + u_cup[i, j, jmin[i, j] + 1])
+                ucd[i, j, jmin[i, j] + 1] = 0.5 * (uc[i, j, jmin[i, j] + 1] + self.u_cup.field[i, j, jmin[i, j] + 1])
                 for ki in range(jmin[i, j], -1, -1):
                     dzo = self.zo_cup.field[i, j, ki + 1] - self.zo_cup.field[i, j, ki]
                     h_entr = 0.5 * (self.heo.field[i, j, ki] + 0.5 * (hco[i, j, ki] + hco[i, j, ki + 1]))
@@ -2082,11 +2119,11 @@ class GFDeepConvection:
                     continue
                 dp = 100.0 * (self.po_cup.field[i, j, 0] - self.po_cup.field[i, j, 1])  # Adjusted for zero-based indexing
                 dellu[i, j, 0] = PGCD * (edto[i, j] * zdo[i, j, 1] * ucd[i, j, 1] -
-                                        edto[i, j] * zdo[i, j, 1] * u_cup[i, j, 1]) * G / dp - \
-                                zuo[i, j, 1] * (uc[i, j, 1] - u_cup[i, j, 1]) * G / dp
+                                        edto[i, j] * zdo[i, j, 1] * self.u_cup.field[i, j, 1]) * G / dp - \
+                                zuo[i, j, 1] * (uc[i, j, 1] - self.u_cup.field[i, j, 1]) * G / dp
                 dellv[i, j, 0] = PGCD * (edto[i, j] * zdo[i, j, 1] * vcd[i, j, 1] -
-                                        edto[i, j] * zdo[i, j, 1] * v_cup[i, j, 1]) * G / dp - \
-                                zuo[i, j, 1] * (vc[i, j, 1] - v_cup[i, j, 1]) * G / dp
+                                        edto[i, j] * zdo[i, j, 1] * self.v_cup.field[i, j, 1]) * G / dp - \
+                                zuo[i, j, 1] * (vc[i, j, 1] - self.v_cup.field[i, j, 1]) * G / dp
 
                 for k in range(kts + 1, ktop[i, j] + 1):
                     # These three are only used at or near mass detrainment and/or entrainment levels
@@ -2137,17 +2174,17 @@ class GFDeepConvection:
                         pgc = 0.0
 
                     dellu[i, j, k] = (
-                        -(zuo[i, j, k + 1] * (uc[i, j, k + 1] - u_cup[i, j, k + 1]) -
-                        zuo[i, j, k] * (uc[i, j, k] - u_cup[i, j, k])) * G / dp +
-                        (zdo[i, j, k + 1] * (ucd[i, j, k + 1] - u_cup[i, j, k + 1]) -
-                        zdo[i, j, k] * (ucd[i, j, k] - u_cup[i, j, k])) * G / dp * edto[i, j] * PGCD
+                        -(zuo[i, j, k + 1] * (uc[i, j, k + 1] - self.u_cup.field[i, j, k + 1]) -
+                        zuo[i, j, k] * (uc[i, j, k] - self.u_cup.field[i, j, k])) * G / dp +
+                        (zdo[i, j, k + 1] * (ucd[i, j, k + 1] - self.u_cup.field[i, j, k + 1]) -
+                        zdo[i, j, k] * (ucd[i, j, k] - self.u_cup.field[i, j, k])) * G / dp * edto[i, j] * PGCD
                     )
 
                     dellv[i, j, k] = (
-                        -(zuo[i, j, k + 1] * (vc[i, j, k + 1] - v_cup[i, j, k + 1]) -
-                        zuo[i, j, k] * (vc[i, j, k] - v_cup[i, j, k])) * G / dp +
-                        (zdo[i, j, k + 1] * (vcd[i, j, k + 1] - v_cup[i, j, k + 1]) -
-                        zdo[i, j, k] * (vcd[i, j, k] - v_cup[i, j, k])) * G / dp * edto[i, j] * PGCD
+                        -(zuo[i, j, k + 1] * (vc[i, j, k + 1] - self.v_cup.field[i, j, k + 1]) -
+                        zuo[i, j, k] * (vc[i, j, k] - self.v_cup.field[i, j, k])) * G / dp +
+                        (zdo[i, j, k + 1] * (vcd[i, j, k + 1] - self.v_cup.field[i, j, k + 1]) -
+                        zdo[i, j, k] * (vcd[i, j, k] - self.v_cup.field[i, j, k])) * G / dp * edto[i, j] * PGCD
                     )
 
         # Calculate tendencies for heat and moisture

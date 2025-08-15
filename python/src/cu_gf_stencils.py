@@ -388,7 +388,7 @@ def cup_env_clev_stencil(
             t_cup = t
             gamma_cup = (constants.XLV / constants.CP) * (constants.XLV / (constants.R_V * t_cup ** 2.0)) * qes_cup
 
-def initialize_cloud_winds_shallow(
+def initialize_cloud_winds(
     us: FloatField, # type: ignore
     vs: FloatField, # type: ignore
     u_cup: FloatField, # type: ignore
@@ -426,7 +426,7 @@ def find_max_cloud_base_index(
     with computation(FORWARD), interval(...):
         if ierr == 0:
             if kbmax_mask:
-                if zo_cup > constants.ZKBMAX + z1:
+                if zo_cup > constants.ZKBMAX_SHAL + z1:
                     kbmax = k_mask
                     kbmax_mask = False
 
@@ -2226,3 +2226,77 @@ def get_partition_liq_ice_stencil(
         if constants.MELT_GLAC and cumulus_type == constants.CUMULUS_DEEP:
             if ierr == 0:
                 melting_layer = melting_layer / (norm + 1e-6) * (100 * (po_cup.at(K=k_start) - po_cup.at(K=k_end - 1)) / constants.G)
+
+def set_max_pressure_level_deep(
+    kpbl: IntFieldIJ32, # type: ignore
+    cap_max: FloatFieldIJ, # type: ignore
+    po_cup: FloatField, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    heo_cup: FloatField, # type: ignore
+    kbmax: IntFieldIJ32, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    imid: int,
+    ierr: IntFieldIJ32, # type: ignore
+):
+    """
+    Sets the maximum pressure level based on the cloud base height.
+    """
+    with computation(FORWARD), interval(0,1):
+        if ierr == 0:
+            if kpbl > 4 and imid == 1:  # This is the only differece between shallow and deep convection
+                cap_max = po_cup.at(K=kpbl)
+                # cap_max = po_cup[0, 0, kpbl]
+            k22 = 1
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            if k_mask <= kbmax + 2:
+                if heo_cup > heo_cup.at(K=k22):
+                # if heo_cup > heo_cup[0, 0, k22 - k_mask]:
+                    k22 = k_mask
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            if k22 >= kbmax:
+                ierr = 2
+                ktop = -1
+                k22 = -1
+                kbcon = -1
+
+def find_max_cloud_base_index_deep(
+    zo_cup: FloatField, # type: ignore
+    z1: FloatFieldIJ, # type: ignore
+    zkbmax: float,
+    kbmax: IntFieldIJ32, # type: ignore
+    kdet: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+):
+    """
+    Finds the maximum cloud base index based on the height of the cloud base.
+    """
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            found = False
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if not found:
+                if zo_cup > zkbmax + z1:
+                    kbmax = k_mask
+                    found = True
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            found = False
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if not found:
+                if zo_cup > constants.Z_DETR + z1:
+                    kdet = k_mask
+                    found = True

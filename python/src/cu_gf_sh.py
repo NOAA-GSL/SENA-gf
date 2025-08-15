@@ -15,7 +15,7 @@ from cu_gf_stencils import (
     estimate_convective_velocity_and_excesses,
     cup_env_stencil,
     cup_env_clev_stencil,
-    initialize_cloud_winds_shallow,
+    initialize_cloud_winds,
     find_max_cloud_base_index,
     set_max_pressure_level,
     compute_cloud_base_properties,
@@ -845,8 +845,8 @@ class GFShallowConvection:
             externals={},
         )
 
-        self._initialize_cloud_winds_shallow = state.stencil_factory.from_dims_halo(
-            func=initialize_cloud_winds_shallow,
+        self._initialize_cloud_winds = state.stencil_factory.from_dims_halo(
+            func=initialize_cloud_winds,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
         )
@@ -1105,7 +1105,7 @@ class GFShallowConvection:
             z1=z1,
         )
 
-        self._initialize_cloud_winds_shallow(
+        self._initialize_cloud_winds(
             us=us,
             vs=vs,
             u_cup=self.u_cup,
