@@ -15,6 +15,7 @@ from cu_gf_stencils import (
     cup_env_stencil,
     cup_env_clev_stencil,
     cup_kbcon_stencil,
+    get_partition_liq_ice_stencil,
 )
 
 # Constants
@@ -41,9 +42,6 @@ SCAV_FACTOR = 0.5  # Scavenging factor
 MAXENS3 = 16
 
 # Meltglac parameters
-MELT_GLAC = True  # Flag to enable / disable ice phase / melting
-T_0 = 273.16  # Reference temperature (K)
-T_ICE = 250.16  # Ice temperature (K)
 XLF = 0.333e6  # Latent heat of freezing (J / kg)
 
 QRC_CRIT = 2.0e-4  # Critical value for cloud water / ice detrainment (kg / kg)
@@ -510,6 +508,21 @@ class GFDeepConvection:
             units="none",
             dtype=state.ikind,
         )
+        self.norm: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.p_liq_ice: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.melting_layer: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
 
         self._initialize_deep_convection = state.stencil_factory.from_dims_halo(
             func=initialize_deep_convection,
@@ -535,6 +548,13 @@ class GFDeepConvection:
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
         )
+
+        self._get_partition_liq_ice = state.stencil_factory.from_dims_halo(
+            func=get_partition_liq_ice_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
 
     def cu_gf_deep_run(self,
         itf, jtf, ktf, its, ite, jts, jte, kts, kte,  # Dimensions
@@ -668,7 +688,6 @@ class GFDeepConvection:
         # Arrays
         pefc = np.zeros((ite - its + 1, jte - jts + 1,))
         flg = np.zeros((ite - its + 1, jte - jts + 1,), dtype=bool)
-        cumulus = np.full((ite - its + 1, jte - jts + 1,), "", dtype="U4")
         up_massentr = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         up_massdetr = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         c1d = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
@@ -807,8 +826,6 @@ class GFDeepConvection:
         pr_ens = np.zeros((ite - its + 1, jte - jts + 1, MAXENS3))  # maxens3 is used for the second dimension
 
         # Arrays for liquid/ice partitioning and melting layers
-        p_liq_ice = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        melting_layer = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         melting = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
 
         # Scalars for rain evaporation and energy calculations
@@ -834,11 +851,11 @@ class GFDeepConvection:
 
         # Set cumulus type
         if imid == 1:
-            cumulus = 'mid'
+            cumulus = constants.CUMULUS_MID
             pmin = 75.0  # Minimum pressure for mid-level convection
             zkbmax = 2000.0
         else:
-            cumulus = 'deep'
+            cumulus = constants.CUMULUS_DEEP
             pmin = 150.0
             zkbmax = 4000.0
 
@@ -999,24 +1016,15 @@ class GFDeepConvection:
         )
 
         # Call get_partition_liq_ice to calculate partition between liquid and ice cloud contents
-
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"")
-        # print(f"")
-        # for k in range(kte+1):
-        #     print(f"{tn[0,k]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{p_liq_ice[0,k]:>20.12E}{melting_layer[0,k]:>20.12E}")
-
-        get_partition_liq_ice(
-            ierr, tn, self.po_cup.field, p_liq_ice, melting_layer,
-            itf, jtf, ktf, its, ite, jts, jte, kts, kte, cumulus
+        self._get_partition_liq_ice(
+            tn=tn,
+            po_cup=self.po_cup,
+            p_liq_ice=self.p_liq_ice,
+            melting_layer=self.melting_layer,
+            cumulus_type=cumulus,
+            ierr=ierr,
+            norm=self.norm,
         )
-
-        # Output variable match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"")
-        # print(f"")
-        # for k in range(kte+1):
-        #     print(f"{tn[0,k]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{p_liq_ice[0,k]:>20.12E}{melting_layer[0,k]:>20.12E}")
 
         # First loop: Initialize u_cup and v_cup, and calculate self.cap_max.field
         for i in range(its, itf + 1):  # Adjust loop to start at zero
@@ -1546,8 +1554,8 @@ class GFDeepConvection:
                     )
 
                     # Include glaciation effects
-                    hc[i, j, k] += (1.0 - p_liq_ice[i, j, k]) * qrco[i, j, k] * XLF
-                    hco[i, j, k] += (1.0 - p_liq_ice[i, j, k]) * qrco[i, j, k] * XLF
+                    hc[i, j, k] += (1.0 - self.p_liq_ice.field[i, j, k]) * qrco[i, j, k] * XLF
+                    hco[i, j, k] += (1.0 - self.p_liq_ice.field[i, j, k]) * qrco[i, j, k] * XLF
                     dby[i, j, k] = hc[i, j, k] - self.hes_cup.field[i, j, k]
                     dbyo[i, j, k] = hco[i, j, k] - self.heso_cup.field[i, j, k]
                     dz = self.zo_cup.field[i, j, k + 1] - self.zo_cup.field[i, j, k]
@@ -2028,13 +2036,13 @@ class GFDeepConvection:
         # print(f"")
         # print(f"{edto[0]:>20.12E}")
         # for k in range(kte+1):
-        #     print(f"{self.tn_cup.field[0,k]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{p_liq_ice[0,k]:>20.12E}{melting_layer[0,k]:>20.12E}{qrco[0,k]:>20.12E}{pwo[0,k]:>20.12E}")
+        #     print(f"{self.tn_cup.field[0,k]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{self.p_liq_ice.field[0,k]:>20.12E}{self.melting_layer.field[0,k]:>20.12E}{qrco[0,k]:>20.12E}{pwo[0,k]:>20.12E}")
         # for k in range(kte+1):
         #     print(f"{pwdo[0,k]:>20.12E}{melting[0,k]:>20.12E}")
 
         # Call get_melting_profile to get melting profile
         get_melting_profile(
-            ierr, self.tn_cup.field, self.po_cup.field, p_liq_ice, melting_layer, qrco,
+            ierr, self.tn_cup.field, self.po_cup.field, self.p_liq_ice.field, self.melting_layer.field, qrco,
             pwo, edto, pwdo, melting,
             itf, jtf, ktf, its, ite, jts, jte, kts, kte, cumulus
         )
@@ -2043,7 +2051,7 @@ class GFDeepConvection:
         # print(f"")
         # print(f"{edto[0]:>20.12E}")
         # for k in range(kte+1):
-        #     print(f"{self.tn_cup.field[0,k]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{p_liq_ice[0,k]:>20.12E}{melting_layer[0,k]:>20.12E}{qrco[0,k]:>20.12E}{pwo[0,k]:>20.12E}")
+        #     print(f"{self.tn_cup.field[0,k]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{self.p_liq_ice.field[0,k]:>20.12E}{self.melting_layer.field[0,k]:>20.12E}{qrco[0,k]:>20.12E}{pwo[0,k]:>20.12E}")
         # for k in range(kte+1):
         #     print(f"{pwdo[0,k]:>20.12E}{melting[0,k]:>20.12E}")
 
@@ -2168,7 +2176,7 @@ class GFDeepConvection:
                                     (zdo[i, j, k + 1] * (hcdo[i, j, k + 1] - self.heo_cup.field[i, j, k + 1]) -
                                         zdo[i, j, k] * (hcdo[i, j, k] - self.heo_cup.field[i, j, k])) * G / dp * edto[i, j]
 
-                        dellah[i, j, k] += XLF * ((1.0 - p_liq_ice[i, j, k]) * 0.5 * (qrco[i, j, k + 1] + qrco[i, j, k]) -
+                        dellah[i, j, k] += XLF * ((1.0 - self.p_liq_ice.field[i, j, k]) * 0.5 * (qrco[i, j, k + 1] + qrco[i, j, k]) -
                                             melting[i, j, k]) * G / dp
 
                         detup = up_massdetro[i, j, k]
@@ -2292,7 +2300,7 @@ class GFDeepConvection:
                         )
 
                         # Include glaciation effects on xhc
-                        xhc[i, j, k] += XLF * (1.0 - p_liq_ice[i, j, k]) * qrco[i, j, k]
+                        xhc[i, j, k] += XLF * (1.0 - self.p_liq_ice.field[i, j, k]) * qrco[i, j, k]
 
                         # Update xdby
                         xdby[i, j, k] = xhc[i, j, k] - self.xhes_cup.field[i, j, k]
@@ -5002,27 +5010,27 @@ def get_partition_liq_ice(ierr, tn, po_cup, p_liq_ice, melting_layer,
     melting_layer[:, :, :] = 0.0
 
     # Partition total condensate into liquid and ice phases
-    if MELT_GLAC and cumulus == 'deep':
+    if constants.MELT_GLAC and cumulus == constants.CUMULUS_DEEP:
         for i in range(its, itf + 1):
             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                 if ierr[i, j] == 0:
                     for k in range(kts, ktf + 1):
-                        if tn[i, j, k] <= T_ICE:
+                        if tn[i, j, k] <= constants.T_ICE:
                             p_liq_ice[i, j, k] = 0.0
-                        elif T_ICE < tn[i, j, k] < T_0:
-                            p_liq_ice[i, j, k] = ((tn[i, j, k] - T_ICE) / (T_0 - T_ICE))**2
+                        elif constants.T_ICE < tn[i, j, k] < constants.T_0:
+                            p_liq_ice[i, j, k] = ((tn[i, j, k] - constants.T_ICE) / (constants.T_0 - constants.T_ICE))**2
                         else:
                             p_liq_ice[i, j, k] = 1.0
 
-        # Define the melting layer
+        # # Define the melting layer
         for i in range(its, itf + 1):
             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                 if ierr[i, j] == 0:
                     for k in range(kts, ktf + 1):
-                        if tn[i, j, k] <= T_0 + 1:
+                        if tn[i, j, k] <= constants.T_0 + 1:
                             melting_layer[i, j, k] = 0.0
-                        elif T_0 + 1 < tn[i, j, k] < t1:
-                            melting_layer[i, j, k] = ((tn[i, j, k] - T_0 + 1) / (t1 - T_0 + 1))**2
+                        elif constants.T_0 + 1 < tn[i, j, k] < t1:
+                            melting_layer[i, j, k] = ((tn[i, j, k] - constants.T_0 + 1) / (t1 - constants.T_0 + 1))**2
                         else:
                             melting_layer[i, j, k] = 1.0
                         melting_layer[i, j, k] *= (1 - melting_layer[i, j, k])
@@ -5042,9 +5050,9 @@ def get_partition_liq_ice(ierr, tn, po_cup, p_liq_ice, melting_layer,
                     melting_layer[i, j, :] = melting_layer[i, j, :] / (norm[i, j] + 1e-6) * (
                         100 * (po_cup[i, j, kts] - po_cup[i, j, ktf]) / G
                     )
-    else:
-        p_liq_ice[:, :, :] = 1.0
-        melting_layer[:, :, :] = 0.0
+    # else:
+    #     p_liq_ice[:, :, :] = 1.0
+    #     melting_layer[:, :, :] = 0.0
 
 
 def get_melting_profile(ierr, tn_cup, po_cup, p_liq_ice, melting_layer, qrco, 
@@ -5074,7 +5082,7 @@ def get_melting_profile(ierr, tn_cup, po_cup, p_liq_ice, melting_layer, qrco,
     pwo_solid_phase = np.zeros((itf - its + 1, jtf - jts + 1, kte - kts + 1))
     pwo_eff = np.zeros((itf - its + 1, jtf - jts + 1, kte - kts + 1))
 
-    if MELT_GLAC and cumulus == 'deep':
+    if constants.MELT_GLAC and cumulus == constants.CUMULUS_DEEP:
         # Set melting to zero for columns without deep convection
         for i in range(its, itf + 1):
             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing

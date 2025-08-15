@@ -2171,3 +2171,58 @@ def initialize_deep_convection(
         else:
             cd = 0.1 * entr_rate
         cdd = 1.0e-9
+
+def get_partition_liq_ice_stencil(
+    tn: FloatField, # type: ignore
+    po_cup: FloatField, # type: ignore
+    p_liq_ice: FloatField, # type: ignore
+    melting_layer: FloatField, # type: ignore
+    cumulus_type: int,
+    ierr: IntFieldIJ32, # type: ignore
+    norm: FloatFieldIJ, # type: ignore
+):
+    """
+    Calculates the partition between cloud water and cloud ice.
+    """
+    from __externals__ import ( # type: ignore
+        k_start,
+        k_end,
+    )
+
+    with computation(PARALLEL), interval(...):
+        # Initialize p_liq_ice and melting_layer
+        p_liq_ice = 1.0
+        melting_layer = 0.0
+
+    with computation(PARALLEL), interval(0, -1):
+        if constants.MELT_GLAC and cumulus_type == constants.CUMULUS_DEEP:
+            if ierr == 0:
+                if tn <= constants.T_ICE:
+                    p_liq_ice = 0.0
+                elif (constants.T_ICE < tn) and (tn < constants.T_0):
+                    p_liq_ice = ((tn - constants.T_ICE) / (constants.T_0 - constants.T_ICE))**2
+                else:
+                    p_liq_ice = 1.0
+
+                if tn <= constants.T_0 + 1:
+                    melting_layer = 0.0
+                elif constants.T_0 + 1 < tn and tn < constants.MELT_TEMP_UPPER_THRESH:
+                    melting_layer = ((tn - constants.T_0 + 1) / (constants.MELT_TEMP_UPPER_THRESH - constants.T_0 + 1))**2
+                else:
+                    melting_layer = 1.0
+                melting_layer *= (1 - melting_layer)
+
+    with computation(FORWARD), interval(0, 1):
+        if constants.MELT_GLAC and cumulus_type == constants.CUMULUS_DEEP:
+            norm = 0.0  # Initialize norm array
+
+    with computation(FORWARD), interval(0, -1):
+        if constants.MELT_GLAC and cumulus_type == constants.CUMULUS_DEEP:
+            if ierr == 0:
+                dp = 100.0 * (po_cup - po_cup[0, 0, 1])  # Compute pressure difference
+                norm += melting_layer * dp / constants.G
+
+    with computation(FORWARD), interval(...):
+        if constants.MELT_GLAC and cumulus_type == constants.CUMULUS_DEEP:
+            if ierr == 0:
+                melting_layer = melting_layer / (norm + 1e-6) * (100 * (po_cup.at(K=k_start) - po_cup.at(K=k_end - 1)) / constants.G)

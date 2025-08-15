@@ -28,3 +28,11 @@ MBDT = 0.5  # Mass balance delta time (s)
 USE_EXCESS = 0  # Flag for shallow and mid convection tuning
 DX_THRESH = 6500.0 # Threshold for grid spacing (meters)
 FRH_THRESH = 0.9  # Maximum allowed fractional coverage
+CUMULUS_SHALLOW = 0  # Cumulus shallow convection type
+CUMULUS_MID = 1  # Cumulus mid-level convection type
+CUMULUS_DEEP = 2  # Cumulus deep convection type
+# Meltglac parameters
+MELT_GLAC = True  # Flag to enable / disable ice phase / melting
+T_0 = 273.16  # Reference temperature (K)
+T_ICE = 250.16  # Ice temperature (K)
+MELT_TEMP_UPPER_THRESH = 276.16 # Upper temperature threshold for melting layer (K)
