@@ -20,6 +20,7 @@ from cu_gf_stencils import (
     find_max_cloud_base_index_deep,
     set_max_pressure_level_deep,
     compute_cloud_base_properties,
+    cup_minimi_stencil,
 )
 
 # Constants
@@ -547,6 +548,26 @@ class GFDeepConvection:
             units="none",
             dtype=state.ikind,
         )
+        self.kstop: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
+        self.x: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.kstabi: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
+        self.kzdown: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
 
         # Initialize a k-mask for selecting "this vertical level"
         self.k_mask: Quantity = state.quantity_factory.zeros(
@@ -607,6 +628,12 @@ class GFDeepConvection:
 
         self._set_max_pressure_level_deep = state.stencil_factory.from_dims_halo(
             func=set_max_pressure_level_deep,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        self._cup_minimi = state.stencil_factory.from_dims_halo(
+            func=cup_minimi_stencil,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
         )
@@ -843,8 +870,6 @@ class GFDeepConvection:
         edtc = np.zeros((ite - its + 1, jte - jts + 1, 1))
 
         # Integer arrays for levels and indices
-        kzdown = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
-        kstabi = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
         ktopdby = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
         turn = 0
         pmin_lev = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
@@ -1102,7 +1127,7 @@ class GFDeepConvection:
             kbcon=kbcon,
             k_mask=self.k_mask,
             imid=imid,
-            ierr=ierr, 
+            ierr=ierr,
         )
 
         self._compute_cloud_base_properties(
@@ -1153,11 +1178,15 @@ class GFDeepConvection:
             kbcon_m1=self.kbcon_m1,
         )
 
-        # Call cup_minimi to increase detrainment in stable layers
-        cup_minimi(
-            self.heso_cup.field, kbcon, self.kstabm.field, kstabi, ierr,
-            itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte
+        self._cup_minimi(
+            array=self.heso_cup,
+            ks=kbcon,
+            kend=self.kstabm,
+            kt=self.kstabi,
+            x=self.x,
+            kstop=self.kstop,
+            k_mask=self.k_mask,
+            ierr=ierr,
         )
 
         # Parallel loop to process updraft initialization
@@ -1183,7 +1212,7 @@ class GFDeepConvection:
 
         if imid == 1:
             # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{kbcon[0]:>4}{kstabi[0]:>4}")
+            # print(f"{kbcon[0]:>4}{self.kstabi.field[0]:>4}")
             # print(f"")
             # for k in range(kte+1):
             #     print(f"{k_inv_layers[0,k]:>4}")
@@ -1192,11 +1221,11 @@ class GFDeepConvection:
 
             get_inversion_layers(
                 ierr, self.p_cup.field, self.t_cup.field, self.z_cup.field, self.q_cup.field, self.qes_cup.field, k_inv_layers,
-                kbcon, kstabi, dtempdz, itf, jtf, ktf, its, ite, jts, jte, kts, kte
+                kbcon, self.kstabi.field, dtempdz, itf, jtf, ktf, its, ite, jts, jte, kts, kte
             )
 
             # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{kbcon[0]:>4}{kstabi[0]:>4}")
+            # print(f"{kbcon[0]:>4}{self.kstabi.field[0]:>4}")
             # print(f"")
             # for k in range(kte+1):
             #     print(f"{k_inv_layers[0,k]:>4}")
@@ -1207,7 +1236,7 @@ class GFDeepConvection:
         # Parallelizable region (equivalent to !$acc kernels)
         for i in range(its, itf + 1):  # Convert 1-based to 0-based
             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if kstabi[i, j] < kbcon[i, j]:
+                if self.kstabi.field[i, j] < kbcon[i, j]:
                     kbcon[i, j] = 0
                     ierr[i, j] = 42
 
@@ -1226,7 +1255,7 @@ class GFDeepConvection:
                             k_inv_layers[i, j, 1] > -1 and
                             (self.po_cup.field[i, j, k22[i, j]] - self.po_cup.field[i, j, k_inv_layers[i, j, 1]]) < 500.0
                         ):
-                            ktop[i, j] = min(kstabi[i, j], k_inv_layers[i, j, 1])
+                            ktop[i, j] = min(self.kstabi.field[i, j], k_inv_layers[i, j, 1])
                             ktopdby[i, j] = ktop[i, j]
                         else:
                             # Sequential loop (equivalent to !$acc loop seq)
@@ -1242,38 +1271,38 @@ class GFDeepConvection:
         # For mid-level clouds, restrict cloud height to where stability changes
         if imid == 1:
             # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{kstabi[0]:>4}{k22[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
+            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{self.kstabi.field[0]:>4}{k22[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
             # print(f"{rand_vmas[0]:>20.12E}{self.hkbo.field[0]:>20.12E}")
             # for k in range(kte+1):
             #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
 
             rates_up_pdf(
                 rand_vmas, ipr, 'mid', ktop, ierr, self.po_cup.field, entr_rate_2d, self.hkbo.field, self.heo.field, self.heso_cup.field, self.zo_cup.field,
-                self.xland1.field, kstabi, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kpbl, ktopdby, csum, pmin_lev
+                self.xland1.field, self.kstabi.field, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kpbl, ktopdby, csum, pmin_lev
             )
 
             # Output variable match
             # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{kstabi[0]:>4}{k22[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
+            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{self.kstabi.field[0]:>4}{k22[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
             # print(f"{rand_vmas[0]:>20.12E}{self.hkbo.field[0]:>20.12E}")
             # for k in range(kte+1):
             #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
 
         else:
             # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{kstabi[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
+            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{self.kstabi.field[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
             # print(f"{rand_vmas[0]:>20.12E}{self.hkbo.field[0]:>20.12E}")
             # for k in range(kte+1):
             #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
 
             rates_up_pdf(
                 rand_vmas, ipr, 'deep', ktop, ierr, self.po_cup.field, entr_rate_2d, self.hkbo.field, self.heo.field, self.heso_cup.field, self.zo_cup.field,
-                self.xland1.field, kstabi, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kbcon, ktopdby, csum, pmin_lev
+                self.xland1.field, self.kstabi.field, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kbcon, ktopdby, csum, pmin_lev
             )
 
             # Output variable match
             # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{kstabi[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
+            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{self.kstabi.field[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
             # print(f"{rand_vmas[0]:>20.12E}{self.hkbo.field[0]:>20.12E}")
             # for k in range(kte+1):
             #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
@@ -1410,7 +1439,7 @@ class GFDeepConvection:
         # Loop to calculate kzdown based on zktop
         for i in range(its, itf + 1):  # Adjust loop to start at zero
             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                kzdown[i, j] = 0
+                self.kzdown.field[i, j] = 0
                 if ierr[i, j] == 0:
                     zktop = (self.zo_cup.field[i, j, ktop[i, j]] - z1[i, j]) * 0.6
                     if imid == 1:
@@ -1420,25 +1449,21 @@ class GFDeepConvection:
                     # Sequential loop to find kzdown
                     for k in range(kts, ktf + 1):  # Adjust range for zero-based indexing
                         if self.zo_cup.field[i, j, k] > zktop:
-                            kzdown[i, j] = k
-                            kzdown[i, j] = min(kzdown[i, j], kstabi[i, j] - 1)
+                            self.kzdown.field[i, j] = k
+                            self.kzdown.field[i, j] = min(self.kzdown.field[i, j], self.kstabi.field[i, j] - 1)
                             break
 
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{k22[0]:>4}{kzdown[0]:>4}{jmin[0]:>4}")
-        # print(f"")
-        # for k in range(kte+1):
-        #     print(f"{self.heso_cup.field[0,k]:>20.12E}")
-
         # Call cup_minimi to calculate downdraft originating level (jmin)
-        cup_minimi(self.heso_cup.field, k22, kzdown, jmin, ierr, itf, jtf, ktf, its, ite, jts, jte, kts, kte)
-
-        # Output variable match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{k22[0]:>4}{kzdown[0]:>4}{jmin[0]:>4}")
-        # print(f"")
-        # for k in range(kte+1):
-        #     print(f"{self.heso_cup.field[0,k]:>20.12E}")
+        self._cup_minimi(
+            array=self.heso_cup,
+            ks=k22,
+            kend=self.kzdown,
+            kt=jmin,
+            x=self.x,
+            kstop=self.kstop,
+            k_mask=self.k_mask,
+            ierr=ierr,
+        )
 
         # Loop to adjust downdraft properties
         for i in range(its, itf + 1):  # Adjust loop to start at zero
