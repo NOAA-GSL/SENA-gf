@@ -29,10 +29,14 @@ C0_SHAL = 0.001  # Parameter for shallow convection
 MBDT = 0.5  # Mass balance delta time (s)
 USE_EXCESS = 0  # Flag for shallow and mid convection tuning
 DX_THRESH = 6500.0 # Threshold for grid spacing (meters)
+RH_THRESH = 0.97  # Relative humidity threshold
 FRH_THRESH = 0.9  # Maximum allowed fractional coverage
+SIG_THRESH = (1.0 - FRH_THRESH)**2
 CUMULUS_SHALLOW = 0  # Cumulus shallow convection type
 CUMULUS_MID = 1  # Cumulus mid-level convection type
 CUMULUS_DEEP = 2  # Cumulus deep convection type
+PMIN_MID = 75.0  # Minimum pressure for mid-level convection (hPa)
+PMIN_DEEP = 150.0  # Minimum pressure for deep convection (hPa
 # Meltglac parameters
 MELT_GLAC = True  # Flag to enable / disable ice phase / melting
 T_0 = 273.16  # Reference temperature (K)

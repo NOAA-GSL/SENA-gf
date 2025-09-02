@@ -21,6 +21,9 @@ from cu_gf_stencils import (
     set_max_pressure_level_deep,
     compute_cloud_base_properties,
     cup_minimi_stencil,
+    initialize_updraft_starting_levels,
+    get_inversion_layers_stencil,
+    compute_entrainment_and_deep_convection_top,
 )
 
 # Constants
@@ -33,7 +36,6 @@ TCRIT = 258.0  # Critical temperature for water / ice conversion (K)
 # Tuning constants
 C1 = 0.003  # Tuning constant for cloud water / ice detrainment
 IRAINEVAP = 1  # Parameter to enable / disable rainwater evaporation
-RH_THRESH = 0.97  # Relative humidity threshold
 BETA_JB = 1.2  # Tuning constant for J. Brown closure
 PGCD = 0.1  # Parameter to modify momentum transport by downdrafts
 
@@ -568,6 +570,107 @@ class GFDeepConvection:
             units="index",
             dtype=state.ikind,
         )
+        self.pmin_lev: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.offset: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.k_inv_layers: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
+        self.dtempdz: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.sec_deriv: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.ix: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.ilev: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.kadd: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.ken: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.max_k_inv_layer: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.kk: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.kk_p1: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.kk_m1: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.kj: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.k800: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.k550: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.temporary: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.temporary_int: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.entr_rate_2d: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.ktopdby: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.ktopdby.field[:, :] = -1
 
         # Initialize a k-mask for selecting "this vertical level"
         self.k_mask: Quantity = state.quantity_factory.zeros(
@@ -638,6 +741,23 @@ class GFDeepConvection:
             externals={},
         )
 
+        self._initialize_updraft_starting_levels = state.stencil_factory.from_dims_halo(
+            func=initialize_updraft_starting_levels,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        self._get_inversion_layers = state.stencil_factory.from_dims_halo(
+            func=get_inversion_layers_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        self._compute_entrainment_and_deep_convection_top = state.stencil_factory.from_dims_halo(
+            func=compute_entrainment_and_deep_convection_top,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
 
     def cu_gf_deep_run(self,
         itf, jtf, ktf, its, ite, jts, jte, kts, kte,  # Dimensions
@@ -730,7 +850,6 @@ class GFDeepConvection:
         dh = 0.0
         trash = 0.0
         trash2 = 0.0
-        sig_thresh = 0.0
 
         # Scalars
         mbdt = 0.0
@@ -741,7 +860,6 @@ class GFDeepConvection:
         dh = 0.0
         trash = 0.0
         trash2 = 0.0
-        sig_thresh = 0.0
         entdo = 0.0
         dp = 0.0
         subin = 0.0
@@ -811,7 +929,6 @@ class GFDeepConvection:
         massflx = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
 
         # Arrays for environmental and cloud properties
-        entr_rate_2d = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         mentrd_rate_2d = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         dby = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         hc = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
@@ -870,16 +987,8 @@ class GFDeepConvection:
         edtc = np.zeros((ite - its + 1, jte - jts + 1, 1))
 
         # Integer arrays for levels and indices
-        ktopdby = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
         turn = 0
-        pmin_lev = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
         ktopkeep = np.zeros((ite - its + 1, jte - jts + 1,), dtype=int)
-
-        # Array for temperature gradient
-        dtempdz = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-
-        # Integer array for inversion layers
-        k_inv_layers = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1), dtype=int)
 
         # Array for smoke/dust wet scavenging
         c0t3d = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
@@ -917,7 +1026,6 @@ class GFDeepConvection:
         dts = 0.0
         fp = 0.0
         fpi = 0.0
-        pmin = 0.0
         x_add = 0.0
 
         # Integer variable
@@ -926,15 +1034,12 @@ class GFDeepConvection:
         # Set cumulus type
         if imid == 1:
             cumulus = constants.CUMULUS_MID
-            pmin = 75.0  # Minimum pressure for mid-level convection
+            pmin = constants.PMIN_MID  # Minimum pressure for mid-level convection
             zkbmax = constants.ZKBMAX_MID
         else:
             cumulus = constants.CUMULUS_DEEP
-            pmin = 150.0
+            pmin = constants.PMIN_DEEP
             zkbmax = constants.ZKBMAX_DEEP
-
-        # Initialize downdraft top levels
-        ktopdby[:, :] = -1
 
         # Set constants
         c1_max = C1
@@ -952,9 +1057,6 @@ class GFDeepConvection:
 
         # Set height (m) above which no downdrafts are allowed to originate
         zcutdown = 4000.0
-
-        # Calculate the threshold for fractional cloud coverage
-        sig_thresh = (1.0 - constants.FRH_THRESH)**2
 
         # Set minimum cloud depth (m)
         depth_min = 3000.0
@@ -1189,84 +1291,75 @@ class GFDeepConvection:
             ierr=ierr,
         )
 
-        # Parallel loop to process updraft initialization
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0:
-                    frh = min(self.qo_cup.field[i, j, kbcon[i, j]] / self.qeso_cup.field[i, j, kbcon[i, j]], 1.0)
-                    if frh >= RH_THRESH and self.sig.field[i, j] <= sig_thresh:
-                        ierr[i, j] = 231
-                        continue
-
-                    # Never go too low...
-                    x_add = 0.0
-                    for k in range(kbcon[i, j] + 1, ktf + 1):  # Adjust loop to start at zero
-                        if po[i, j, kbcon[i, j]] - po[i, j, k] > pmin + x_add:
-                            pmin_lev[i, j] = k
-                            break
-
-                    # Call get_cloud_bc to initialize conditions for updraft
-                    self.start_level.field[i, j] = k22[i, j]
-                    x_add = XLV * self.zqexec.field[i, j] + CP * self.ztexec.field[i, j]
-                    self.hkb.field[i, j] = get_cloud_bc(kte, self.he_cup.field[i, j, :kte + 1], self.hkb.field[i, j], k22[i, j], x_add)
+        self._initialize_updraft_starting_levels(
+            frh=self.frh,
+            qo_cup=self.qo_cup,
+            qeso_cup=self.qeso_cup,
+            kbcon=kbcon,
+            sig=self.sig,
+            x_add=self.x_add,
+            po=po,
+            pmin=pmin,
+            pmin_lev=self.pmin_lev,
+            start_level=self.start_level,
+            k22=k22,
+            zqexec=self.zqexec,
+            ztexec=self.ztexec,
+            hkb=self.hkb,
+            he_cup=self.he_cup,
+            ierr=ierr,
+            k_mask=self.k_mask,
+            found=self.found,
+        )
 
         if imid == 1:
-            # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{kbcon[0]:>4}{self.kstabi.field[0]:>4}")
-            # print(f"")
-            # for k in range(kte+1):
-            #     print(f"{k_inv_layers[0,k]:>4}")
-            # for k in range(kte+1):
-            #     print(f"{self.p_cup.field[0,k]:>20.12E}{self.t_cup.field[0,k]:>20.12E}{self.z_cup.field[0,k]:>20.12E}{self.q_cup.field[0,k]:>20.12E}{self.qes_cup.field[0,k]:>20.12E}{dtempdz[0,k]:>20.12E}")
 
-            get_inversion_layers(
-                ierr, self.p_cup.field, self.t_cup.field, self.z_cup.field, self.q_cup.field, self.qes_cup.field, k_inv_layers,
-                kbcon, self.kstabi.field, dtempdz, itf, jtf, ktf, its, ite, jts, jte, kts, kte
+            self._get_inversion_layers(
+                ierr=ierr,
+                p_cup=self.p_cup,
+                t_cup=self.t_cup,
+                z_cup=self.z_cup,
+                k_inv_layers=self.k_inv_layers,
+                kstart=kbcon,
+                kend=self.kstabi,
+                dtempdz=self.dtempdz,
+                sec_deriv=self.sec_deriv,
+                offset=self.offset,
+                ix=self.ix,
+                ilev=self.ilev,
+                kadd=self.kadd,
+                ken=self.ken,
+                max_k_inv_layer=self.max_k_inv_layer,
+                kk=self.kk,
+                kk_p1=self.kk_p1,
+                kk_m1=self.kk_m1,
+                kj=self.kj,
+                k800=self.k800,
+                k550=self.k550,
+                k_mask=self.k_mask,
+                found=self.found,
+                temporary=self.temporary,
+                temporary_int=self.temporary_int,
             )
 
-            # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{kbcon[0]:>4}{self.kstabi.field[0]:>4}")
-            # print(f"")
-            # for k in range(kte+1):
-            #     print(f"{k_inv_layers[0,k]:>4}")
-            # for k in range(kte+1):
-            #     print(f"{self.p_cup.field[0,k]:>20.12E}{self.t_cup.field[0,k]:>20.12E}{self.z_cup.field[0,k]:>20.12E}{self.q_cup.field[0,k]:>20.12E}{self.qes_cup.field[0,k]:>20.12E}{dtempdz[0,k]:>20.12E}")
-
-
-        # Parallelizable region (equivalent to !$acc kernels)
-        for i in range(its, itf + 1):  # Convert 1-based to 0-based
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if self.kstabi.field[i, j] < kbcon[i, j]:
-                    kbcon[i, j] = 0
-                    ierr[i, j] = 42
-
-                for k in range(kts, ktf + 1):  # Convert 1-based to 0-based
-                    entr_rate_2d[i, j, k] = self.entr_rate.field[i, j]
-
-                if ierr[i, j] == 0:
-                    kbcon[i, j] = max(1, kbcon[i, j])
-
-                    for k in range(kts + 1, ktf + 1):  # Convert 1-based to 0-based
-                        frh = min(self.qo_cup.field[i, j, k] / self.qeso_cup.field[i, j, k], 1.0)
-                        entr_rate_2d[i, j, k] = self.entr_rate.field[i, j] * (1.3 - frh)
-
-                    if imid == 1:
-                        if (
-                            k_inv_layers[i, j, 1] > -1 and
-                            (self.po_cup.field[i, j, k22[i, j]] - self.po_cup.field[i, j, k_inv_layers[i, j, 1]]) < 500.0
-                        ):
-                            ktop[i, j] = min(self.kstabi.field[i, j], k_inv_layers[i, j, 1])
-                            ktopdby[i, j] = ktop[i, j]
-                        else:
-                            # Sequential loop (equivalent to !$acc loop seq)
-                            for k in range(kbcon[i, j] + 1, ktf + 1):  # Convert 1-based to 0-based
-                                if (self.po_cup.field[i, j, k22[i, j]] - self.po_cup.field[i, j, k]) > 500.0:
-                                    ktop[i, j] = k  # Convert back to 1-based for ktop
-                                    ktopdby[i, j] = ktop[i, j]
-                                    break
-
-        # Initialize variable
-        i = 0
+        self._compute_entrainment_and_deep_convection_top(
+            kstabi=self.kstabi,
+            kbcon=kbcon,
+            entr_rate_2d=self.entr_rate_2d,
+            entr_rate=self.entr_rate,
+            frh=self.frh,
+            qo_cup=self.qo_cup,
+            qeso_cup=self.qeso_cup,
+            imid=imid,
+            k_inv_layers=self.k_inv_layers,
+            po_cup=self.po_cup,
+            k22=k22,
+            ktop=ktop,
+            ktopdby=self.ktopdby,
+            k_mask=self.k_mask,
+            found=self.found,
+            ierr=ierr,
+        )
 
         # For mid-level clouds, restrict cloud height to where stability changes
         if imid == 1:
@@ -1277,32 +1370,32 @@ class GFDeepConvection:
             #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
 
             rates_up_pdf(
-                rand_vmas, ipr, 'mid', ktop, ierr, self.po_cup.field, entr_rate_2d, self.hkbo.field, self.heo.field, self.heso_cup.field, self.zo_cup.field,
-                self.xland1.field, self.kstabi.field, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kpbl, ktopdby, csum, pmin_lev
+                rand_vmas, ipr, 'mid', ktop, ierr, self.po_cup.field, self.entr_rate_2d.field, self.hkbo.field, self.heo.field, self.heso_cup.field, self.zo_cup.field,
+                self.xland1.field, self.kstabi.field, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kpbl, self.ktopdby.field, csum, self.pmin_lev.field
             )
 
             # Output variable match
             # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{self.kstabi.field[0]:>4}{k22[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
+            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{self.kstabi.field[0]:>4}{k22[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{self.pmin_lev.field[0]:>4}")
             # print(f"{rand_vmas[0]:>20.12E}{self.hkbo.field[0]:>20.12E}")
             # for k in range(kte+1):
             #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
 
         else:
             # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{self.kstabi.field[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
+            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{self.kstabi.field[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{self.pmin_lev.field[0]:>4}")
             # print(f"{rand_vmas[0]:>20.12E}{self.hkbo.field[0]:>20.12E}")
             # for k in range(kte+1):
             #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
 
             rates_up_pdf(
-                rand_vmas, ipr, 'deep', ktop, ierr, self.po_cup.field, entr_rate_2d, self.hkbo.field, self.heo.field, self.heso_cup.field, self.zo_cup.field,
-                self.xland1.field, self.kstabi.field, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kbcon, ktopdby, csum, pmin_lev
+                rand_vmas, ipr, 'deep', ktop, ierr, self.po_cup.field, self.entr_rate_2d.field, self.hkbo.field, self.heo.field, self.heso_cup.field, self.zo_cup.field,
+                self.xland1.field, self.kstabi.field, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kbcon, self.ktopdby.field, csum, self.pmin_lev.field
             )
 
             # Output variable match
             # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{self.kstabi.field[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
+            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{self.kstabi.field[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{self.pmin_lev.field[0]:>4}")
             # print(f"{rand_vmas[0]:>20.12E}{self.hkbo.field[0]:>20.12E}")
             # for k in range(kte+1):
             #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
@@ -1342,7 +1435,7 @@ class GFDeepConvection:
 
             get_lateral_massflux(
                 itf, jtf, ktf, its, ite, jts, jte, kts, kte,
-                ierr, ktop, self.zo_cup.field, zuo, self.cd.field, entr_rate_2d,
+                ierr, ktop, self.zo_cup.field, zuo, self.cd.field, self.entr_rate_2d.field,
                 up_massentro, up_massdetro, up_massentr, up_massdetr,
                 3, kbcon, k22, up_massentru, up_massdetru, self.lambau.field
             )
@@ -1367,7 +1460,7 @@ class GFDeepConvection:
 
             get_lateral_massflux(
                 itf, jtf, ktf, its, ite, jts, jte, kts, kte,
-                ierr, ktop, self.zo_cup.field, zuo, self.cd.field, entr_rate_2d,
+                ierr, ktop, self.zo_cup.field, zuo, self.cd.field, self.entr_rate_2d.field,
                 up_massentro, up_massdetro, up_massentr, up_massdetr,
                 1, kbcon, k22, up_massentru, up_massdetru, self.lambau.field
             )
@@ -1648,7 +1741,7 @@ class GFDeepConvection:
                     zu[i, j, k] = 0.0
                     zuo[i, j, k] = 0.0
                     self.cd.field[i, j, k] = 0.0
-                    entr_rate_2d[i, j, k] = 0.0
+                    self.entr_rate_2d.field[i, j, k] = 0.0
                     up_massentr[i, j, k] = 0.0
                     up_massdetr[i, j, k] = 0.0
                     up_massentro[i, j, k] = 0.0
@@ -1705,7 +1798,7 @@ class GFDeepConvection:
                 dd_massentro[i, j, :] = 0.0
 
                 # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-                # print(f"{self.kdet.field[0]:>4}{jmin[0]:>4}{kpbl[0]:>4}{ipr:>4}{xland1[0]:>4}{csum[0]:>4}{pmin_lev[0]:>4}")
+                # print(f"{self.kdet.field[0]:>4}{jmin[0]:>4}{kpbl[0]:>4}{ipr:>4}{xland1[0]:>4}{csum[0]:>4}{self.pmin_lev.field[0]:>4}")
                 # print(f"{rand_vmas[0]:>20.12E}{beta:>20.12E}")
                 # for k in range(kte+1):
                 #     print(f"{self.po_cup.field[0,k]:>20.12E}{zdo[0,k]:>20.12E}")
@@ -1715,7 +1808,7 @@ class GFDeepConvection:
                 # Call to get_zu_zd_pdf_fim (assumed to be a Python function)
                 # get_zu_zd_pdf_fim(
                 #     -1, self.po_cup.field[i, j, :], rand_vmas[i, j], 0.0, ipr, xland1[i, j], zuh2, 4,
-                #     ierr[i, j], self.kdet.field[i, j], jmin[i, j] + 1, zdo[i, j, :], kts, kte, ktf, beta, kpbl[i, j], csum[i, j], pmin_lev[i, j]
+                #     ierr[i, j], self.kdet.field[i, j], jmin[i, j] + 1, zdo[i, j, :], kts, kte, ktf, beta, kpbl[i, j], csum[i, j], self.pmin_lev.field[i, j]
                 # )
 
                 # get_zu_zd_pdf_fim(
@@ -1736,7 +1829,7 @@ class GFDeepConvection:
 
                 # Output variable match
                 # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-                # print(f"{self.kdet.field[0]:>4}{jmin[0]:>4}{kpbl[0]:>4}{ipr:>4}{xland1[0]:>4}{csum[0]:>4}{pmin_lev[0]:>4}")
+                # print(f"{self.kdet.field[0]:>4}{jmin[0]:>4}{kpbl[0]:>4}{ipr:>4}{xland1[0]:>4}{csum[0]:>4}{self.pmin_lev.field[0]:>4}")
                 # print(f"{rand_vmas[0]:>20.12E}{beta:>20.12E}")
                 # for k in range(kte+1):
                 #     print(f"{self.po_cup.field[0,k]:>20.12E}{zdo[0,k]:>20.12E}")
@@ -1928,7 +2021,7 @@ class GFDeepConvection:
                             tau_bl[i, j] = (self.zo_cup.field[i, j, kbcon[i, j]] - z1[i, j]) / umean
                         else:
                             # Over land
-                            tau_bl[i, j] = (self.zo_cup.field[i, j, ktopdby[i, j]] - self.zo_cup.field[i, j, kbcon[i, j]]) / wmean[i, j]
+                            tau_bl[i, j] = (self.zo_cup.field[i, j, self.ktopdby.field[i, j]] - self.zo_cup.field[i, j, kbcon[i, j]]) / wmean[i, j]
 
             # Get the profiles modified only by boundary layer tendencies
             for i in range(its, itf + 1):

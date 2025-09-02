@@ -2300,3 +2300,115 @@ def find_max_cloud_base_index_deep(
                 if zo_cup > constants.Z_DETR + z1:
                     kdet = k_mask
                     found = True
+
+def initialize_updraft_starting_levels(
+    frh: FloatFieldIJ,       # type: ignore
+    qo_cup: FloatField,       # type: ignore
+    qeso_cup: FloatField,       # type: ignore
+    kbcon: IntFieldIJ32,       # type: ignore
+    sig: FloatFieldIJ,       # type: ignore
+    x_add: FloatFieldIJ,       # type: ignore
+    po: FloatField,       # type: ignore
+    pmin: float,       # type: ignore
+    pmin_lev: IntFieldIJ32,       # type: ignore
+    start_level: IntFieldIJ32,       # type: ignore
+    k22: IntFieldIJ32,       # type: ignore
+    zqexec: FloatFieldIJ,       # type: ignore
+    ztexec: FloatFieldIJ,       # type: ignore
+    hkb: FloatFieldIJ,       # type: ignore
+    he_cup: FloatField,       # type: ignore
+    ierr: IntFieldIJ32,       # type: ignore
+    k_mask: IntFieldK32,       # type: ignore
+    found: BoolFieldIJ,       # type: ignore
+):
+
+    """
+    Initialize the updraft starting levels.
+    """
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            frh = min(qo_cup.at(K=kbcon) / qeso_cup.at(K=kbcon), 1.0)
+            found = False
+            if frh >= constants.RH_THRESH and sig <= constants.SIG_THRESH:
+                ierr = 231
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if k_mask >= kbcon and not found:
+                if po.at(K=kbcon) - po > pmin:
+                    pmin_lev = k_mask
+                    found = True
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            start_level = k22
+            x_add = constants.XLV * zqexec + constants.CP * ztexec  # Calculate x_add
+            hkb = get_cloud_bc(
+                array=he_cup,
+                k22=k22,
+                add_x=x_add,
+            )
+
+def compute_entrainment_and_deep_convection_top(
+    kstabi: IntFieldIJ32, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    entr_rate_2d: FloatField, # type: ignore
+    entr_rate: FloatFieldIJ, # type: ignore
+    frh: FloatFieldIJ, # type: ignore
+    qo_cup: FloatField, # type: ignore
+    qeso_cup: FloatField, # type: ignore
+    imid: int,
+    k_inv_layers: IntField32, # type: ignore
+    po_cup: FloatField, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    ktopdby: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+):
+    """
+    Calculates the entrainment rate and shallow convection top level.
+    """
+
+    with computation(FORWARD), interval(0, 1):
+        if kstabi < kbcon:
+            kbcon = 0
+            ierr = 42  # Set error code if kstabi is less than kbcon
+
+    with computation(FORWARD), interval(...):
+        entr_rate_2d = entr_rate
+
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            kbcon = max(1, kbcon)  # Ensure kbcon is at least 1
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            frh = min(qo_cup / qeso_cup, 1.0)  # Calculate relative humidity
+            entr_rate_2d = entr_rate * (1.3 - frh)  # Calculate entrainment rate
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            found = False
+            if imid == 1:
+                if (
+                    k_inv_layers.at(K=1) > -1 and
+                    (po_cup.at(K=k22) - po_cup.at(K=k_inv_layers.at(K=1))) < 500.0
+                ):
+                    ktop = min(kstabi, k_inv_layers.at(K=1))
+                    ktopdby= ktop
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if imid == 1:
+                if not (
+                    k_inv_layers.at(K=1) > -1 and
+                    (po_cup.at(K=k22) - po_cup.at(K=k_inv_layers.at(K=1))) < 500.0
+                ):
+                    if k_mask > kbcon and not found:
+                        if (po_cup.at(K=k22) - po_cup) > 500.0:
+                            ktop = k_mask  # Convert back to 1-based for ktop
+                            ktopdby = ktop
+                            found = True
