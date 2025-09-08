@@ -2475,3 +2475,113 @@ def adjust_updraft_mass_flux_profiles(
                 zuo = 0.0
                 zu = 0.0
                 xzu = 0.0
+
+def initialize_updraft_properties(
+    uc: FloatField, # type: ignore
+    vc: FloatField, # type: ignore
+    hc: FloatField, # type: ignore
+    dby: FloatField, # type: ignore
+    hco: FloatField, # type: ignore
+    dbyo: FloatField, # type: ignore
+    start_level: IntFieldIJ32, # type: ignore
+    u_cup: FloatField, # type: ignore
+    v_cup: FloatField, # type: ignore
+    heo: FloatField, # type: ignore
+    he_cup: FloatField, # type: ignore
+    heo_cup: FloatField, # type: ignore
+    hkb: FloatFieldIJ, # type: ignore
+    hkbo: FloatFieldIJ, # type: ignore
+    ktopkeep: IntFieldIJ32, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    dbyt: FloatField, # type: ignore
+    zuo: FloatField, # type: ignore
+    up_massdetro: FloatField, # type: ignore
+    up_massentro: FloatField, # type: ignore
+    heso_cup: FloatField, # type: ignore
+    zktop: FloatFieldIJ, # type: ignore
+    zo_cup: FloatField, # type: ignore
+    kzdown: IntFieldIJ32, # type: ignore
+    z1: FloatFieldIJ, # type: ignore
+    imid: int,
+    kstabi: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    k_index: IntFieldIJ, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+):
+
+    from __externals__ import ( # type: ignore
+        k_start,
+        k_end,
+    )
+
+    with computation(PARALLEL), interval(...):
+        uc = 0.0
+        vc = 0.0
+        hc = 0.0
+        dby = 0.0
+        hco = 0.0
+        dbyo = 0.0
+        # dbyt = 0.0
+
+        if ierr == 0:
+            if k_mask <= start_level:
+                uc = u_cup
+                vc = v_cup
+            if k_mask < start_level:
+                hc = he_cup
+                hco = heo_cup
+
+    with computation(FORWARD), interval(0, 1):
+        ktopkeep = -1
+        found = False
+        if ierr == 0:
+            hc[0, 0, start_level] = hkb
+            hco[0, 0, start_level] = hkbo
+            ktopkeep = ktop
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            if k_mask > start_level and k_mask <= ktop and not found:
+                denom = zuo[0, 0, -1] - 0.5 * up_massdetro[0, 0, -1] + up_massentro[0, 0, -1]
+                if denom < 1e-8:
+                    ierr = 51
+                    found = True
+                if not found:
+                    hco = (
+                        (hco[0, 0, -1] * zuo[0, 0, -1] - 0.5 * up_massdetro[0, 0, -1] * hco[0, 0, -1] +
+                        up_massentro[0, 0, -1] * heo[0, 0, -1]) /
+                        (zuo[0, 0, -1] - 0.5 * up_massdetro[0, 0, -1] + up_massentro[0, 0, -1])
+                    )
+                    dbyo = hco - heso_cup
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            found = False
+
+    with computation(BACKWARD), interval(...):
+        if ierr == 0:
+            if k_mask < ktop and k_mask >= kbcon and not found:
+                if dbyo > 0.0:
+                    ktopkeep = k_mask + 1
+                    found = True
+
+    with computation(FORWARD), interval(0, 1):
+        kzdown = 0
+        found = False
+        if ierr == 0:
+            zktop = (zo_cup.at(K=ktop) - z1) * 0.6
+            if imid == 1:
+                zktop = (zo_cup.at(K=ktop) - z1) * 0.4
+            zktop = min(zktop + z1, constants.ZCUTDOWN + z1)
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            k_index = 0
+            while k_index <= k_end and not found:
+                if zo_cup.at(K=k_index) > zktop:
+                    kzdown = k_index
+                    kzdown = min(kzdown, kstabi - 1)
+                    found = True
+                k_index += 1
