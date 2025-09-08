@@ -574,6 +574,11 @@ class GFShallowConvection:
             units="none",
             dtype=state.rkind,
         )
+        self.trash2d: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
         self.tunning: Quantity = state.quantity_factory.zeros(
             dims=[X_DIM, Y_DIM],
             units="none",
@@ -906,7 +911,9 @@ class GFShallowConvection:
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={
                 "zustart": 0.1,
-                "maxlim": 1.0,
+                "maxlim_1": 1.2,
+                "maxlim_2": 1.0,
+                "maxlim_3": 1.5,
             },
         )
 
@@ -1248,12 +1255,14 @@ class GFShallowConvection:
             k22=k22,
             kbcon=kbcon,
             zuo=zuo,
+            ktopdby=self.ktopx,
             k_mask=self.k_mask,
         )
 
         self._get_zu_zd_pdf_fim(
             kklev=kbcon,
-            p=self.p_cup,
+            rand_vmas=self.rand_vmas,
+            p=self.po_cup,
             draft=2,
             kb=k22,
             kt=ktop,
@@ -1267,6 +1276,8 @@ class GFShallowConvection:
             g_alpha2=self.g_alpha2,
             fzu= self.fzu,
             zu_kpbli=self.zu_kpbli,
+            trash=self.trash2d,
+            beta_deep=self.beta_deep,
             k_mask=self.k_mask,
             k_index=self.k_index,
             argmax=self.argmax,

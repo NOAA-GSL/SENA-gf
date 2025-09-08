@@ -24,6 +24,9 @@ from cu_gf_stencils import (
     initialize_updraft_starting_levels,
     get_inversion_layers_stencil,
     compute_entrainment_and_deep_convection_top,
+    rates_up_pdf_shallow_stencil,
+    get_zu_zd_pdf_fim_stencil,
+    rates_up_pdf_deep_stencil,
 )
 
 # Constants
@@ -671,6 +674,96 @@ class GFDeepConvection:
             dtype=state.ikind,
         )
         self.ktopdby.field[:, :] = -1
+        self.kb_adj: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
+        self.tunning: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.alpha2: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.g_alpha2: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.fzu: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.zu_kpbli: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.trash: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.beta_deep: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.argmax: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="index",
+            dtype=state.ikind,
+        )
+        self.maxval: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.zeros_int: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.finalzu: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.kklev: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+
+        # Lookup tables for constants
+        self.alpha: Quantity = state.quantity_factory_table.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.alpha.field[0, 0, :] = [
+        3.699999, 3.699999, 3.699999, 3.699999, 3.024999, 2.559999, 2.249999, 2.028571, 1.862500,
+        1.733333, 1.630000, 1.545454, 1.475000, 1.415385, 1.364286, 1.320000, 1.281250, 1.247059,
+        1.216667, 1.189474, 1.165000, 1.142857, 1.122727, 1.104348, 1.087500, 1.075000, 1.075000,
+        1.075000, 1.075000, 1.075000
+        ]
+        self.g_alpha: Quantity = state.quantity_factory_table.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.g_alpha.field[0, 0, :] = [
+        4.170645,  4.170645,  4.170645,  4.170645,  2.046925,  1.387837,  1.133003,  1.012418,
+        0.9494680, 0.9153771, 0.8972442, 0.8885444, 0.8856795, 0.8865333, 0.8897996, 0.8946404,
+        0.9005030, 0.9070138, 0.9139161, 0.9210315, 0.9282347, 0.9354376, 0.9425780, 0.9496124,
+        0.9565111, 0.9619183, 0.9619183, 0.9619183, 0.9619183, 0.9619183
+        ]
+
 
         # Initialize a k-mask for selecting "this vertical level"
         self.k_mask: Quantity = state.quantity_factory.zeros(
@@ -757,6 +850,29 @@ class GFDeepConvection:
             func=compute_entrainment_and_deep_convection_top,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
+        )
+
+        self._rates_up_pdf_shallow = state.stencil_factory.from_dims_halo(
+            func=rates_up_pdf_shallow_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={"zustart": constants.ZUSTART},
+        )
+
+        self._get_zu_zd_pdf_fim = state.stencil_factory.from_dims_halo(
+            func=get_zu_zd_pdf_fim_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={
+                "zustart": constants.ZUSTART,
+                "maxlim_1": 1.2,
+                "maxlim_2": 1.0,
+                "maxlim_3": 1.5,
+            },
+        )
+
+        self._rates_up_pdf_deep = state.stencil_factory.from_dims_halo(
+            func=rates_up_pdf_deep_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={"zustart": constants.ZUSTART},
         )
 
     def cu_gf_deep_run(self,
@@ -1363,42 +1479,94 @@ class GFDeepConvection:
 
         # For mid-level clouds, restrict cloud height to where stability changes
         if imid == 1:
-            # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{self.kstabi.field[0]:>4}{k22[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{pmin_lev[0]:>4}")
-            # print(f"{rand_vmas[0]:>20.12E}{self.hkbo.field[0]:>20.12E}")
-            # for k in range(kte+1):
-            #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
 
-            rates_up_pdf(
-                rand_vmas, ipr, 'mid', ktop, ierr, self.po_cup.field, self.entr_rate_2d.field, self.hkbo.field, self.heo.field, self.heso_cup.field, self.zo_cup.field,
-                self.xland1.field, self.kstabi.field, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kpbl, self.ktopdby.field, csum, self.pmin_lev.field
+            self._rates_up_pdf_shallow(
+                ktop=ktop,
+                ierr=ierr,
+                entr_rate_2d=self.entr_rate_2d,
+                z_cup=self.zo_cup,
+                k22=k22,
+                kbcon=kbcon,
+                zuo=zuo,
+                ktopdby=self.ktopdby,
+                k_mask=self.k_mask,
             )
 
-            # Output variable match
-            # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{self.kstabi.field[0]:>4}{k22[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{self.pmin_lev.field[0]:>4}")
-            # print(f"{rand_vmas[0]:>20.12E}{self.hkbo.field[0]:>20.12E}")
-            # for k in range(kte+1):
-            #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
+            self._get_zu_zd_pdf_fim(
+                kklev=self.zeros_int,
+                rand_vmas=rand_vmas,
+                p=self.po_cup,
+                draft=3,
+                kb=k22,
+                kt=ktop,
+                zu=zuo,
+                kpbli=kbcon,
+                alpha=self.alpha.field[0,0,:],
+                g_alpha=self.g_alpha.field[0,0,:],
+                kb_adj=self.kb_adj,
+                tunning=self.tunning,
+                alpha2=self.alpha2,
+                g_alpha2=self.g_alpha2,
+                fzu= self.fzu,
+                zu_kpbli=self.zu_kpbli,
+                trash=self.trash,
+                beta_deep=self.beta_deep,
+                k_mask=self.k_mask,
+                k_index=self.k_index,
+                argmax=self.argmax,
+                maxval=self.maxval,
+                found=self.found,
+                ierr=ierr,
+            )
 
         else:
-            # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{self.kstabi.field[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{self.pmin_lev.field[0]:>4}")
-            # print(f"{rand_vmas[0]:>20.12E}{self.hkbo.field[0]:>20.12E}")
-            # for k in range(kte+1):
-            #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
 
-            rates_up_pdf(
-                rand_vmas, ipr, 'deep', ktop, ierr, self.po_cup.field, self.entr_rate_2d.field, self.hkbo.field, self.heo.field, self.heso_cup.field, self.zo_cup.field,
-                self.xland1.field, self.kstabi.field, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kbcon, self.ktopdby.field, csum, self.pmin_lev.field
+            self._rates_up_pdf_deep(
+                kklev=self.kklev,
+                ktop=ktop,
+                ierr=ierr,
+                entr_rate_2d=self.entr_rate_2d,
+                hkbo=self.hkbo,
+                z_cup=self.zo_cup,
+                k22=k22,
+                kbcon=kbcon,
+                zuo=zuo,
+                ktopdby=self.ktopdby,
+                heo=self.heo,
+                heso_cup=self.heso_cup,
+                kfinalzu=self.finalzu,
+                k_mask=self.k_mask,
+                k_index=self.k_index,
+                maxval=self.maxval,
+                found=self.found,
             )
 
-            # Output variable match
-            # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-            # print(f"{ipr:>4}{ktop[0]:>4}{xland1[0]:>4}{self.kstabi.field[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{csum[0]:>4}{kpbl[0]:>4}{ktopdby[0]:>4}{self.pmin_lev.field[0]:>4}")
-            # print(f"{rand_vmas[0]:>20.12E}{self.hkbo.field[0]:>20.12E}")
-            # for k in range(kte+1):
-            #     print(f"{self.po_cup.field[0,k]:>20.12E}{entr_rate_2d[0,k]:>20.12E}{self.heo.field[0,k]:>20.12E}{self.heso_cup.field[0,k]:>20.12E}{self.zo_cup.field[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
+            self._get_zu_zd_pdf_fim(
+                kklev=self.kklev,
+                rand_vmas=rand_vmas,
+                p=self.po_cup,
+                draft=1,
+                kb=k22,
+                kt=self.finalzu,
+                zu=zuo,
+                kpbli=kbcon,
+                alpha=self.alpha.field[0,0,:],
+                g_alpha=self.g_alpha.field[0,0,:],
+                kb_adj=self.kb_adj,
+                tunning=self.tunning,
+                alpha2=self.alpha2,
+                g_alpha2=self.g_alpha2,
+                fzu= self.fzu,
+                zu_kpbli=self.zu_kpbli,
+                trash=self.trash,
+                beta_deep=self.beta_deep,
+                k_mask=self.k_mask,
+                k_index=self.k_index,
+                argmax=self.argmax,
+                maxval=self.maxval,
+                found=self.found,
+                ierr=ierr,
+            )
 
         # Loop to adjust updraft mass flux profiles
         for i in range(its, itf + 1):  # Adjust loop to start at zero

@@ -5,6 +5,7 @@ from ndsl.dsl.typing import (
     IntFieldIJ,
     IntFieldIJ32,
     FloatFieldIJ,
+    FloatFieldK,
     IntFieldK32,
     BoolFieldIJ,
     Float,
@@ -946,6 +947,7 @@ def rates_up_pdf_shallow_stencil(
     k22: IntFieldIJ32, # type: ignore
     kbcon: IntFieldIJ32, # type: ignore
     zuo: FloatField, # type: ignore
+    ktopdby: IntFieldIJ32, # type: ignore
     k_mask: IntFieldK32, # type: ignore
 ):
     """
@@ -984,6 +986,126 @@ def rates_up_pdf_shallow_stencil(
     with computation(FORWARD), interval(0, 1):
         if ierr <= 0:
             if ktop <= kbcon + 2:
+                ierr = 41
+                ktop = -1
+            else:
+                ktopdby = ktop + 1
+
+def rates_up_pdf_deep_stencil(
+    ktop: IntFieldIJ32, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    entr_rate_2d: FloatField, # type: ignore
+    hkbo: FloatFieldIJ, # type: ignore
+    z_cup: FloatField, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    zuo: FloatField, # type: ignore
+    ktopdby: IntFieldIJ32, # type: ignore
+    # hcot: FloatField, # type: ignore
+    heo: FloatField, # type: ignore
+    heso_cup: FloatField, # type: ignore
+    # dby: FloatField, # type: ignore
+    # dbm: FloatField, # type: ignore
+    kfinalzu: IntFieldIJ32, # type: ignore
+    kklev: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    k_index: IntFieldIJ, # type: ignore
+    maxval: FloatFieldIJ, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+):
+    """
+    Calculates a normalized mass-flux profile for updrafts and downdrafts.
+    """
+
+    from __externals__ import ( # type: ignore
+        zustart,
+        k_start,
+        k_end,
+    )
+
+    with computation(PARALLEL), interval(...):
+        dz = 0.0
+        massent = 0.0
+        massdetr = 0.0
+        zux = 0.0
+        hcot = 0.0
+        dby = 0.0
+        dbm = 0.0
+        if ierr <= 0:
+            zuo = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr <= 0:
+            kfinalzu = 0.0
+            kklev = 0
+            kbcon = max(kbcon, 1)
+            zuo[0, 0, k22] = zustart
+            zux[0, 0, k22] = zustart
+
+    with computation(FORWARD), interval(1, None):
+        if ierr <= 0:
+            if k_mask > k22 and k_mask <= kbcon:
+                dz = z_cup - z_cup[0, 0, -1]
+                massent = dz * entr_rate_2d[0, 0, -1] * zuo[0, 0, -1]
+                massdetr = dz * 0.1 * entr_rate_2d.at(K=k_start) * zuo[0, 0, -1]
+                zuo = zuo[0, 0, -1] + massent - massdetr
+                zux = zuo
+
+    # Start of if deep specific part
+    with computation(FORWARD), interval(0, 1):
+        if ierr <= 0:
+            ktop = -1
+            hcot[0, 0, k22] = hkbo
+
+    with computation(FORWARD), interval(1, None):
+        if ierr <= 0:
+            if k_mask > k22 and k_mask <= k_end - 2:
+                dz = z_cup - z_cup[0, 0, -1]
+                hcot = ((1.0 - 0.5 * entr_rate_2d[0, 0, -1] * dz) * hcot[0, 0, -1] \
+                        + entr_rate_2d[0, 0, -1] * dz * heo[0, 0, -1]) \
+                        / (1.0 + 0.5 * entr_rate_2d[0, 0, -1] * dz)
+                if k_mask >= kbcon:
+                    dby = dby[0, 0, -1] + (hcot - heso_cup) * dz
+                    dbm = hcot - heso_cup
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr <= 0:
+            ktopdby = 0
+            kklev = 0
+            maxval = 0.0
+            found = False
+            k_index = 0
+
+    with computation(FORWARD), interval(...):
+        if ierr <= 0:
+            if dby > dby.at(K=ktopdby):
+                ktopdby = k_mask
+                maxval = dby
+            if dbm > dbm.at(K=kklev):
+                kklev = k_mask
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr <= 0:
+            k_index = ktopdby + 1
+
+    with computation(FORWARD), interval(1, None):
+        if ierr <= 0:
+            if k_mask > ktopdby and k_mask <= k_end - 2 and not found:
+                if dby < 0.8 * maxval:
+                    kfinalzu = k_mask - 1
+                    ktop = kfinalzu
+                    found = True
+                k_index += 1
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr <= 0:
+            if dby.at(K=k_index) >= 0.8 * maxval:
+                kfinalzu = k_end - 3
+                ktop = kfinalzu
+            ktop = ktopdby
+            kklev = min(kklev + 3, ktop -2)
+
+            if kfinalzu <= kbcon + 2:
                 ierr = 41
                 ktop = -1
 
@@ -1176,6 +1298,7 @@ def rates_up_pdf_shallow_stencil(
 
 def get_zu_zd_pdf_fim_stencil(
     kklev: IntFieldIJ32, # type: ignore
+    rand_vmas: FloatFieldIJ, # type: ignore
     p: FloatField, # type: ignore
     draft: int,
     kb: IntFieldIJ32, # type: ignore
@@ -1190,6 +1313,8 @@ def get_zu_zd_pdf_fim_stencil(
     g_alpha2: FloatFieldIJ, # type: ignore
     fzu: FloatFieldIJ, # type: ignore
     zu_kpbli: FloatFieldIJ, # type: ignore
+    trash: FloatFieldIJ, # type: ignore
+    beta_deep: FloatFieldIJ, # type: ignore
     k_mask: IntFieldK32, # type: ignore
     k_index: IntFieldIJ, # type: ignore
     argmax: IntFieldIJ32, # type: ignore
@@ -1203,7 +1328,9 @@ def get_zu_zd_pdf_fim_stencil(
 
     from __externals__ import ( # type: ignore
         zustart,
-        maxlim,
+        maxlim_1,
+        maxlim_2,
+        maxlim_3,
         k_end,
     )
 
@@ -1216,10 +1343,42 @@ def get_zu_zd_pdf_fim_stencil(
             kb_adj = max(kb, 1)  # Adjust kb to be at least 1
             argmax = 0
             fzu = 0.0
+            rand_vmas = 0.0
+            trash = 0.0
+            beta_deep = 0.0
 
 
     with computation(FORWARD), interval(0, 1):
         if ierr <= 0:
+            if draft == 1:
+                trash = -p.at(K=kt + 1) + p.at(K=kb_adj)
+                tunning = p.at(K=kklev)  # Get tunning value from p at kklev
+                if rand_vmas != 0.0:
+                    tunning = p.at(K=kklev - 1) + 0.1 * rand_vmas * trash
+                beta_deep = 1.3 + (1.0 - trash / 1200.0)
+                tunning = min(0.95, (tunning - p.at(K=kb_adj)) / (p.at(K=kt + 1) - p.at(K=kb_adj)))
+                tunning = max(0.02, tunning)  # Ensure tunning is
+                alpha2 = (tunning * (beta_deep - 2.0) + 1.0) / (1.0 - tunning)
+
+                k_index = 26
+                found = False
+                while k_index > 1 and not found:
+                    if alpha.A[k_index] >= alpha2:
+                        found = True
+                    else:
+                        k_index -= 1
+
+                if alpha.A[k_index + 1] != alpha.A[k_index]:
+                    g_alpha2 = (g_alpha.A[k_index + 1] - g_alpha.A[k_index]) \
+                        * ((alpha2 - (alpha.A[k_index] * (k_index + 1) - (k_index) * alpha.A[k_index + 1]))
+                        / (alpha.A[k_index + 1] - alpha.A[k_index])) \
+                        + (g_alpha.A[k_index] * (k_index + 1) - (k_index) * g_alpha.A[k_index + 1])
+                else:
+                    g_alpha2 = g_alpha.A[k_index + 1]
+
+                fzu = gamma(alpha2 + beta_deep) / (gamma(alpha2) * gamma(beta_deep))
+                zu[0, 0, kb_adj] = zustart  # Set initial value
+
             if draft == 2:
                 tunning = p.at(K=kklev)  # Get tunning value from p at kklev
                 tunning = min(0.95, (tunning - p.at(K=kb_adj)) / (p.at(K=kt + 2) - p.at(K=kb_adj)))
@@ -1244,30 +1403,64 @@ def get_zu_zd_pdf_fim_stencil(
 
                 fzu = gamma(alpha2 + constants.BETA_SH) / (g_alpha2 * constants.G_BETA_SH)
                 zu[0, 0, kb_adj] = zustart  # Set initial value
+            if draft == 3:
+                tunning = 0.5 * (p.at(K=kt + 2) + p.at(K=kpbli))
+                tunning = min(0.95, (tunning - p.at(K=kb_adj)) / (p.at(K=kt + 2) - p.at(K=kb_adj)))
+                tunning = max(0.02, tunning)
+                alpha2 = (tunning * (constants.BETA_MID - 2.0) + 1.0) / (1.0 - tunning)
+
+                k_index = 26
+                found = False
+                while k_index > 1 and not found:
+                    if alpha.A[k_index] >= alpha2:
+                        found = True
+                    else:
+                        k_index -= 1
+
+                if alpha.A[k_index + 1] != alpha.A[k_index]:
+                    g_alpha2 = (g_alpha.A[k_index + 1] - g_alpha.A[k_index]) \
+                        * ((alpha2 - (alpha.A[k_index] * (k_index + 1) - (k_index) * alpha.A[k_index + 1]))
+                        / (alpha.A[k_index + 1] - alpha.A[k_index])) \
+                        + (g_alpha.A[k_index] * (k_index + 1) - (k_index) * g_alpha.A[k_index + 1])
+                else:
+                    g_alpha2 = g_alpha.A[k_index + 1]
+
+                fzu = gamma(alpha2 + constants.BETA_MID) / (gamma(alpha2) * gamma(constants.BETA_MID))
+                zu[0, 0, kb_adj] = zustart  # Set initial value
 
     with computation(PARALLEL), interval(...):
         if ierr <= 0:
+            if draft == 1:
+                if k_mask > kb_adj and k_mask <= min(k_end, kt):
+                    kratio = (p - p.at(K=kb_adj)) / (p.at(K=kt + 1) - p.at(K=kb_adj))
+                    zu = zustart + fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(beta_deep - 1.0)
             if draft == 2:
                 if k_mask > kb_adj and k_mask <= min(k_end, kt + 1):
                     kratio = (p - p.at(K=kb_adj)) / (p.at(K=kt + 2) - p.at(K=kb_adj))
                     zu = zustart + fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(constants.BETA_SH - 1.0)
+            if draft == 3:
+                if k_mask > kb_adj and k_mask <= min(k_end, kt + 1):
+                    kratio = (p - p.at(K=kb_adj)) / (p.at(K=kt + 2) - p.at(K=kb_adj))
+                    zu = zustart + fzu * kratio**(alpha2 - 1.0) * (1.0 - kratio)**(constants.BETA_MID - 1.0)
 
     with computation(FORWARD), interval(0, 1):
         if ierr <= 0:
-            if draft == 2:
-                zu_kpbli = zu.at(K=kpbli)
+            zu_kpbli = zu.at(K=kpbli)
 
     with computation(FORWARD), interval(...):
         if ierr <= 0:
-            if draft == 2:
-                # zu_kpbli = zu.at(K=kpbli)
+            if draft == 1:
+                if zu_kpbli > 0.0:  # Normalize by the value at kpbli
+                    if k_mask <= min(k_end - 1, kt):
+                        zu = zu / zu_kpbli  # Normalize by the value at kpbli
+            if draft ==2 or draft == 3:
                 if zu_kpbli > 0.0:  # Normalize by the value at kpbli
                     if k_mask <= min(k_end - 1, kt + 1):
                         zu = zu / zu_kpbli  # Normalize by the value at kpbli
 
     with computation(FORWARD), interval(0, 1):
         if ierr <= 0:
-            if draft == 2:
+            if draft == 1 or draft == 2 or draft == 3:
                 found = False
                 argmax = 0
                 maxval = 0.0
@@ -1281,19 +1474,53 @@ def get_zu_zd_pdf_fim_stencil(
 
     with computation(BACKWARD), interval(...):
         if ierr <= 0:
-            if draft == 2:
+            if draft == 1 or draft == 2 or draft == 3:
                 if k_mask <= argmax and not found:
                     if zu < 1e-6:
                         kb_adj = k_mask + 1
                         found = True
 
+    with computation(FORWARD), interval(0, 1):
+        if ierr <= 0:
+            if draft == 1 or draft == 3:
+                kb_adj = max(1, kb_adj)
+
+    with computation(PARALLEL), interval(...):
+        if ierr <= 0:
+            if draft == 1:
+                if k_mask < kb_adj:
+                    zu = 0.0
+            if draft == 3:
+                if k_mask < kb_adj:
+                    zu = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr <= 0:
+            if draft == 1 or draft == 3:
+                maxval = 0.0
+                k_index = 0
+                while k_index <= k_end:
+                    if zu.at(K=k_index) > maxval:
+                        maxval = zu.at(K=k_index)
+                    k_index += 1
+
     with computation(FORWARD), interval(...):
         if ierr <= 0:
+            if draft == 1:
+                if k_mask >= kb_adj and k_mask <= kt + 2:
+                    zu_kb_adj = zu.at(K=kb_adj)
+                    if (maxval - zu_kb_adj) > maxlim_1:
+                        zu = (zu - zu_kb_adj) * maxlim_1 / (maxval - zu_kb_adj) + zu_kb_adj
             if draft == 2:
                 if k_mask <= kt + 2:
                     zu_kb_adj = zu.at(K=kb_adj)
-                    if (maxval - zu_kb_adj) > maxlim:
-                        zu = (zu - zu_kb_adj) * maxlim / (maxval - zu_kb_adj) + zu_kb_adj
+                    if (maxval - zu_kb_adj) > maxlim_2:
+                        zu = (zu - zu_kb_adj) * maxlim_2 / (maxval - zu_kb_adj) + zu_kb_adj
+            if draft == 3:
+                if k_mask <= kt + 2:
+                    zu_kb_adj = zu.at(K=kb_adj)
+                    if (maxval - zu_kb_adj) > maxlim_3:
+                        zu = (zu - zu_kb_adj) * maxlim_3 / (maxval - zu_kb_adj) + zu_kb_adj
 
 
 def copy_updraft_in_active_cloud_layers(
