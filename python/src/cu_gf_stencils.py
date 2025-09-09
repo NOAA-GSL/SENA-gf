@@ -2585,3 +2585,59 @@ def initialize_updraft_properties(
                     kzdown = min(kzdown, kstabi - 1)
                     found = True
                 k_index += 1
+
+def adjust_downdraft_origin(
+    jmin: IntFieldIJ32, # type: ignore
+    jmini: IntFieldIJ32, # type: ignore
+    kdet: IntFieldIJ32, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    hcdo: FloatField, # type: ignore
+    heso_cup: FloatField, # type: ignore
+    zo_cup: FloatField, # type: ignore
+    hco: FloatField, # type: ignore
+    dbyo: FloatField, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    k_index: IntFieldIJ, # type: ignore
+):
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            jmini = jmin
+            found = False
+            while not found:
+                found = True
+                if jmini - 1 < kdet:
+                    kdet = jmini - 1
+                if jmini >= ktop - 1:
+                    jmini = ktop - 2
+                # ki = jmini
+                hcdo[0, 0, jmini] = heso_cup[0, 0, jmini]
+                dz = zo_cup.at(K=jmini + 1) - zo_cup.at(K=jmini)
+                dh = 0.0
+
+                # k_index = ki - 1
+                k_index = jmini - 1
+                while k_index >= 0 and ierr != 9:  # Reverse loop
+                    hcdo[0, 0, k_index] = heso_cup[0, 0, jmini]
+                    dz = zo_cup.at(K=k_index + 1) - zo_cup.at(K=k_index)
+                    dh += dz * (hcdo.at(K=k_index) - heso_cup.at(K=k_index))
+                    if dh > 0.0:
+                        jmini -= 1
+                        if jmini > 4:
+                            found = False
+                        else:
+                            ierr = 9
+                            # ierrc = "could not find jmini9"
+                    k_index -= 1
+            jmin = jmini
+            if jmini <= 4:
+                ierr = 4
+                # ierrc = "could not find jmini4"
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if k_mask > ktop:
+                hco = heso_cup
+                dbyo = 0.0
