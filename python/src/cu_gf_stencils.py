@@ -2685,6 +2685,10 @@ def cup_up_moisture_stencil(
     found: BoolFieldIJ, # type: ignore
 ):
 
+    """
+    Calculates moisture properties of the updraft.
+    """
+
     with computation(PARALLEL), interval(...):
         c0t3d = 0.0
 
