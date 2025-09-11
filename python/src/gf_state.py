@@ -956,7 +956,9 @@ class GFState:
             units="m2",
             dtype=self.rkind
         )
-        self.garea.field[:,:] = np.reshape(np.transpose(_dataset.variables["garea"][:]), (self.im, self.jm))
+        # self.garea.field[:,:] = np.reshape(np.transpose(_dataset.variables["garea"][:]), (self.im, self.jm))
+        self.garea.field[:] = np.reshape(np.transpose(_dataset.variables["garea"][:]), (self.im, self.jm))[:]
+        # print(f"garea layout = {self.garea.data.strides}")
 
         # Get dt
         self.dt = float(_dataset.variables["dt"][:])
@@ -1027,7 +1029,9 @@ class GFState:
             units="m2 s-2",
             dtype=self.rkind
         )
-        self.phil.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["phil"][:]), (self.im, self.jm, self.km))
+        # self.phil.field[:,:,:] = np.reshape(np.transpose(_dataset.variables["phil"][:]), (self.im, self.jm, self.km))
+        self.phil.field[:] = np.reshape(np.transpose(_dataset.variables["phil"][:]), (self.im, self.jm, self.km))[:]
+        # print(f"phil layout = {self.phil.data.strides}")
 
         # Get raincv
         self.raincv = self.quantity_factory.zeros(

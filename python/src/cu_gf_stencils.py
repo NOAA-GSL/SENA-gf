@@ -12,7 +12,7 @@ from ndsl.dsl.typing import (
     # GlobalTable
 )
 import cu_gf_constants as constants
-from ndsl.dsl.gt4py import log, floor, abs, gamma, sqrt
+from ndsl.dsl.gt4py import log, floor, abs, gamma, sqrt, exp
 from ndsl.dsl.gt4py import GlobalTable
 
 
@@ -2641,3 +2641,230 @@ def adjust_downdraft_origin(
             if k_mask > ktop:
                 hco = heso_cup
                 dbyo = 0.0
+
+def cup_up_moisture_stencil(
+    cumulus_type: int,
+    ierr: IntFieldIJ32, # type: ignore
+    z_cup: FloatField, # type: ignore
+    qc: FloatField, # type: ignore
+    qrc: FloatField, # type: ignore
+    pw: FloatField, # type: ignore
+    pwav: FloatFieldIJ, # type: ignore
+    pwavh: FloatFieldIJ, # type: ignore
+    p_cup: FloatField, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    dby: FloatField, # type: ignore
+    clw_all: FloatField, # type: ignore
+    xland1: IntFieldIJ32, # type: ignore
+    q: FloatField, # type: ignore
+    gamma_cup: FloatField, # type: ignore
+    zu: FloatField, # type: ignore
+    qes_cup: FloatField, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    qe_cup: FloatField, # type: ignore
+    c0: FloatFieldIJ, # type: ignore
+    c0t3d: FloatField, # type: ignore
+    zqexec: FloatField, # type: ignore
+    ccn: FloatFieldIJ, # type: ignore
+    ccnclean: float, # type: ignore
+    rho: FloatField, # type: ignore
+    c1d: FloatField, # type: ignore
+    t: FloatField, # type: ignore
+    autoconv: int, # type: ignore
+    up_massentr: FloatField, # type: ignore
+    up_massdetr: FloatField, # type: ignore
+    psum: FloatFieldIJ, # type: ignore
+    psumh: FloatFieldIJ, # type: ignore
+    itest: FloatField, # type: ignore
+    bdsp: FloatFieldIJ, # type: ignore
+    qaver: FloatFieldIJ, # type: ignore
+    add_x: FloatFieldIJ, # type: ignore
+    kklev: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+):
+
+    with computation(PARALLEL), interval(...):
+        c0t3d = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        pwav = 0.0
+        pwavh = 0.0
+        psum = 0.0
+        psumh = 0.0
+        add_x = 0.0
+        if xland1 == 0:
+            bdsp = constants.BDISPM
+        else:
+            bdsp = constants.BDISPC
+
+    with computation(PARALLEL), interval(...):
+        pw = 0.0
+        pwh = 0.0
+        qc = 0.0
+        qch = 0.0
+        c1d_b = 0.0
+        c0t = 0.0
+        if ierr == 0:
+            qc = qe_cup
+            qch = qe_cup
+        clw_all = 0.0
+        clw_allh = 0.0
+        qrc = 0.0
+        qrcb = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            qaver = get_cloud_bc(
+                array=qe_cup,
+                k22=k22,
+                add_x=add_x,
+            )
+            qc[0, 0, k22] = qaver
+            qch[0, 0, k22] = qaver
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if k_mask < k22:
+                qc = qe_cup
+                qch = qe_cup
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            if k_mask > k22 and k_mask <= kbcon:
+                if t > 273.16:
+                    c0t = c0
+                else:
+                    c0t = c0 * exp(constants.C0_ICECONV * (t - 273.16))
+                c0t3d = c0t
+                qc = (
+                    (qc[0, 0, -1] * zu[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1] * qc[0, 0, -1] +
+                    up_massentr[0, 0, -1] * q[0, 0, -1]) /
+                    (zu[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1] + up_massentr[0, 0, -1])
+                )
+                qrch = (
+                    qes_cup +
+                    (1. / constants.XLV) * (gamma_cup / (1. + gamma_cup)) * dby
+                )
+                if k_mask < kbcon:
+                    qrch = qc
+                if qc > qrch:
+                    dz = z_cup - z_cup[0, 0, -1]
+                    qrc = (qc - qrch) / (1. + c0t * dz)
+                    pw = c0t * dz * qrc * zu
+                    qc = qrch + qrc
+                    clw_all = qrc
+                clw_allh = clw_all
+                qrcb = qrc
+                pwh = pw
+                qch = qc
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            kklev = 0
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if zu > zu.at(K=kklev):
+                kklev = k_mask
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            if k_mask > kbcon and k_mask <= ktop:
+                if t > 273.16:
+                    c0t = c0
+                else:
+                    c0t = c0 * exp(constants.C0_ICECONV * (t - 273.16))
+                if cumulus_type == constants.CUMULUS_MID:
+                    c0t = 0.004
+                c0t3d = c0t
+
+                if autoconv > 1:
+                    c0t = c0
+                denom = zu[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1] + up_massentr[0, 0, -1]
+                if denom < 1.e-16:
+                    ierr = 51
+                else:
+                    rhoc = 0.5 * (rho + rho[0, 0, -1])
+                    dz = z_cup - z_cup[0, 0, -1]
+                    dp = -100.0 * (p_cup - p_cup[0, 0, -1])
+                    qrch = qes_cup + (1.0 / constants.XLV) * (gamma_cup / (1.0 + gamma_cup)) * dby
+
+                    # Calculate qc and qch using steady-state plume equations
+                    qc = (
+                        (qc[0, 0, -1] * zu[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1] * qc[0, 0, -1] +
+                        up_massentr[0, 0, -1] * q[0, 0, -1]) /
+                        (zu[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1] + up_massentr[0, 0, -1])
+                    )
+                    qch = (
+                        (qch[0, 0, -1] * zu[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1] * qch[0, 0, -1] +
+                        up_massentr[0, 0, -1] * q[0, 0, -1]) /
+                        (zu[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1] + up_massentr[0, 0, -1])
+                    )
+
+                    # Ensure qc and qch are greater than qrch
+                    if qc <= qrch:
+                        qc = qrch + 1e-8
+                    if qch <= qrch:
+                        qch = qrch + 1e-8
+
+                    # Calculate condensed water and rainout
+                    clw_all = max(0.0, qc - qrch)
+                    qrc = max(0.0, qc - qrch)
+                    clw_allh = max(0.0, qch - qrch)
+                    qrcb = max(0.0, qch - qrch)
+
+                    # Set cloud water detrainment factor
+                    if cumulus_type == constants.CUMULUS_DEEP:
+                        clwdet = 0.1
+                    else:
+                        clwdet = 0.1
+
+                    # Update c1d and c1d_b for levels above kbcon(i) + 1
+                    if k_mask > kbcon + 1:
+                        c1d = clwdet * up_massdetr[0, 0, -1]
+                        c1d_b = clwdet * up_massdetr[0, 0, -1]
+
+                    if autoconv == 2:
+                        q1 = 1.e3 * rhoc * clw_allh
+                        pwh = c0t * dz * zu * clw_allh
+                        qrcb_h = (qch - qrch) / (1.0 + (c1d_b + c0t) * dz)
+                        qrcb = 0.0
+                        berryc0 = (q1 * q1 / (60.0 * (5.0 + 0.0366 * ccnclean * 1.e1 / (q1 * bdsp))))
+                        berryc0 = 1.e-3 * berryc0 * constants.G / dp * dz
+                        prop_b = pwh / berryc0
+                        qrcb = qrcb_h
+                        if qrcb <= 0.0:
+                            pwh = 0.0
+                        qch = qrcb + qrch
+                        pwavh += pwh
+                        psumh += pwh * constants.G / dp
+                        q1 = 1.e3 * rhoc * clw_all
+                        berryc = (q1 * q1 / (60.0 * (5.0 + 0.0366 * ccn * 1.e1 / (q1 * bdsp))))
+                        berryc = 1.e-3 * berryc * constants.G / dp * dz
+                        pw = prop_b * berryc
+                        berryc = pw / (dz * zu * clw_all)
+                        if qrc <= 0.0:
+                            berryc = 0.0
+                        qrc = max(0.0, (qc - qrch) / (1.0 + (c1d + berryc) * dz))
+                        if qrc < 0.0:
+                            qrc = 0.0
+                            pw = 0.0
+                        qc = qrc + qrch
+                    else:
+                        qrc = (qc - qrch) / (1.0 + (c1d + c0t) * dz)
+                        if qrc < 0.0:
+                            qrc = 0.0
+                        pw = c0t * dz * qrc * zu
+                        if qrc < 0.0:
+                            qrc = 0.0
+                            pw = 0.0
+                        qc = qrc + qrch
+                    pwav += pw
+                    psum += pw * constants.G / dp
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if k_mask > k22 and k_mask <= ktop:
+                qc -= qrc

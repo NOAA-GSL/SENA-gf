@@ -44,3 +44,6 @@ T_ICE = 250.16  # Ice temperature (K)
 MELT_TEMP_UPPER_THRESH = 276.16 # Upper temperature threshold for melting layer (K)
 Z_DETR = 500.0 # Set depth (m) over which downdraft detrains all its mass
 ZCUTDOWN = 4000.0 # Set height (m) above which no downdrafts are allowed to originate
+BDISPM = 0.366  # Default value for BDISP over land
+BDISPC = 0.146  # Default value for BDISP over ocean
+C0_ICECONV = 0.01  # Parameter for ice convection
