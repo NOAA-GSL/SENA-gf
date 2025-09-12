@@ -735,6 +735,12 @@ class GFDeepConvection:
             units="none",
             dtype=state.ikind,
         )
+        self.neg_ones_int: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
+        self.neg_ones_int.field[:, :] = -1
         self.finalzu: Quantity = state.quantity_factory.zeros(
             dims=[X_DIM, Y_DIM],
             units="none",
@@ -1096,13 +1102,11 @@ class GFDeepConvection:
             externals={},
         )
 
-        state.stencil_factory.config.rebuild = True
         self._update_updraft_downdraft_properties = state.stencil_factory.from_dims_halo(
             func=update_updraft_downdraft_properties,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
         )
-        state.stencil_factory.config.rebuild = False
 
     def cu_gf_deep_run(self,
         itf, jtf, ktf, its, ite, jts, jte, kts, kte,  # Dimensions
@@ -1978,6 +1982,8 @@ class GFDeepConvection:
             ktop=ktop,
             kbcon=kbcon,
             dbyt=self.dbyt,
+            dby=self.dby,
+            dbyo=self.dbyo,
             start_level=self.start_level,
             zuo=zuo,
             up_massdetro=self.up_massdetro,
@@ -2001,7 +2007,7 @@ class GFDeepConvection:
             heo=self.heo,
             us=us,
             vs=vs,
-            hes_cup=self.heso_cup,
+            hes_cup=self.hes_cup,
             heso_cup=self.heso_cup,
             u_cup=self.u_cup,
             v_cup=self.v_cup,
@@ -2025,135 +2031,6 @@ class GFDeepConvection:
             k_mask=self.k_mask,
             found=self.found,
         )
-
-        # Loop to calculate moist static energy, buoyancy, and related properties
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                # self.ktopkeep.field[i, j] = -1
-                # self.dbyt.field[i, j, :] = 0.0
-                if ierr[i, j] != 0:
-                    continue
-                # self.ktopkeep.field[i, j] = ktop[i, j]
-
-                # Mass conservation option
-                for k in range(self.start_level.field[i, j] + 1, ktop[i, j] + 1):  # Adjust range for zero-based indexing
-                    denom = zuo[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] + self.up_massentro.field[i, j, k - 1]
-                    if denom < 1e-8:
-                        ierr[i, j] = 51
-                        break
-
-                    # self.hc.field[i, j, k] = (
-                    #     (self.hc.field[i, j, k - 1] * self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetr.field[i, j, k - 1] * self.hc.field[i, j, k - 1] +
-                    #     self.up_massentr.field[i, j, k - 1] * self.he.field[i, j, k - 1]) /
-                    #     (self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetr.field[i, j, k - 1] + self.up_massentr.field[i, j, k - 1])
-                    # )
-                    self.uc.field[i, j, k] = (
-                        (self.uc.field[i, j, k - 1] * self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetru.field[i, j, k - 1] * self.uc.field[i, j, k - 1] +
-                        self.up_massentru.field[i, j, k - 1] * us[i, j, k - 1] -
-                        pgcon * 0.5 * (self.zu.field[i, j, k] + self.zu.field[i, j, k - 1]) * (self.u_cup.field[i, j, k] - self.u_cup.field[i, j, k - 1])) /
-                        (self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetru.field[i, j, k - 1] + self.up_massentru.field[i, j, k - 1])
-                    )
-                    self.vc.field[i, j, k] = (
-                        (self.vc.field[i, j, k - 1] * self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetru.field[i, j, k - 1] * self.vc.field[i, j, k - 1] +
-                        self.up_massentru.field[i, j, k - 1] * vs[i, j, k - 1] -
-                        pgcon * 0.5 * (self.zu.field[i, j, k] + self.zu.field[i, j, k - 1]) * (self.v_cup.field[i, j, k] - self.v_cup.field[i, j, k - 1])) /
-                        (self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetru.field[i, j, k - 1] + self.up_massentru.field[i, j, k - 1])
-                    )
-                    # self.dby.field[i, j, k] = self.hc.field[i, j, k] - self.hes_cup.field[i, j, k]
-                    self.hco.field[i, j, k] = (
-                        (self.hco.field[i, j, k - 1] * zuo[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] * self.hco.field[i, j, k - 1] +
-                        self.up_massentro.field[i, j, k - 1] * self.heo.field[i, j, k - 1]) /
-                        (zuo[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] + self.up_massentro.field[i, j, k - 1])
-                    )
-
-                    # Include glaciation effects
-                    self.hc.field[i, j, k] += (1.0 - self.p_liq_ice.field[i, j, k]) * self.qrco.field[i, j, k] * XLF
-                    self.hco.field[i, j, k] += (1.0 - self.p_liq_ice.field[i, j, k]) * self.qrco.field[i, j, k] * XLF
-                    self.dby.field[i, j, k] = self.hc.field[i, j, k] - self.hes_cup.field[i, j, k]
-                    self.dbyo.field[i, j, k] = self.hco.field[i, j, k] - self.heso_cup.field[i, j, k]
-                    dz = self.zo_cup.field[i, j, k + 1] - self.zo_cup.field[i, j, k]
-                    self.dbyt.field[i, j, k] = self.dbyt.field[i, j, k - 1] + self.dbyo.field[i, j, k] * dz
-
-                # Find the indices of the maximum values in dbyt and zuo arrays
-                # kk = np.argmax(self.dbyt.field[i, j, :])  # Adjusted for Python's zero-based indexing
-                # ki = np.argmax(zuo[i, j, :])  # Adjusted for Python's zero-based indexing
-
-                # Determine self.ktopkeep.field based on buoyancy
-                for k in range(ktop[i, j] - 1, kbcon[i, j] - 1, -1):  # Reverse loop
-                    if self.dbyo.field[i, j, k] > 0.0:
-                        self.ktopkeep.field[i, j] = k + 1
-                        break
-
-        # Initialize properties above the cloud top
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] != 0:
-                    continue
-                for k in range(ktop[i, j] + 1, ktf + 1):  # Adjust range for zero-based indexing
-                    self.hc.field[i, j, k] = self.hes_cup.field[i, j, k]
-                    self.uc.field[i, j, k] = self.u_cup.field[i, j, k]
-                    self.vc.field[i, j, k] = self.v_cup.field[i, j, k]
-                    self.hco.field[i, j, k] = self.heso_cup.field[i, j, k]
-                    self.dby.field[i, j, k] = 0.0
-                    self.dbyo.field[i, j, k] = 0.0
-                    self.zu.field[i, j, k] = 0.0
-                    zuo[i, j, k] = 0.0
-                    self.cd.field[i, j, k] = 0.0
-                    self.entr_rate_2d.field[i, j, k] = 0.0
-                    self.up_massentr.field[i, j, k] = 0.0
-                    self.up_massdetr.field[i, j, k] = 0.0
-                    self.up_massentro.field[i, j, k] = 0.0
-                    self.up_massdetro.field[i, j, k] = 0.0
-
-        # Check if cloud top is too small and handle errors
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] != 0:
-                    continue
-                if ktop[i, j] < kbcon[i, j] + 2:
-                    ierr[i, j] = 5
-                    # ierrc[i, j] = 'ktop too small deep'
-                    ktop[i, j] = -1
-
-        # Check cloud depth and adjust error flags
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0:
-                    if jmin[i, j] - 1 < self.kdet.field[i, j]:
-                        self.kdet.field[i, j] = jmin[i, j] - 1
-                    if -self.zo_cup.field[i, j, kbcon[i, j]] + self.zo_cup.field[i, j, ktop[i, j]] < depth_min:
-                        ierr[i, j] = 6
-                        # ierrc[i, j] = "cloud depth very shallow"
-
-        # Initialize downdraft properties
-        for k in range(kts, ktf + 1):  # Adjust range for zero-based indexing
-            for i in range(its, itf + 1):  # Adjust loop to start at zero
-                for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                    zdo[i, j, k] = 0.0
-                    self.cdd.field[i, j, k] = 0.0
-                    self.dd_massentro.field[i, j, k] = 0.0
-                    self.dd_massdetro.field[i, j, k] = 0.0
-                    self.dd_massentru.field[i, j, k] = 0.0
-                    self.dd_massdetru.field[i, j, k] = 0.0
-                    self.hcdo.field[i, j, k] = self.heso_cup.field[i, j, k]
-                    self.ucd.field[i, j, k] = self.u_cup.field[i, j, k]
-                    self.vcd.field[i, j, k] = self.v_cup.field[i, j, k]
-                    self.dbydo.field[i, j, k] = 0.0
-                    self.mentrd_rate_2d.field[i, j, k] = self.entr_rate.field[i, j]
-
-        # Calculate downdraft mass flux and related properties
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] != 0:
-                    continue
-                # beta = max(0.025, 0.055 - float(csum[i, j]) * 0.0015)
-                # if imid == 1:
-                #     beta = 0.025
-                # bud[i, j] = 0.0
-                self.cdd.field[i, j, :jmin[i, j] + 1] = 0.1 * self.entr_rate.field[i, j]
-                self.cdd.field[i, j, jmin[i, j]] = 0.0
-                self.dd_massdetro.field[i, j, :] = 0.0
-                self.dd_massentro.field[i, j, :] = 0.0
 
                 # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
                 # print(f"{self.kdet.field[0]:>4}{jmin[0]:>4}{kpbl[0]:>4}{ipr:>4}{xland1[0]:>4}{csum[0]:>4}{self.pmin_lev.field[0]:>4}")
@@ -2179,6 +2056,32 @@ class GFDeepConvection:
             self.kdet.field, jmin + 1, zdo, its, itf, jts, jtf, kts, kte, ktf, kpbl, ierr,
         )
 
+        # self._get_zu_zd_pdf_fim(
+        #     kklev=self.neg_ones_int,
+        #     rand_vmas=rand_vmas,
+        #     p=self.po_cup,
+        #     draft=4,
+        #     kb=self.kdet,
+        #     kt=jmin,
+        #     zu=zdo,
+        #     kpbli=kpbl,
+        #     alpha=self.alpha.field[0,0,:],
+        #     g_alpha=self.g_alpha.field[0,0,:],
+        #     kb_adj=self.kb_adj,
+        #     tunning=self.tunning,
+        #     alpha2=self.alpha2,
+        #     g_alpha2=self.g_alpha2,
+        #     fzu= self.fzu,
+        #     zu_kpbli=self.zu_kpbli,
+        #     trash=self.trash,
+        #     beta_deep=self.beta_deep,
+        #     k_mask=self.k_mask,
+        #     k_index=self.k_index,
+        #     argmax=self.argmax,
+        #     maxval=self.maxval,
+        #     found=self.found,
+        #     ierr=ierr,
+        # )
 
         for i in range(its, itf + 1):  # Adjust loop to start at zero
             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
