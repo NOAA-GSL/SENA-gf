@@ -2872,3 +2872,296 @@ def cup_up_moisture_stencil(
         if ierr == 0:
             if k_mask > k22 and k_mask <= ktop:
                 qc -= qrc
+
+def update_updraft_downdraft_properties(
+    ktopkeep: IntFieldIJ32, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    dbyt: FloatField, # type: ignore
+    start_level: IntFieldIJ32, # type: ignore
+    zuo: FloatField, # type: ignore
+    up_massdetro: FloatField, # type: ignore
+    up_massentro: FloatField, # type: ignore
+    up_massdetr: FloatField, # type: ignore
+    up_massentr: FloatField, # type: ignore
+    up_massdetru: FloatField, # type: ignore
+    up_massentru: FloatField, # type: ignore
+    dd_massdetro: FloatField, # type: ignore
+    dd_massentro: FloatField, # type: ignore
+    dd_massentru: FloatField, # type: ignore
+    dd_massdetru: FloatField, # type: ignore
+    pgcon: float,
+    depth_min: float,
+    hc: FloatField, # type: ignore
+    uc: FloatField, # type: ignore
+    vc: FloatField, # type: ignore
+    hco: FloatField, # type: ignore
+    zu: FloatField, # type: ignore
+    he: FloatField, # type: ignore
+    heo: FloatField, # type: ignore
+    us: FloatField, # type: ignore
+    vs: FloatField, # type: ignore
+    hes_cup: FloatField, # type: ignore
+    heso_cup: FloatField, # type: ignore
+    u_cup: FloatField, # type: ignore
+    v_cup: FloatField, # type: ignore
+    zo_cup: FloatField, # type: ignore
+    p_liq_ice: FloatField, # type: ignore
+    qrco: FloatField, # type: ignore
+    cd: FloatField, # type: ignore
+    entr_rate_2d: FloatField, # type: ignore
+    entr_rate: FloatFieldIJ, # type: ignore
+    jmin: IntFieldIJ32, # type: ignore
+    kdet: IntFieldIJ32, # type: ignore
+    zdo: FloatField, # type: ignore
+    cdd: FloatField, # type: ignore
+    hcdo: FloatField, # type: ignore
+    ucd: FloatField, # type: ignore
+    vcd: FloatField, # type: ignore
+    dbydo: FloatField, # type: ignore
+    mentrd_rate_2d: FloatField, # type: ignore
+    csum: FloatFieldIJ, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+):
+
+    # # Loop to calculate moist static energy, buoyancy, and related properties
+    # for i in range(its, itf + 1):  # Adjust loop to start at zero
+    #     for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+    #         self.ktopkeep.field[i, j] = -1
+    #         self.dbyt.field[i, j, :] = 0.0
+    #         if ierr[i, j] != 0:
+    #             continue
+    #         self.ktopkeep.field[i, j] = ktop[i, j]
+
+    with computation(FORWARD), interval(0, 1):
+        ktopkeep = -1
+        found = False
+        if ierr == 0:
+            ktopkeep = ktop
+
+    with computation(PARALLEL), interval(...):
+        dbyt = 0.0
+
+    #         # Mass conservation option
+    #         for k in range(self.start_level.field[i, j] + 1, ktop[i, j] + 1):  # Adjust range for zero-based indexing
+    #             denom = zuo[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] + self.up_massentro.field[i, j, k - 1]
+    #             if denom < 1e-8:
+    #                 ierr[i, j] = 51
+    #                 break
+
+                # self.hc.field[i, j, k] = (
+                #     (self.hc.field[i, j, k - 1] * self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetr.field[i, j, k - 1] * self.hc.field[i, j, k - 1] +
+                #     self.up_massentr.field[i, j, k - 1] * self.he.field[i, j, k - 1]) /
+                #     (self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetr.field[i, j, k - 1] + self.up_massentr.field[i, j, k - 1])
+                # )
+                # self.uc.field[i, j, k] = (
+                #     (self.uc.field[i, j, k - 1] * self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetru.field[i, j, k - 1] * self.uc.field[i, j, k - 1] +
+                #     self.up_massentru.field[i, j, k - 1] * us[i, j, k - 1] -
+                #     pgcon * 0.5 * (self.zu.field[i, j, k] + self.zu.field[i, j, k - 1]) * (self.u_cup.field[i, j, k] - self.u_cup.field[i, j, k - 1])) /
+                #     (self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetru.field[i, j, k - 1] + self.up_massentru.field[i, j, k - 1])
+                # )
+                # self.vc.field[i, j, k] = (
+                #     (self.vc.field[i, j, k - 1] * self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetru.field[i, j, k - 1] * self.vc.field[i, j, k - 1] +
+                #     self.up_massentru.field[i, j, k - 1] * vs[i, j, k - 1] -
+                #     pgcon * 0.5 * (self.zu.field[i, j, k] + self.zu.field[i, j, k - 1]) * (self.v_cup.field[i, j, k] - self.v_cup.field[i, j, k - 1])) /
+                #     (self.zu.field[i, j, k - 1] - 0.5 * self.up_massdetru.field[i, j, k - 1] + self.up_massentru.field[i, j, k - 1])
+                # )
+                # self.dby.field[i, j, k] = self.hc.field[i, j, k] - self.hes_cup.field[i, j, k]
+                # self.hco.field[i, j, k] = (
+                #     (self.hco.field[i, j, k - 1] * zuo[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] * self.hco.field[i, j, k - 1] +
+                #     self.up_massentro.field[i, j, k - 1] * self.heo.field[i, j, k - 1]) /
+                #     (zuo[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] + self.up_massentro.field[i, j, k - 1])
+                # )
+
+                # # Include glaciation effects
+                # self.hc.field[i, j, k] += (1.0 - self.p_liq_ice.field[i, j, k]) * self.qrco.field[i, j, k] * XLF
+                # self.hco.field[i, j, k] += (1.0 - self.p_liq_ice.field[i, j, k]) * self.qrco.field[i, j, k] * XLF
+                # self.dby.field[i, j, k] = self.hc.field[i, j, k] - self.hes_cup.field[i, j, k]
+                # self.dbyo.field[i, j, k] = self.hco.field[i, j, k] - self.heso_cup.field[i, j, k]
+                # dz = self.zo_cup.field[i, j, k + 1] - self.zo_cup.field[i, j, k]
+                # self.dbyt.field[i, j, k] = self.dbyt.field[i, j, k - 1] + self.dbyo.field[i, j, k] * dz
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            if k_mask > start_level and k_mask <= ktop and not found:
+                denom = zuo[0, 0, -1] - 0.5 * up_massdetro[0, 0, -1] + up_massentro[0, 0, -1]
+                if denom < 1e-8:
+                    ierr = 51
+                    found = True
+                else:
+                    hc = (
+                        (hc[0, 0, -1] * zu[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1] * hc[0, 0, -1] +
+                        up_massentr[0, 0, -1] * he[0, 0, -1]) /
+                        (zu[0, 0, -1] - 0.5 * up_massdetr[0, 0, -1] + up_massentr[0, 0, -1])
+                    )
+                    # uc = (
+                    #     (uc[0, 0, -1] * zu[0, 0, -1] - 0.5 * up_massdetru[0, 0, -1] * uc[0, 0, -1] +
+                    #     up_massentru[0, 0, -1] * us[0, 0, -1] -
+                    #     pgcon * 0.5 * (zu + zu[0, 0, -1]) * (u_cup - u_cup[0, 0, -1])) /
+                    #     (zu[0, 0, -1] - 0.5 * up_massdetru[0, 0, -1] + up_massentru[0, 0, -1])
+                    # )
+                    # vc = (
+                    #     (vc[0, 0, -1] * zu[0, 0, -1] - 0.5 * up_massdetru[0, 0, -1] * vc[0, 0, -1] +
+                    #     up_massentru[0, 0, -1] * vs[0, 0, -1] -
+                    #     pgcon * 0.5 * (zu + zu[0, 0, -1]) * (v_cup - v_cup[0, 0, -1])) /
+                    #     (zu[0, 0, -1] - 0.5 * up_massdetru[0, 0, -1] + up_massentru[0, 0, -1])
+                    # )
+    #                 hco = (
+    #                     (hco[0, 0, -1] * zuo[0, 0, -1] - 0.5 * up_massdetro[0, 0, -1] * hco[0, 0, -1] +
+    #                     up_massentro[0, 0, -1] * heo[0, 0, -1]) /
+    #                     (zuo[0, 0, -1] - 0.5 * up_massdetro[0, 0, -1] + up_massentro[0, 0, -1])
+    #                 )
+
+    #                 hc += (1.0 - p_liq_ice) * qrco * constants.XLF
+    #                 hco += (1.0 - p_liq_ice) * qrco * constants.XLF
+    #                 dby = hc - hes_cup
+    #                 dbyo = hco - heso_cup
+    #                 dz = zo_cup[0, 0, 1] - zo_cup
+    #                 dbyt = dbyt[0, 0, -1] + dbyo * dz
+
+    #         # Find the indices of the maximum values in dbyt and zuo arrays
+    #         kk = np.argmax(self.dbyt.field[i, j, :])  # Adjusted for Python's zero-based indexing
+    #         ki = np.argmax(zuo[i, j, :])  # Adjusted for Python's zero-based indexing
+
+    #         # Determine self.ktopkeep.field based on buoyancy
+    #         for k in range(ktop[i, j] - 1, kbcon[i, j] - 1, -1):  # Reverse loop
+    #             if self.dbyo.field[i, j, k] > 0.0:
+    #                 self.ktopkeep.field[i, j] = k + 1
+    #                 break
+
+    # with computation(FORWARD), interval(0, 1):
+    #     if ierr == 0:
+    #         found = False
+
+    # with computation(BACKWARD), interval(...):
+    #     if ierr == 0:
+    #         if k_mask < ktop and k_mask >= kbcon and not found:
+    #             if dbyo > 0.0:
+    #                 ktopkeep = k_mask + 1
+    #                 found = True
+
+    # # Initialize properties above the cloud top
+    # for i in range(its, itf + 1):  # Adjust loop to start at zero
+    #     for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+    #         if ierr[i, j] != 0:
+    #             continue
+    #         for k in range(ktop[i, j] + 1, ktf + 1):  # Adjust range for zero-based indexing
+    #             self.hc.field[i, j, k] = self.hes_cup.field[i, j, k]
+    #             self.uc.field[i, j, k] = self.u_cup.field[i, j, k]
+    #             self.vc.field[i, j, k] = self.v_cup.field[i, j, k]
+    #             self.hco.field[i, j, k] = self.heso_cup.field[i, j, k]
+    #             self.dby.field[i, j, k] = 0.0
+    #             self.dbyo.field[i, j, k] = 0.0
+    #             self.zu.field[i, j, k] = 0.0
+    #             zuo[i, j, k] = 0.0
+    #             self.cd.field[i, j, k] = 0.0
+    #             self.entr_rate_2d.field[i, j, k] = 0.0
+    #             self.up_massentr.field[i, j, k] = 0.0
+    #             self.up_massdetr.field[i, j, k] = 0.0
+    #             self.up_massentro.field[i, j, k] = 0.0
+    #             self.up_massdetro.field[i, j, k] = 0.0
+
+    # with computation(PARALLEL), interval(...):
+    #     if ierr == 0:
+    #         if k_mask > ktop:
+    #             hc = hes_cup
+    #             uc = u_cup
+    #             vc = v_cup
+    #             hco = heso_cup
+    #             dby = 0.0
+    #             dbyo = 0.0
+    #             zu = 0.0
+    #             zuo = 0.0
+    #             cd = 0.0
+    #             entr_rate_2d = 0.0
+    #             up_massentr = 0.0
+    #             up_massdetr = 0.0
+    #             up_massentro = 0.0
+    #             up_massdetro = 0.0
+
+    # # Check if cloud top is too small and handle errors
+    # for i in range(its, itf + 1):  # Adjust loop to start at zero
+    #     for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+    #         if ierr[i, j] != 0:
+    #             continue
+    #         if ktop[i, j] < kbcon[i, j] + 2:
+    #             ierr[i, j] = 5
+    #             # ierrc[i, j] = 'ktop too small deep'
+    #             ktop[i, j] = -1
+
+    # with computation(FORWARD), interval(0, 1):
+    #     if ierr == 0:
+    #         if ktop < kbcon + 2:
+    #             ierr = 5
+    #             ktop = -1
+
+    # # Check cloud depth and adjust error flags
+    # for i in range(its, itf + 1):  # Adjust loop to start at zero
+    #     for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+    #         if ierr[i, j] == 0:
+    #             if jmin[i, j] - 1 < self.kdet.field[i, j]:
+    #                 self.kdet.field[i, j] = jmin[i, j] - 1
+    #             if -self.zo_cup.field[i, j, kbcon[i, j]] + self.zo_cup.field[i, j, ktop[i, j]] < depth_min:
+    #                 ierr[i, j] = 6
+    #                 # ierrc[i, j] = "cloud depth very shallow"
+
+    # with computation(FORWARD), interval(0, 1):
+    #     if ierr == 0:
+    #         if jmin - 1 < kdet:
+    #             kdet = jmin - 1
+    #         if -zo_cup.at(K=kbcon) + zo_cup.at(K=ktop) < depth_min:
+    #             ierr = 6
+
+    # # Initialize downdraft properties
+    # for k in range(kts, ktf + 1):  # Adjust range for zero-based indexing
+    #     for i in range(its, itf + 1):  # Adjust loop to start at zero
+    #         for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+    #             zdo[i, j, k] = 0.0
+    #             self.cdd.field[i, j, k] = 0.0
+    #             dd_massentro[i, j, k] = 0.0
+    #             dd_massdetro[i, j, k] = 0.0
+    #             dd_massentru[i, j, k] = 0.0
+    #             dd_massdetru[i, j, k] = 0.0
+    #             self.hcdo.field[i, j, k] = self.heso_cup.field[i, j, k]
+    #             ucd[i, j, k] = self.u_cup.field[i, j, k]
+    #             vcd[i, j, k] = self.v_cup.field[i, j, k]
+    #             dbydo[i, j, k] = 0.0
+    #             mentrd_rate_2d[i, j, k] = self.entr_rate.field[i, j]
+
+    # with computation(PARALLEL), interval(...):
+    #     zdo = 0.0
+    #     cdd = 0.0
+    #     dd_massentro = 0.0
+    #     dd_massdetro = 0.0
+    #     dd_massentru = 0.0
+    #     dd_massdetru = 0.0
+    #     hcdo = heso_cup
+    #     ucd = u_cup
+    #     vcd = v_cup
+    #     dbydo = 0.0
+    #     mentrd_rate_2d = entr_rate
+
+    # # Calculate downdraft mass flux and related properties
+    # for i in range(its, itf + 1):  # Adjust loop to start at zero
+    #     for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+    #         if ierr[i, j] != 0:
+    #             continue
+    #         beta = max(0.025, 0.055 - float(csum[i, j]) * 0.0015)
+    #         if imid == 1:
+    #             beta = 0.025
+    #         bud[i, j] = 0.0
+    #         self.cdd.field[i, j, :jmin[i, j] + 1] = 0.1 * self.entr_rate.field[i, j]
+    #         self.cdd.field[i, j, jmin[i, j]] = 0.0
+    #         dd_massdetro[i, j, :] = 0.0
+    #         dd_massentro[i, j, :] = 0.0
+
+    # with computation(FORWARD), interval(...):
+    #     if ierr == 0:
+    #         dd_massdetro = 0.0
+    #         dd_massentro = 0.0
+    #         if k_mask <= jmin:
+    #             cdd = 0.1 * entr_rate
+    #         if k_mask == jmin:
+    #             cdd = 0.0

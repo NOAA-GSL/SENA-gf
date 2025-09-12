@@ -42,6 +42,7 @@ MELT_GLAC = True  # Flag to enable / disable ice phase / melting
 T_0 = 273.16  # Reference temperature (K)
 T_ICE = 250.16  # Ice temperature (K)
 MELT_TEMP_UPPER_THRESH = 276.16 # Upper temperature threshold for melting layer (K)
+XLF = 0.333e6  # Latent heat of freezing (J / kg) 
 Z_DETR = 500.0 # Set depth (m) over which downdraft detrains all its mass
 ZCUTDOWN = 4000.0 # Set height (m) above which no downdrafts are allowed to originate
 BDISPM = 0.366  # Default value for BDISP over land
