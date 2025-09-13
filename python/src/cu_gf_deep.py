@@ -1231,10 +1231,6 @@ class GFDeepConvection:
         pefc = np.zeros((ite - its + 1, jte - jts + 1,))
         flg = np.zeros((ite - its + 1, jte - jts + 1,), dtype=bool)
         c1d = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        # dd_massentro = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        # dd_massdetro = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        # dd_massentru = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        # dd_massdetru = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         c1_max = 0.0
         pgcon = 0.0
         blqe = 0.0
@@ -1267,11 +1263,9 @@ class GFDeepConvection:
         massflx = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
 
         # Arrays for environmental and cloud properties
-        # mentrd_rate_2d = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         qrcdo = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         pwdo = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         qcdo = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        # dbydo = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         xdby = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         xhc = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
 
@@ -1280,8 +1274,6 @@ class GFDeepConvection:
         dellaq = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         dellat = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         dellaqc = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        # ucd = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        # vcd = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         dellu = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         dellv = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         dellat_ens = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1, 1))  # Dimensions: (ite - its + 1, jte - jts + 1, kte - kts + 1, 1)
@@ -2032,56 +2024,32 @@ class GFDeepConvection:
             found=self.found,
         )
 
-                # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-                # print(f"{self.kdet.field[0]:>4}{jmin[0]:>4}{kpbl[0]:>4}{ipr:>4}{xland1[0]:>4}{csum[0]:>4}{self.pmin_lev.field[0]:>4}")
-                # print(f"{rand_vmas[0]:>20.12E}{beta:>20.12E}")
-                # for k in range(kte+1):
-                #     print(f"{self.po_cup.field[0,k]:>20.12E}{zdo[0,k]:>20.12E}")
-                # for k in range(40):
-                #     print(f"{zuh2[k]:>20.12E}")
-
-                # Call to get_zu_zd_pdf_fim (assumed to be a Python function)
-                # get_zu_zd_pdf_fim(
-                #     -1, self.po_cup.field[i, j, :], rand_vmas[i, j], 0.0, ipr, xland1[i, j], zuh2, 4,
-                #     ierr[i, j], self.kdet.field[i, j], jmin[i, j] + 1, zdo[i, j, :], kts, kte, ktf, beta, kpbl[i, j], csum[i, j], self.pmin_lev.field[i, j]
-                # )
-
-                # get_zu_zd_pdf_fim(
-                #     -1, self.po_cup.field[i, j, :], rand_vmas[i, j], 0.0, 4,
-                #     self.kdet.field[i, j], jmin[i, j] + 1, zdo[i, j, :], kts, kte, ktf, kpbl[i, j], ierr[i, j],
-                # )
-
-        get_zu_zd_pdf_fim(
-            np.full((ite - its + 1, jte - jts + 1,), -1, dtype=int), self.po_cup.field, rand_vmas, 0.0, 4,
-            self.kdet.field, jmin + 1, zdo, its, itf, jts, jtf, kts, kte, ktf, kpbl, ierr,
+        self._get_zu_zd_pdf_fim(
+            kklev=self.neg_ones_int,
+            rand_vmas=rand_vmas,
+            p=self.po_cup,
+            draft=4,
+            kb=self.kdet,
+            kt=jmin,
+            zu=zdo,
+            kpbli=kpbl,
+            alpha=self.alpha.field[0,0,:],
+            g_alpha=self.g_alpha.field[0,0,:],
+            kb_adj=self.kb_adj,
+            tunning=self.tunning,
+            alpha2=self.alpha2,
+            g_alpha2=self.g_alpha2,
+            fzu= self.fzu,
+            zu_kpbli=self.zu_kpbli,
+            trash=self.trash,
+            beta_deep=self.beta_deep,
+            k_mask=self.k_mask,
+            k_index=self.k_index,
+            argmax=self.argmax,
+            maxval=self.maxval,
+            found=self.found,
+            ierr=ierr,
         )
-
-        # self._get_zu_zd_pdf_fim(
-        #     kklev=self.neg_ones_int,
-        #     rand_vmas=rand_vmas,
-        #     p=self.po_cup,
-        #     draft=4,
-        #     kb=self.kdet,
-        #     kt=jmin,
-        #     zu=zdo,
-        #     kpbli=kpbl,
-        #     alpha=self.alpha.field[0,0,:],
-        #     g_alpha=self.g_alpha.field[0,0,:],
-        #     kb_adj=self.kb_adj,
-        #     tunning=self.tunning,
-        #     alpha2=self.alpha2,
-        #     g_alpha2=self.g_alpha2,
-        #     fzu= self.fzu,
-        #     zu_kpbli=self.zu_kpbli,
-        #     trash=self.trash,
-        #     beta_deep=self.beta_deep,
-        #     k_mask=self.k_mask,
-        #     k_index=self.k_index,
-        #     argmax=self.argmax,
-        #     maxval=self.maxval,
-        #     found=self.found,
-        #     ierr=ierr,
-        # )
 
         for i in range(its, itf + 1):  # Adjust loop to start at zero
             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing

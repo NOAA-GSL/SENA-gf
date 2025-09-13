@@ -1289,10 +1289,10 @@ def get_zu_zd_pdf_fim_stencil(
             if draft == 4:
                 fzu = zu.at(K=k_start)
 
-    with computation(FORWARD), interval(0, 1):
+    with computation(FORWARD), interval(...):
         if ierr <= 0:
             if draft == 4:
-                if k_mask <= min(k_end -1, kt):
+                if k_mask <= min(k_end - 1, kt):
                     if zu > fzu:
                         fzu = zu
 
@@ -1380,11 +1380,13 @@ def get_zu_zd_pdf_fim_stencil(
             if draft == 4:
                 zu = 0.0
 
-    # with computation(FORWARD), interval(1, None):
-    #     if ierr <= 0:
-    #         if draft == 4:
-    #             if k_mask > 0 and k_mask < kb:
-    #                 zu[0, 0, kb] = zu[0, 0, kb + 1] - zu.at(K=kb) * (p[0, 0, kb] - p[0, 0, kb + 1]) / (p.at(K=0) - p.at(K=kb))
+    with computation(FORWARD), interval(1, None):
+        if ierr <= 0:
+            if draft == 4:
+                if k_mask > 0 and k_mask < kb:
+                    zu_kb = zu.at(K=kb)
+                    zu_kbmkp1 = zu.at(K=kb - k_mask + 1)
+                    zu[0, 0, kb - k_mask - k_mask] = zu_kbmkp1 - zu_kb * (p.at(K=kb - k_mask) - p.at(K=kb - k_mask + 1)) / (p.at(K=0) - p.at(K=kb))
 
     with computation(FORWARD), interval(0, 1):
         if ierr >= 0:
