@@ -1,23 +1,29 @@
 from gf_state import GFState
 from cu_gf_driver import GFDriver
 
-input_file = "input_state_0400.nc.baseline"
-output_file = "test_output.nc"
 errmsg = ""
 errflg = 0
 
-state = GFState()
+first_step = 1
+last_step = 576
+# first_step = 76
+# last_step = 77
 
-for n in range(1,577):
-# for n in range(76,77):
+first_input = f"data/input_state_{first_step:04d}.nc"
+state = GFState()
+state.read_state(first_input)
+driver = GFDriver(state)
+
+
+for n in range(first_step, last_step + 1):
     print(f"Running GF test for state {n:04d}")
 
-    input_file = f"data/input_state_{n:04d}.nc"
-    state.read_state(input_file)
+    step_input = f"data/input_state_{n:04d}.nc"
+    state.read_state(step_input)
 
     # Call GF driver
-    driver = GFDriver(state)
+    # driver = GFDriver(state)
     driver.cu_gf_driver_run(state, errmsg, errflg)
 
-    output_file = f"output_state_{n:04d}.nc"
-    state.write_state(output_file)
+    step_output = f"output_state_{n:04d}.nc"
+    state.write_state(step_output)

@@ -3096,3 +3096,1065 @@ def update_updraft_downdraft_properties(
                 cdd = 0.1 * entr_rate
             if k_mask == jmin:
                 cdd = 0.0
+
+def calculate_downdraft_massflux_detrainment_entrainment(
+    zdo: FloatField, # type: ignore
+    jmin: IntFieldIJ32, # type: ignore
+    cdd: FloatField, # type: ignore
+    zo_cup: FloatField, # type: ignore
+    dd_massdetro: FloatField, # type: ignore
+    dd_massentro: FloatField, # type: ignore
+    dd_massdetru: FloatField, # type: ignore
+    dd_massentru: FloatField, # type: ignore
+    mentrd_rate_2d: FloatField, # type: ignore
+    lambau: FloatFieldIJ, # type: ignore
+    dbydo: FloatField, # type: ignore
+    bud: FloatFieldIJ, # type: ignore
+    heso_cup: FloatField, # type: ignore
+    u_cup: FloatField, # type: ignore
+    ucd: FloatField, # type: ignore
+    vcd: FloatField, # type: ignore
+    uc: FloatField, # type: ignore
+    hcdo: FloatField, # type: ignore
+    heo: FloatField, # type: ignore
+    hco: FloatField, # type: ignore
+    pgcon: float,
+    us: FloatField, # type: ignore
+    vs: FloatField, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+    argmax: IntFieldIJ32, # type: ignore
+):
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            found = False
+            argmax = 0
+            if zdo[0, 0, jmin] < 1e-8:
+                zdo[0, 0, jmin] = 0.0
+                jmin -= 1
+                found = True
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0 and found:
+            if k_mask >= jmin:
+                cdd = 0.0
+            if k_mask > jmin:
+                zdo = 0.0
+            if zdo[0, 0, jmin] < 1e-8:
+                ierr = 876
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if zdo > zdo.at(K=argmax):
+                argmax = k_mask
+
+    with computation(BACKWARD), interval(0, -1):
+        if ierr == 0:
+            if k_mask  <= jmin and k_mask >= argmax:
+                dzo = zo_cup[0, 0, 1] - zo_cup
+                dd_massdetro = cdd * dzo * zdo[0, 0, 1]
+                dd_massentro = zdo - zdo[0, 0, 1] + dd_massdetro
+                if dd_massentro < 0.0:
+                    dd_massentro = 0.0
+                    dd_massdetro = zdo[0, 0, 1] - zdo
+                    if zdo[0, 0, 1] > 0.0:
+                        cdd = dd_massdetro / (dzo * zdo[0, 0, 1])
+                if zdo[0, 0, 1] > 0.0:
+                    mentrd_rate_2d = dd_massentro / (dzo * zdo[0, 0, 1])
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            mentrd_rate_2d = 0.0
+
+    with computation(BACKWARD), interval(0, -1):
+        if ierr ==0:
+            if k_mask < argmax:
+                dzo = zo_cup[0, 0, 1] - zo_cup
+                dd_massentro = mentrd_rate_2d * dzo * zdo[0, 0, 1]
+                dd_massdetro = zdo[0, 0, 1] + dd_massentro - zdo
+                if dd_massdetro < 0.0:
+                    dd_massdetro = 0.0
+                    dd_massentro = zdo - zdo[0, 0, 1]
+                    if zdo[0, 0, 1] > 0.0:
+                        mentrd_rate_2d = dd_massentro / (dzo * zdo[0, 0, 1])
+                if zdo[0, 0, 1] > 0.0:
+                    cdd = dd_massdetro / (dzo * zdo[0, 0, 1])
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            if k_mask <= jmin + 1:
+                dd_massentru[0, 0, -1] = dd_massentro[0, 0, -1] + lambau * dd_massdetro[0, 0, -1]
+                dd_massdetru[0, 0, -1] = dd_massdetro[0, 0, -1] + lambau * dd_massdetro[0, 0, -1]
+
+    with computation(FORWARD), interval(0, -1):
+        if ierr == 0:
+            if k_mask == jmin:
+                dbydo = hcdo - heso_cup
+                ucd[0, 0, 1] = 0.5 * (uc[0, 0, 1] + u_cup[0, 0, 1])
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            if k_mask == jmin:
+                bud = dbydo * (zo_cup[0, 0, 1] - zo_cup)
+
+    with computation(BACKWARD), interval(0, -1):
+        if ierr == 0:
+            if k_mask <= jmin:
+                dzo = zo_cup[0, 0, 1] - zo_cup
+                h_entr = 0.5 * (heo + 0.5 * (hco + hco[0, 0, 1]))
+                ucd = (
+                    (ucd[0, 0, 1] * zdo[0, 0, 1] - 0.5 * dd_massdetru * ucd[0, 0, 1] +
+                    dd_massentru * us -
+                    pgcon * zdo[0, 0, 1] * (us[0, 0, 1] - us)) /
+                    (zdo[0, 0, 1] - 0.5 * dd_massdetru + dd_massentru)
+                )
+                vcd = (
+                    (vcd[0, 0, 1] * zdo[0, 0, 1] - 0.5 * dd_massdetru * vcd[0, 0, 1] +
+                    dd_massentru * vs -
+                    pgcon * zdo[0, 0, 1] * (vs[0, 0, 1] - vs)) /
+                    (zdo[0, 0, 1] - 0.5 * dd_massdetru + dd_massentru)
+                )
+                hcdo = (
+                    (hcdo[0, 0, 1] * zdo[0, 0, 1] - 0.5 * dd_massdetro * hcdo[0, 0, 1] +
+                    dd_massentro * h_entr) /
+                    (zdo[0, 0, 1] - 0.5 * dd_massdetro + dd_massentro)
+                )
+                dbydo = hcdo - heso_cup
+                bud += dbydo * dzo
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            if bud > 0.0:
+                ierr = 7
+
+def cup_dd_moisture_stencil(
+    zd: FloatField, # type: ignore
+    hcd: FloatField, # type: ignore
+    hes_cup: FloatField, # type: ignore
+    qcd: FloatField, # type: ignore
+    qes_cup: FloatField, # type: ignore
+    pwd: FloatField, # type: ignore
+    q_cup: FloatField, # type: ignore
+    z_cup: FloatField, # type: ignore
+    dd_massentr: FloatField, # type: ignore
+    dd_massdetr: FloatField, # type: ignore
+    jmin: IntFieldIJ32, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    gamma_cup: FloatField, # type: ignore
+    pwev: FloatFieldIJ, # type: ignore
+    bu: FloatFieldIJ, # type: ignore
+    qrcd: FloatField, # type: ignore
+    p_cup: FloatField, # type: ignore
+    q: FloatField, # type: ignore
+    he: FloatField, # type: ignore
+    iloop: int,
+    k_mask: IntFieldK32, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+):
+    """
+    Calculates moisture properties of downdrafts.
+    """
+
+    with computation(FORWARD), interval(0, 1):
+        pwev = 0.0
+        bu = 0.0
+        found = False
+
+    with computation(PARALLEL), interval(...):
+        qcd = 0.0
+        qrcd = 0.0
+        pwd = 0.0
+
+    with computation(FORWARD), interval(0, -1):
+        if ierr == 0:
+            if k_mask == jmin:
+                dz = z_cup[0, 0, 1] - z_cup
+                dp = -100.0 * (p_cup[0, 0, 1] - p_cup)
+                qcd = q_cup
+                dh = hcd - hes_cup
+                if dh < 0.0:
+                    qrcd = (qes_cup + (1.0 / constants.XLV) * (gamma_cup / (1.0 + gamma_cup)) * dh)
+                else:
+                    qrcd = qes_cup
+                pwd = zd * min(0.0, qcd - qrcd)
+                qcd = qrcd
+                pwev += pwd * constants.G / dp
+                bu = dz * dh
+
+    with computation(BACKWARD), interval(0, -1):
+        if ierr == 0:
+            if k_mask < jmin and not found:
+                dz = z_cup[0, 0, 1] - z_cup
+                dp = -100.0 * (p_cup[0, 0, 1] - p_cup)
+                denom = zd[0, 0, 1] - 0.5 * dd_massdetr + dd_massentr
+                if denom < 1.0e-16:
+                    ierr = 51
+                    found = True
+                else:
+                    qcd = (qcd[0, 0, 1] * zd[0, 0, 1] - 0.5 * dd_massdetr * qcd[0, 0, 1] +
+                            dd_massentr * q) / denom
+                    dh = hcd - hes_cup
+                    bu += dz * dh
+                    qrcd = qes_cup + (1.0 / constants.XLV) * (gamma_cup / (1.0 + gamma_cup)) * dh
+                    dqeva = qcd - qrcd
+                    if dqeva > 0.0:
+                        dqeva = 0.0
+                        qrcd = qcd
+                    pwd = zd * dqeva
+                    qcd = qrcd
+                    pwev += pwd * constants.G / dp
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            if pwev == 0.0 and iloop == 1:
+                ierr = 7
+            if bu >= 0.0 and iloop == 1:
+                ierr = 7
+
+def initialize_shallow_temporaries(
+    xland1: IntFieldIJ32, # type: ignore
+    ktopx: IntFieldIJ32, # type: ignore
+    cap_max_increment: FloatFieldIJ, # type: ignore
+    entr_rate: FloatFieldIJ, # type: ignore
+    kbmax: IntFieldIJ32, # type: ignore
+    aa0: FloatFieldIJ, # type: ignore
+    aa1: FloatFieldIJ, # type: ignore
+    cap_max: FloatFieldIJ, # type: ignore
+    ztexec: FloatFieldIJ, # type: ignore
+    zqexec: FloatFieldIJ, # type: ignore
+    zws: FloatFieldIJ, # type: ignore
+    up_massentro: FloatField, # type: ignore
+    up_massdetro: FloatField, # type: ignore
+    up_massentru: FloatField, # type: ignore
+    up_massdetru: FloatField, # type: ignore
+    z: FloatField, # type: ignore
+    xz: FloatField, # type: ignore
+    qrco: FloatField, # type: ignore
+    pwo: FloatField, # type: ignore
+    cd: FloatField, # type: ignore
+    dellaqc: FloatField, # type: ignore
+    buo_flux: FloatFieldIJ, # type: ignore
+    pgeoh: FloatFieldIJ, # type: ignore
+    flux_tun: FloatFieldIJ, # type: ignore
+    hkb: FloatFieldIJ, # type: ignore
+    hkbo: FloatFieldIJ, # type: ignore
+    qes: FloatField, # type: ignore
+    hes: FloatField, # type: ignore
+    he: FloatField, # type: ignore
+    qeso: FloatField, # type: ignore
+    heso: FloatField, # type: ignore
+    heo: FloatField, # type: ignore
+    xqes: FloatField, # type: ignore
+    xhes: FloatField, # type: ignore
+    xhe: FloatField, # type: ignore
+    xq: FloatField, # type: ignore
+    xt: FloatField, # type: ignore
+    qes_cup: FloatField, # type: ignore
+    q_cup: FloatField, # type: ignore
+    he_cup: FloatField, # type: ignore
+    hes_cup: FloatField, # type: ignore
+    z_cup: FloatField, # type: ignore
+    p_cup: FloatField, # type: ignore
+    gamma_cup: FloatField, # type: ignore
+    t_cup: FloatField, # type: ignore
+    qeso_cup: FloatField, # type: ignore
+    qo_cup: FloatField, # type: ignore
+    heo_cup: FloatField, # type: ignore
+    heso_cup: FloatField, # type: ignore
+    zo_cup: FloatField, # type: ignore
+    po_cup: FloatField, # type: ignore
+    gammao_cup: FloatField, # type: ignore
+    tn_cup: FloatField, # type: ignore
+    xqes_cup: FloatField, # type: ignore
+    xq_cup: FloatField, # type: ignore
+    xhe_cup: FloatField, # type: ignore
+    xhes_cup: FloatField, # type: ignore
+    xz_cup: FloatField, # type: ignore
+    xt_cup: FloatField, # type: ignore
+    u_cup: FloatField, # type: ignore
+    v_cup: FloatField, # type: ignore
+    dbyo: FloatField, # type: ignore
+    kstabi: IntFieldIJ32, # type: ignore
+    kbmax_mask: BoolFieldIJ, # type: ignore
+    iloop: IntFieldIJ32, # type: ignore
+    hcot: FloatFieldIJ, # type: ignore
+    dz: FloatField, # type: ignore
+    adjustment_attempts: IntFieldIJ32, # type: ignore
+    tries: IntFieldIJ32, # type: ignore
+    k_index: IntFieldIJ, # type: ignore
+    x_add: FloatFieldIJ, # type: ignore
+    kbcon_m1: IntFieldIJ32, # type: ignore
+    pbcdif: FloatFieldIJ, # type: ignore
+    plus: FloatFieldIJ, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+    kstop: IntFieldIJ32, # type: ignore
+    x: FloatFieldIJ, # type: ignore
+    offset: IntFieldIJ32, # type: ignore
+    k_inv_layers: IntField32, # type: ignore
+    dtempdz: FloatField, # type: ignore
+    sec_deriv: FloatField, # type: ignore
+    ix: IntFieldIJ32, # type: ignore
+    ilev: IntFieldIJ32, # type: ignore
+    kadd: IntFieldIJ32, # type: ignore
+    ken: IntFieldIJ32, # type: ignore
+    max_k_inv_layer: IntFieldIJ32, # type: ignore
+    kk: IntFieldIJ32, # type: ignore
+    kk_p1: IntFieldIJ32, # type: ignore
+    kk_m1: IntFieldIJ32, # type: ignore
+    kj: IntFieldIJ32, # type: ignore
+    k800: IntFieldIJ32, # type: ignore
+    k550: IntFieldIJ32, # type: ignore
+    temporary: FloatField, # type: ignore
+    temporary_int: IntField32, # type: ignore
+    entr_rate_2d: FloatField, # type: ignore
+    start_level: IntFieldIJ32, # type: ignore
+    kstart: IntFieldIJ32, # type: ignore
+    rand_vmas: FloatFieldIJ, # type: ignore
+    pmin_lev: IntFieldIJ32, # type: ignore
+    index: IntFieldIJ32, # type: ignore
+    kb_adj: IntFieldIJ32, # type: ignore
+    trash: FloatField, # type: ignore
+    trash2: FloatField, # type: ignore
+    trash2d: FloatFieldIJ, # type: ignore
+    tunning: FloatFieldIJ, # type: ignore
+    beta_deep: FloatFieldIJ, # type: ignore
+    alpha2: FloatFieldIJ, # type: ignore
+    g_alpha2: FloatFieldIJ, # type: ignore
+    fzu: FloatFieldIJ, # type: ignore
+    zu_kpbli: FloatFieldIJ, # type: ignore
+    k1: IntFieldIJ, # type: ignore
+    a: FloatFieldIJ, # type: ignore
+    zu: FloatField, # type: ignore
+    xzu: FloatField, # type: ignore
+    argmax: IntFieldIJ32, # type: ignore
+    maxval: FloatFieldIJ, # type: ignore
+    up_massentr: FloatField, # type: ignore
+    up_massdetr: FloatField, # type: ignore
+    lambau: FloatFieldIJ, # type: ignore
+    hc: FloatField, # type: ignore
+    qco: FloatField, # type: ignore
+    dby: FloatField, # type: ignore
+    hco: FloatField, # type: ignore
+    uc: FloatField, # type: ignore
+    vc: FloatField, # type: ignore
+    dbyt: FloatField, # type: ignore
+    qaver: FloatFieldIJ, # type: ignore
+    c1d: FloatField, # type: ignore
+    xaa0: FloatFieldIJ, # type: ignore
+    xdby: FloatField, # type: ignore
+    dellah: FloatField, # type: ignore
+    dellaq: FloatField, # type: ignore
+    dellu: FloatField, # type: ignore
+    dellv: FloatField, # type: ignore
+    dellat: FloatField, # type: ignore
+    xhc: FloatField, # type: ignore
+    xhkb: FloatFieldIJ, # type: ignore
+    xmb: FloatFieldIJ, # type: ignore
+    xff_shal0: FloatFieldIJ, # type: ignore
+    xff_shal1: FloatFieldIJ, # type: ignore
+    xff_shal2: FloatFieldIJ, # type: ignore
+    xmbmax: FloatFieldIJ, # type: ignore
+    xkshal: FloatFieldIJ, # type: ignore
+    blqe: FloatFieldIJ, # type: ignore
+    dts: FloatFieldIJ, # type: ignore
+    fpi: FloatFieldIJ, # type: ignore
+):
+    with computation(FORWARD), interval(0, 1):
+        xland1 = 0
+        ktopx = 0
+        entr_rate = 0.0
+        kbmax = 0
+        aa0 = 0.0
+        aa1 = 0.0
+        cap_max = 0.0
+        ztexec = 0.0
+        zqexec = 0.0
+        zws = 0.0
+        buo_flux = 0.0
+        pgeoh = 0.0
+        flux_tun = constants.FLUXTUNE
+        hkb = 0.0
+        hkbo = 0.0
+        kstabi = 0
+        kbmax_mask = True
+        iloop = 0
+        hcot = 0.0
+        adjustment_attempts = 0
+        tries = 0
+        k_index = 0
+        x_add = 0.0
+        kbcon_m1 = 0
+        pbcdif = 0.0
+        plus = 0.0
+        found = False
+        kstop = 0
+        x = 0.0
+        offset = 0
+        ix = 0
+        ilev = 0
+        kadd = 0
+        ken = 0
+        max_k_inv_layer = 0
+        kk = 0
+        kk_p1 = 0
+        kk_m1 = 0
+        kj = 0
+        k800 = 0
+        k550 = 0
+        start_level = 0
+        kstart = 0
+        rand_vmas = 0.0
+        pmin_lev = 0
+        index = 0
+        kb_adj = 0
+        trash2d = 0.0
+        tunning = 0.0
+        beta_deep = 0.0
+        alpha2 = 0.0
+        g_alpha2 = 0.0
+        fzu = 0.0
+        zu_kpbli = 0.0
+        k1 = 0
+        a = 0.0
+        argmax = 0
+        maxval = 0.0
+        lambau = 2.0
+        qaver = 0.0
+        xaa0 = 0.0
+        xhkb = 0.0
+        xmb = 0.0
+        xff_shal0 = 0.0
+        xff_shal1 = 0.0
+        xff_shal2 = 0.0
+        xmbmax = 0.0
+        xkshal = 0.0
+        blqe = 0.0
+        dts = 0.0
+        fpi = 0.0
+
+    with computation(PARALLEL), interval(...):
+        up_massentro = 0.0
+        up_massdetro = 0.0
+        up_massentru = 0.0
+        up_massdetru = 0.0
+        up_massentr = 0.0
+        up_massdetr = 0.0
+        z = 0.0
+        xz = 0.0
+        qrco = 0.0
+        pwo = 0.0
+        cd = 0.0
+        dellaqc = 0.0
+        qes = 0.0
+        hes = 0.0
+        he = 0.0
+        qeso = 0.0
+        heso = 0.0
+        heo = 0.0
+        xqes = 0.0
+        xhes = 0.0
+        xhe = 0.0
+        xq = 0.0
+        xt = 0.0
+        qes_cup = 0.0
+        q_cup = 0.0
+        he_cup = 0.0
+        hes_cup = 0.0
+        z_cup = 0.0
+        p_cup = 0.0
+        gamma_cup = 0.0
+        t_cup = 0.0
+        qeso_cup = 0.0
+        qo_cup = 0.0
+        heo_cup = 0.0
+        heso_cup = 0.0
+        zo_cup = 0.0
+        po_cup = 0.0
+        gammao_cup = 0.0
+        tn_cup = 0.0
+        xqes_cup = 0.0
+        xq_cup = 0.0
+        xhe_cup = 0.0
+        xhes_cup = 0.0
+        xz_cup = 0.0
+        xt_cup = 0.0
+        u_cup = 0.0
+        v_cup = 0.0
+        dbyo = 0.0
+        dz = 0.0
+        k_inv_layers = 0
+        dtempdz = 0.0
+        sec_deriv = 0.0
+        temporary = 0.0
+        temporary_int = 0
+        entr_rate_2d = 0.0
+        trash = 0.0
+        trash2 = 0.0
+        zu = 0.0
+        xzu = 0.0
+        hc = 0.0
+        qco = 0.0
+        qrco = 0.0
+        dby = 0.0
+        hco = 0.0
+        dbyo = 0.0
+        uc = 0.0
+        vc = 0.0
+        dbyt = 0.0
+        c1d = 0.0
+        xdby = 0.0
+        dellah = 0.0
+        dellaq = 0.0
+        dellu = 0.0
+        dellv = 0.0
+        dellat = 0.0
+        xhc = 0.0
+
+def initialize_deep_temporaries(
+    buo_flux: FloatFieldIJ, # type: ignore
+    pgeoh: FloatFieldIJ, # type: ignore
+    zws: FloatFieldIJ, # type: ignore
+    flux_tun: FloatFieldIJ, # type: ignore
+    ztexec: FloatFieldIJ, # type: ignore
+    zqexec: FloatFieldIJ, # type: ignore
+    lambau: FloatFieldIJ, # type: ignore
+    c0: FloatFieldIJ, # type: ignore
+    xland1: IntFieldIJ32, # type: ignore
+    closure_n: FloatFieldIJ, # type: ignore
+    cap_max: FloatFieldIJ, # type: ignore
+    cap_max_increment: FloatFieldIJ, # type: ignore
+    entr_rate: FloatFieldIJ, # type: ignore
+    radius: FloatFieldIJ, # type: ignore
+    frh: FloatFieldIJ, # type: ignore
+    sig: FloatFieldIJ, # type: ignore
+    z: FloatField, # type: ignore
+    xz: FloatField, # type: ignore
+    cd: FloatField, # type: ignore
+    cdd: FloatField, # type: ignore
+    edtmax: FloatFieldIJ, # type: ignore
+    edtmin: FloatFieldIJ, # type: ignore
+    kstabm: IntFieldIJ32, # type: ignore
+    start_level: IntFieldIJ32, # type: ignore
+    qes: FloatField, # type: ignore
+    he: FloatField, # type: ignore
+    hes: FloatField, # type: ignore
+    qeso: FloatField, # type: ignore
+    heo: FloatField, # type: ignore
+    heso: FloatField, # type: ignore
+    qeso_bl: FloatField, # type: ignore
+    heo_bl: FloatField, # type: ignore
+    heso_bl: FloatField, # type: ignore
+    tn_bl: FloatField, # type: ignore
+    qo_bl: FloatField, # type: ignore
+    xqes: FloatField, # type: ignore
+    xhe: FloatField, # type: ignore
+    xhes: FloatField, # type: ignore
+    xt: FloatField, # type: ignore
+    xq: FloatField, # type: ignore
+    qes_cup: FloatField, # type: ignore
+    q_cup: FloatField, # type: ignore
+    he_cup: FloatField, # type: ignore
+    hes_cup: FloatField, # type: ignore
+    z_cup: FloatField, # type: ignore
+    p_cup: FloatField, # type: ignore
+    gamma_cup: FloatField, # type: ignore
+    t_cup: FloatField, # type: ignore
+    qeso_cup: FloatField, # type: ignore
+    qo_cup: FloatField, # type: ignore
+    heo_cup: FloatField, # type: ignore
+    heso_cup: FloatField, # type: ignore
+    zo_cup: FloatField, # type: ignore
+    po_cup: FloatField, # type: ignore
+    gammao_cup: FloatField, # type: ignore
+    tn_cup: FloatField, # type: ignore
+    qeso_cup_bl: FloatField, # type: ignore
+    qo_cup_bl: FloatField, # type: ignore
+    heo_cup_bl: FloatField, # type: ignore
+    heso_cup_bl: FloatField, # type: ignore
+    gammao_cup_bl: FloatField, # type: ignore
+    tn_cup_bl: FloatField, # type: ignore
+    xqes_cup: FloatField, # type: ignore
+    xq_cup: FloatField, # type: ignore
+    xhe_cup: FloatField, # type: ignore
+    xhes_cup: FloatField, # type: ignore
+    xz_cup: FloatField, # type: ignore
+    xt_cup: FloatField, # type: ignore
+    hkbo: FloatFieldIJ, # type: ignore
+    kbmax: IntFieldIJ32, # type: ignore
+    iloop: IntFieldIJ32, # type: ignore
+    hcot: FloatFieldIJ, # type: ignore # Remove later
+    dz: FloatField, # type: ignore
+    adjustment_attempts: IntFieldIJ32, # type: ignore
+    tries: IntFieldIJ32, # type: ignore
+    k_index: IntFieldIJ, # type: ignore
+    x_add: FloatFieldIJ, # type: ignore
+    kbcon_m1: IntFieldIJ32, # type: ignore
+    pbcdif: FloatFieldIJ, # type: ignore
+    plus: FloatFieldIJ, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+    k22x: IntFieldIJ32, # type: ignore
+    kbconx: IntFieldIJ32, # type: ignore
+    ierr2: IntFieldIJ32, # type: ignore
+    ierr3: IntFieldIJ32, # type: ignore
+    norm: FloatFieldIJ, # type: ignore
+    p_liq_ice: FloatField, # type: ignore
+    melting_layer: FloatField, # type: ignore
+    hkb: FloatFieldIJ, # type: ignore
+    u_cup: FloatField, # type: ignore
+    v_cup: FloatField, # type: ignore
+    kdet: IntFieldIJ32, # type: ignore
+    kstop: IntFieldIJ32, # type: ignore
+    x: FloatFieldIJ, # type: ignore
+    kstabi: IntFieldIJ32, # type: ignore
+    kzdown: IntFieldIJ32, # type: ignore
+    pmin_lev: IntFieldIJ32, # type: ignore
+    offset: IntFieldIJ32, # type: ignore
+    k_inv_layers: IntField32, # type: ignore
+    dtempdz: FloatField, # type: ignore
+    sec_deriv: FloatField, # type: ignore
+    ix: IntFieldIJ32, # type: ignore
+    ilev: IntFieldIJ32, # type: ignore
+    kadd: IntFieldIJ32, # type: ignore
+    ken: IntFieldIJ32, # type: ignore
+    max_k_inv_layer: IntFieldIJ32, # type: ignore
+    kk: IntFieldIJ32, # type: ignore
+    kk_p1: IntFieldIJ32, # type: ignore
+    kk_m1: IntFieldIJ32, # type: ignore
+    kj: IntFieldIJ32, # type: ignore
+    k800: IntFieldIJ32, # type: ignore
+    k550: IntFieldIJ32, # type: ignore
+    temporary: FloatField, # type: ignore
+    temporary_int: IntField32, # type: ignore
+    entr_rate_2d: FloatField, # type: ignore
+    ktopdby: IntFieldIJ32, # type: ignore
+    kb_adj: IntFieldIJ32, # type: ignore
+    tunning: FloatFieldIJ, # type: ignore
+    alpha2: FloatFieldIJ, # type: ignore
+    g_alpha2: FloatFieldIJ, # type: ignore
+    fzu: FloatFieldIJ, # type: ignore
+    zu_kpbli: FloatFieldIJ, # type: ignore
+    trash: FloatFieldIJ, # type: ignore
+    beta_deep: FloatFieldIJ, # type: ignore
+    argmax: IntFieldIJ32, # type: ignore
+    maxval: FloatFieldIJ, # type: ignore
+    zeros_int: IntFieldIJ32, # type: ignore
+    neg_ones_int: IntFieldIJ32, # type: ignore
+    finalzu: IntFieldIJ32, # type: ignore
+    kklev: IntFieldIJ32, # type: ignore
+    zu: FloatField, # type: ignore
+    xzu: FloatField, # type: ignore
+    up_massentro: FloatField, # type: ignore
+    up_massdetro: FloatField, # type: ignore
+    up_massentr: FloatField, # type: ignore
+    up_massdetr: FloatField, # type: ignore
+    up_massentru: FloatField, # type: ignore
+    up_massdetru: FloatField, # type: ignore
+    uc: FloatField, # type: ignore
+    vc: FloatField, # type: ignore
+    hc: FloatField, # type: ignore
+    dby: FloatField, # type: ignore
+    hco: FloatField, # type: ignore
+    dbyo: FloatField, # type: ignore
+    dbyt: FloatField, # type: ignore
+    ktopkeep: IntFieldIJ32, # type: ignore
+    zktop: FloatFieldIJ, # type: ignore
+    jmin: IntFieldIJ32, # type: ignore
+    jmini: IntFieldIJ32, # type: ignore
+    hcdo: FloatField, # type: ignore
+    qco: FloatField, # type: ignore
+    qrco: FloatField, # type: ignore
+    pwo: FloatField, # type: ignore
+    pwavo: FloatFieldIJ, # type: ignore
+    pwavh: FloatFieldIJ, # type: ignore
+    clw_all: FloatField, # type: ignore
+    bdsp: FloatFieldIJ, # type: ignore
+    qaver: FloatFieldIJ, # type: ignore
+    c0t3d: FloatField, # type: ignore
+    dd_massdetro: FloatField, # type: ignore
+    dd_massentro: FloatField, # type: ignore
+    dd_massentru: FloatField, # type: ignore
+    dd_massdetru: FloatField, # type: ignore
+    ucd: FloatField, # type: ignore
+    vcd: FloatField, # type: ignore
+    dbydo: FloatField, # type: ignore
+    mentrd_rate_2d: FloatField, # type: ignore
+    bud: FloatFieldIJ, # type: ignore
+    qcdo: FloatField, # type: ignore
+    pwdo: FloatField, # type: ignore
+    pwevo: FloatFieldIJ, # type: ignore
+    bu: FloatFieldIJ, # type: ignore
+    qrcdo: FloatField, # type: ignore
+    c1d: FloatField, # type: ignore
+):
+    """
+    Initialize deep convection temporary variables.
+    """
+
+    with computation(FORWARD), interval(0, 1):
+        buo_flux = 0.0
+        pgeoh = 0.0
+        zws = 0.0
+        flux_tun = constants.FLUXTUNE
+        ztexec = 0.0
+        zqexec = 0.0
+        lambau = 0.0
+        c0 = 0.0
+        xland1 = 0
+        closure_n = 0.0
+        cap_max = 0.0
+        cap_max_increment = 0.0
+        entr_rate = 0.0
+        radius = 0.0
+        frh = 0.0
+        sig = 0.0
+        edtmax = 0.0
+        edtmin = 0.0
+        kstabm = 0
+        start_level = 0
+        hkbo = 0.0
+        kbmax = 0
+        iloop = 0
+        hcot = 0.0
+        adjustment_attempts = 0
+        tries = 0
+        k_index = 0
+        x_add = 0.0
+        kbcon_m1 = 0
+        pbcdif = 0.0
+        plus = 0.0
+        found = False
+        k22x = 0
+        kbconx = 0
+        ierr2 = 0
+        ierr3 = 0
+        norm = 0.0
+        hkb = 0.0
+        kdet = 0
+        kstop = 0
+        x = 0.0
+        kstabi = 0
+        kzdown = 0
+        pmin_lev = 0
+        offset = 0
+        k_inv_layers = 0
+        ix = 0
+        ilev = 0
+        kadd = 0
+        ken = 0
+        max_k_inv_layer = 0
+        kk = 0
+        kk_p1 = 0
+        kk_m1 = 0
+        kj = 0
+        k800 = 0
+        k550 = 0
+        ktopdby = -1
+        kb_adj = 0
+        tunning = 0.0
+        alpha2 = 0.0
+        g_alpha2 = 0.0
+        fzu = 0.0
+        zu_kpbli = 0.0
+        trash = 0.0
+        beta_deep = 0.0
+        argmax = 0
+        maxval = 0.0
+        zeros_int = 0
+        neg_ones_int = -1
+        finalzu = 0
+        kklev = 0
+        ktopkeep = 0
+        zktop = 0.0
+        jmin = 0
+        jmini = 0
+        pwavo = 0.0
+        pwavh = 0.0
+        bdsp = 0.0
+        qaver = 0.0
+        bud = 0.0
+        pwevo = 0.0
+        bu = 0.0
+
+    with computation(PARALLEL), interval(...):
+        z = 0.0
+        xz = 0.0
+        cd = 0.0
+        cdd = 0.0
+        qes = 0.0
+        he = 0.0
+        hes = 0.0
+        qeso = 0.0
+        heo = 0.0
+        heso = 0.0
+        qeso_bl = 0.0
+        heo_bl = 0.0
+        heso_bl = 0.0
+        tn_bl = 0.0
+        qo_bl = 0.0
+        xqes = 0.0
+        xhe = 0.0
+        xhes = 0.0
+        xt = 0.0
+        xq = 0.0
+        qes_cup = 0.0
+        q_cup = 0.0
+        he_cup = 0.0
+        hes_cup = 0.0
+        z_cup = 0.0
+        p_cup = 0.0
+        gamma_cup = 0.0
+        t_cup = 0.0
+        qeso_cup = 0.0
+        qo_cup = 0.0
+        heo_cup = 0.0
+        heso_cup = 0.0
+        zo_cup = 0.0
+        po_cup = 0.0
+        gammao_cup = 0.0
+        tn_cup = 0.0
+        qeso_cup_bl = 0.0
+        qo_cup_bl = 0.0
+        heo_cup_bl = 0.0
+        heso_cup_bl = 0.0
+        gammao_cup_bl = 0.0
+        tn_cup_bl = 0.0
+        xqes_cup = 0.0
+        xq_cup = 0.0
+        xhe_cup = 0.0
+        xhes_cup = 0.0
+        xz_cup = 0.0
+        xt_cup = 0.0
+        dz = 0.0
+        p_liq_ice = 0.0
+        melting_layer = 0.0
+        u_cup = 0.0
+        v_cup = 0.0
+        k_inv_layers = 0
+        dtempdz = 0.0
+        sec_deriv = 0.0
+        temporary = 0.0
+        temporary_int = 0
+        entr_rate_2d = 0.0
+        zu = 0.0
+        xzu = 0.0
+        up_massentro = 0.0
+        up_massdetro = 0.0
+        up_massentr = 0.0
+        up_massdetr = 0.0
+        up_massentru = 0.0
+        up_massdetru = 0.0
+        uc = 0.0
+        vc = 0.0
+        hc = 0.0
+        dby = 0.0
+        hco = 0.0
+        dbyo = 0.0
+        dbyt = 0.0
+        hcdo = 0.0
+        qco = 0.0
+        qrco = 0.0
+        pwo = 0.0
+        clw_all = 0.0
+        c0t3d = 0.0
+        dd_massdetro = 0.0
+        dd_massentro = 0.0
+        dd_massentru = 0.0
+        dd_massdetru = 0.0
+        ucd = 0.0
+        vcd = 0.0
+        dbydo = 0.0
+        mentrd_rate_2d = 0.0
+        qcdo = 0.0
+        pwdo = 0.0
+        qrcdo = 0.0
+        c1d = 0.0
+
+def initialize_driver_temporaries(
+    ccn_gf: FloatFieldIJ, # type: ignore
+    ccn_m: FloatFieldIJ, # type: ignore
+    zo: FloatField, # type: ignore
+    kpbli: IntFieldIJ32, # type: ignore
+    p2d: FloatField, # type: ignore
+    t2d: FloatField, # type: ignore
+    q2d: FloatField, # type: ignore
+    rhoi: FloatField, # type: ignore
+    qcheck: FloatField, # type: ignore
+    tn: FloatField, # type: ignore
+    qo: FloatField, # type: ignore
+    qv: FloatField, # type: ignore
+    qv2di: FloatField, # type: ignore
+    tshall: FloatField, # type: ignore
+    qshall: FloatField, # type: ignore
+    forceqv: FloatField, # type: ignore
+    dhdt: FloatField, # type: ignore
+    hfx: FloatFieldIJ, # type: ignore
+    qfx: FloatFieldIJ, # type: ignore
+    dx: FloatFieldIJ, # type: ignore
+    forcing: FloatField, # type: ignore
+    forcing2: FloatField, # type: ignore
+    omeg: FloatField, # type: ignore
+    xlandi: FloatFieldIJ, # type: ignore
+    ht: FloatFieldIJ, # type: ignore
+    ter11: FloatFieldIJ, # type: ignore
+    psur: FloatFieldIJ, # type: ignore
+    zus: FloatField, # type: ignore
+    xmbs: FloatFieldIJ, # type: ignore
+    kbcons: IntFieldIJ32, # type: ignore
+    ktops: IntFieldIJ32, # type: ignore
+    k22s: IntFieldIJ32, # type: ignore
+    outts: FloatField, # type: ignore
+    outqs: FloatField, # type: ignore
+    outqcs: FloatField, # type: ignore
+    outus: FloatField, # type: ignore
+    outvs: FloatField, # type: ignore
+    cnvwt: FloatField, # type: ignore
+    prets: FloatFieldIJ, # type: ignore
+    cupclws: FloatField, # type: ignore
+    tropics: IntFieldIJ, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    ierrs: IntFieldIJ32, # type: ignore
+    mconv: FloatFieldIJ, # type: ignore
+    cnvwtm: FloatField, # type: ignore
+    zum: FloatField, # type: ignore
+    zdm: FloatField, # type: ignore
+    zdd: FloatField, # type: ignore
+    edtm: FloatFieldIJ, # type: ignore
+    edtd: FloatFieldIJ, # type: ignore
+    xmb: FloatFieldIJ, # type: ignore
+    xmbm: FloatFieldIJ, # type: ignore
+    xmb_dumm: FloatFieldIJ, # type: ignore
+    pretm: FloatFieldIJ, # type: ignore
+    outum: FloatField, # type: ignore
+    outvm: FloatField, # type: ignore
+    outtm: FloatField, # type: ignore
+    outqm: FloatField, # type: ignore
+    outqcm: FloatField, # type: ignore
+    kbconm: IntFieldIJ32, # type: ignore
+    ktopm: IntFieldIJ32, # type: ignore
+    cupclwm: FloatField, # type: ignore
+    frhm: FloatFieldIJ, # type: ignore
+    ierrm: IntFieldIJ32, # type: ignore
+    wetdpc_mid: FloatFieldIJ, # type: ignore
+    rand_mom: FloatFieldIJ, # type: ignore
+    rand_vmas: FloatFieldIJ, # type: ignore
+    rand_clos: FloatField, # type: ignore
+    cap_suppress_j: FloatFieldIJ, # type: ignore
+    k22m: IntFieldIJ32, # type: ignore
+    jminm: IntFieldIJ32, # type: ignore
+    zu: FloatField, # type: ignore
+    zd: FloatField, # type: ignore
+    edt: FloatFieldIJ, # type: ignore
+    xbm: FloatFieldIJ, # type: ignore
+    pret: FloatFieldIJ, # type: ignore
+    outu: FloatField, # type: ignore
+    outv: FloatField, # type: ignore
+    outt: FloatField, # type: ignore
+    outq: FloatField, # type: ignore
+    outqc: FloatField, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    cupclw: FloatField, # type: ignore
+    frhd: FloatFieldIJ, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    jmin: IntFieldIJ32, # type: ignore
+    zh_mask: BoolFieldIJ, # type: ignore
+    psum: FloatFieldIJ, # type: ignore
+):
+    """
+    Initialize driver temporary variables.
+    """
+
+    with computation(FORWARD), interval(0, 1):
+        ccn_gf = 0.0
+        ccn_m = 0.0
+        kpbli = 1
+        hfx = 0.0
+        qfx = 0.0
+        dx = 0.0
+        xlandi = 0.0
+        ht = 0.0
+        ter11 = 0.0
+        psur = 0.0
+        xmbs = 0.0
+        kbcons = -1
+        ktops = -1
+        k22s = -1
+        prets = 0.0
+        tropics = 0
+        ierr = 0
+        ierrs = 0
+        mconv = 0.0
+        edtm = 0.0
+        edtd = 0.0
+        xmb = 0.0
+        xmbm = 0.0
+        xmb_dumm = 0.0
+        pretm = 0.0
+        kbconm = -1
+        ktopm = -1
+        frhm = 0.0
+        ierrm = 0
+        wetdpc_mid = 0.0
+        rand_mom = 0.0
+        rand_vmas = 0.0
+        cap_suppress_j = 0.0
+        k22m = -1
+        jminm = -1
+        edt = 0.0
+        xbm = 0.0
+        pret = 0.0
+        kbcon = -1
+        ktop = -1
+        frhd = 0.0
+        k22 = -1
+        jmin = -1
+        zh_mask = True
+        psum = 0.0
+
+    with computation(PARALLEL), interval(...):
+        zo = 0.0
+        p2d = 0.0
+        t2d = 0.0
+        q2d = 0.0
+        rhoi = 0.0
+        qcheck = 0.0
+        tn = 0.0
+        qo = 0.0
+        qv = 0.0
+        qv2di = 0.0
+        tshall = 0.0
+        qshall = 0.0
+        forceqv = 0.0
+        dhdt = 0.0
+        forcing = 0.0
+        forcing2 = 0.0
+        omeg = 0.0
+        zus = 0.0
+        outts = 0.0
+        outqs = 0.0
+        outqcs = 0.0
+        outus = 0.0
+        outvs = 0.0
+        cnvwt = 0.0
+        cupclws = 0.0
+        cnvwtm = 0.0
+        zum = 0.0
+        zdm = 0.0
+        zdd = 0.0
+        outum = 0.0
+        outvm = 0.0
+        outtm = 0.0
+        outqm = 0.0
+        outqcm = 0.0
+        cupclwm = 0.0
+        rand_clos = 0.0
+        zu = 0.0
+        zd = 0.0
+        outu = 0.0
+        outv = 0.0
+        outt = 0.0
+        outq = 0.0
+        outqc = 0.0
+        cupclw = 0.0

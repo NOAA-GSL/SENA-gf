@@ -2,6 +2,9 @@
 This module contains the Grell-Freitas shallow convection scheme.
 """
 
+import time
+import logging
+
 # Import necessary modules
 
 import numpy as np
@@ -11,6 +14,7 @@ from ndsl.quantity import Quantity
 from gf_state import GFState
 
 from cu_gf_stencils import (
+    initialize_shallow_temporaries,
     initialize_shallow_convection,
     estimate_convective_velocity_and_excesses,
     cup_env_stencil,
@@ -35,6 +39,8 @@ from cu_gf_stencils import (
     finalize_shallow_convection_tendencies,
 )
 
+logger = logging.getLogger(__name__)
+
 import cu_gf_constants as constants
 
 class GFShallowConvection:
@@ -45,6 +51,8 @@ class GFShallowConvection:
 
     def __init__(self, state: GFState):
         self.state = state
+
+        start_time = time.perf_counter()
 
         # Initialize fields
         self.xland1: Quantity = state.quantity_factory.zeros(
@@ -825,6 +833,11 @@ class GFShallowConvection:
         0.9565111, 0.9619183, 0.9619183, 0.9619183, 0.9619183, 0.9619183
         ]
 
+        self._initialize_shallow_temporaries = state.stencil_factory.from_dims_halo(
+            func=initialize_shallow_temporaries,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
 
         self._initialize_shallow_convection = state.stencil_factory.from_dims_halo(
             func=initialize_shallow_convection,
@@ -965,6 +978,10 @@ class GFShallowConvection:
             externals={},
         )
 
+        end_time = time.perf_counter()
+        logging.basicConfig(filename='gf.log', level=logging.DEBUG)
+        logging.info(f"Grell-Freitas shallow convection setup time: {end_time - start_time} seconds")
+
     # Define the main shallow convection function
     def cu_gf_sh_run(self,
         us, vs, zo, t, q, z1, tn, qo, po, psur, dhdt, kpbl, rho,
@@ -1009,6 +1026,155 @@ class GFShallowConvection:
         # Initialize logical flag
         make_calc_for_xk = True
     
+        self._initialize_shallow_temporaries(
+            xland1 = self.xland1,
+            ktopx = self.ktopx,
+            cap_max_increment = self.cap_max_increment,
+            entr_rate = self.entr_rate,
+            kbmax = self.kbmax,
+            aa0 = self.aa0,
+            aa1 = self.aa1,
+            cap_max = self.cap_max,
+            ztexec = self.ztexec,
+            zqexec = self.zqexec,
+            zws = self.zws,
+            up_massentro = self.up_massentro,
+            up_massdetro = self.up_massdetro,
+            up_massentru = self.up_massentru,
+            up_massdetru = self.up_massdetru,
+            z = self.z,
+            xz = self.xz,
+            qrco = self.qrco,
+            pwo = self.pwo,
+            cd = self.cd,
+            dellaqc = self.dellaqc,
+            buo_flux = self.buo_flux,
+            pgeoh = self.pgeoh,
+            flux_tun = self.flux_tun,
+            hkb = self.hkb,
+            hkbo = self.hkbo,
+            qes = self.qes,
+            hes = self.hes,
+            he = self.he,
+            qeso = self.qeso,
+            heso = self.heso,
+            heo = self.heo,
+            xqes = self.xqes,
+            xhes = self.xhes,
+            xhe = self.xhe,
+            xq = self.xq,
+            xt = self.xt,
+            qes_cup = self.qes_cup,
+            q_cup = self.q_cup,
+            he_cup = self.he_cup,
+            hes_cup = self.hes_cup,
+            z_cup = self.z_cup,
+            p_cup = self.p_cup,
+            gamma_cup = self.gamma_cup,
+            t_cup = self.t_cup,
+            qeso_cup = self.qeso_cup,
+            qo_cup = self.qo_cup,
+            heo_cup = self.heo_cup,
+            heso_cup = self.heso_cup,
+            zo_cup = self.zo_cup,
+            po_cup = self.po_cup,
+            gammao_cup = self.gammao_cup,
+            tn_cup = self.tn_cup,
+            xqes_cup = self.xqes_cup,
+            xq_cup = self.xq_cup,
+            xhe_cup = self.xhe_cup,
+            xhes_cup = self.xhes_cup,
+            xz_cup = self.xz_cup,
+            xt_cup = self.xt_cup,
+            u_cup = self.u_cup,
+            v_cup = self.v_cup,
+            dbyo = self.dbyo,
+            kstabi = self.kstabi,
+            kbmax_mask = self.kbmax_mask,
+            iloop = self.iloop,
+            hcot = self.hcot,
+            dz = self.dz,
+            adjustment_attempts = self.adjustment_attempts,
+            tries = self.tries,
+            k_index = self.k_index,
+            x_add = self.x_add,
+            kbcon_m1 = self.kbcon_m1,
+            pbcdif = self.pbcdif,
+            plus = self.plus,
+            found = self.found,
+            kstop = self.kstop,
+            x = self.x,
+            offset = self.offset,
+            k_inv_layers = self.k_inv_layers,
+            dtempdz = self.dtempdz,
+            sec_deriv = self.sec_deriv,
+            ix = self.ix,
+            ilev = self.ilev,
+            kadd = self.kadd,
+            ken = self.ken,
+            max_k_inv_layer = self.max_k_inv_layer,
+            kk = self.kk,
+            kk_p1 = self.kk_p1,
+            kk_m1 = self.kk_m1,
+            kj = self.kj,
+            k800 = self.k800,
+            k550 = self.k550,
+            temporary = self.temporary,
+            temporary_int = self.temporary_int,
+            entr_rate_2d = self.entr_rate_2d,
+            start_level = self.start_level,
+            kstart = self.kstart,
+            rand_vmas = self.rand_vmas,
+            pmin_lev = self.pmin_lev,
+            index = self.index,
+            kb_adj = self.kb_adj,
+            trash = self.trash,
+            trash2 = self.trash2,
+            trash2d = self.trash2d,
+            tunning = self.tunning,
+            beta_deep = self.beta_deep,
+            alpha2 = self.alpha2,
+            g_alpha2 = self.g_alpha2,
+            fzu = self.fzu,
+            zu_kpbli = self.zu_kpbli,
+            k1 = self.k1,
+            a = self.a,
+            zu = self.zu,
+            xzu = self.xzu,
+            argmax = self.argmax,
+            maxval = self.maxval,
+            up_massentr = self.up_massentr,
+            up_massdetr = self.up_massdetr,
+            lambau = self.lambau,
+            hc = self.hc,
+            qco = self.qco,
+            dby = self.dby,
+            hco = self.hco,
+            uc = self.uc,
+            vc = self.vc,
+            dbyt = self.dbyt,
+            qaver = self.qaver,
+            c1d = self.c1d,
+            xaa0 = self.xaa0,
+            xdby = self.xdby,
+            dellah = self.dellah,
+            dellaq = self.dellaq,
+            dellu = self.dellu,
+            dellv = self.dellv,
+            dellat = self.dellat,
+            xhc = self.xhc,
+            xhkb = self.xhkb,
+            xmb = self.xmb,
+            xff_shal0 = self.xff_shal0,
+            xff_shal1 = self.xff_shal1,
+            xff_shal2 = self.xff_shal2,
+            xmbmax = self.xmbmax,
+            xkshal = self.xkshal,
+            blqe = self.blqe,
+            dts = self.dts,
+            fpi = self.fpi,
+        )
+
         # Initialize shallow convection parameters
         self._initialize_shallow_convection(
             xland=xland,

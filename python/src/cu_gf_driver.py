@@ -5,7 +5,7 @@ from ndsl.quantity import Quantity
 from ndsl.constants import X_DIM, Y_DIM, Z_DIM
 from gf_state import GFState
 
-from cu_gf_stencils import (initialize_driver)
+from cu_gf_stencils import (initialize_driver, initialize_driver_temporaries)
 import cu_gf_constants as constants
 from cu_gf_sh import GFShallowConvection
 from cu_gf_deep import GFDeepConvection
@@ -502,6 +502,15 @@ class GFDriver:
             },
         )
 
+        self._initialize_driver_temporaries = state.stencil_factory.from_dims_halo(
+            func=initialize_driver_temporaries,
+            compute_dims=(X_DIM, Y_DIM, Z_DIM),
+            externals={},
+        )
+
+        self._cu_gf_sh = GFShallowConvection(self.state)
+        self._cu_gf_mid = GFDeepConvection(self.state)
+        self._cu_gf_deep = GFDeepConvection(self.state)
 
     # Driver routine for the GF model, incrementally being ported to GF4Py stencils
     def cu_gf_driver_run(self, state, errmsg, errflg):
@@ -590,6 +599,97 @@ class GFDriver:
         # Write input state for sanity check - Should be identical to input_state_0400.nc.baseline
         state.write_state(f'input_state_{kdt:>04}.nc')
 
+        self._initialize_driver_temporaries(
+            ccn_gf=self.ccn_gf,
+            ccn_m=self.ccn_m,
+            zo=self.zo,
+            kpbli=self.kpbli,
+            p2d=self.p2d,
+            t2d=self.t2d,
+            q2d=self.q2d,
+            rhoi=self.rhoi,
+            qcheck=self.qcheck,
+            tn=self.tn,
+            qo=self.qo,
+            qv=self.qv,
+            qv2di=self.qv2di,
+            tshall=self.tshall,
+            qshall=self.qshall,
+            forceqv=self.forceqv,
+            dhdt=self.dhdt,
+            hfx=self.hfx,
+            qfx=self.qfx,
+            dx=self.dx,
+            forcing=self.forcing,
+            forcing2=self.forcing2,
+            omeg=self.omeg,
+            xlandi=self.xlandi,
+            ht=self.ht,
+            ter11=self.ter11,
+            psur=self.psur,
+            zus=self.zus,
+            xmbs=self.xmbs,
+            kbcons=self.kbcons,
+            ktops=self.ktops,
+            k22s=self.k22s,
+            outts=self.outts,
+            outqs=self.outqs,
+            outqcs=self.outqcs,
+            outus=self.outus,
+            outvs=self.outvs,
+            cnvwt=self.cnvwt,
+            prets=self.prets,
+            cupclws=self.cupclws,
+            tropics=self.tropics,
+            ierr=self.ierr,
+            ierrs=self.ierrs,
+            mconv=self.mconv,
+            cnvwtm=self.cnvwtm,
+            zum=self.zum,
+            zdm=self.zdm,
+            zdd=self.zdd,
+            edtm=self.edtm,
+            edtd=self.edtd,
+            xmb=self.xmb,
+            xmbm=self.xmbm,
+            xmb_dumm=self.xmb_dumm,
+            pretm=self.pretm,
+            outum=self.outum,
+            outvm=self.outvm,
+            outtm=self.outtm,
+            outqm=self.outqm,
+            outqcm=self.outqcm,
+            kbconm=self.kbconm,
+            ktopm=self.ktopm,
+            cupclwm=self.cupclwm,
+            frhm=self.frhm,
+            ierrm=self.ierrm,
+            wetdpc_mid=self.wetdpc_mid,
+            rand_mom=self.rand_mom,
+            rand_vmas=self.rand_vmas,
+            rand_clos=self.rand_clos,
+            cap_suppress_j=self.cap_suppress_j,
+            k22m=self.k22m,
+            jminm=self.jminm,
+            zu=self.zu,
+            zd=self.zd,
+            edt=self.edt,
+            xbm=self.xbm,
+            pret=self.pret,
+            outu=self.outu,
+            outv=self.outv,
+            outt=self.outt,
+            outq=self.outq,
+            outqc=self.outqc,
+            kbcon=self.kbcon,
+            ktop=self.ktop,
+            cupclw=self.cupclw,
+            frhd=self.frhd,
+            k22=self.k22,
+            jmin=self.jmin,
+            zh_mask=self.zh_mask,
+            psum=self.psum,
+        )
         imid_gf = 1
     
         dicycle = 0  # Diurnal cycle flag for deep convection
@@ -793,8 +893,7 @@ class GFDriver:
                     self.ierrs.field[i, j] = 0
                     self.ierrm.field[i, j] = 0
 
-            cu_gf_sh = GFShallowConvection(self.state)
-            cu_gf_sh.cu_gf_sh_run(
+            self._cu_gf_sh.cu_gf_sh_run(
                 us=us,
                 vs=vs,
                 zo=self.zo,
@@ -847,8 +946,7 @@ class GFDriver:
         ipr = 0
 
         if imid_gf == 1:
-            cu_gf_mid = GFDeepConvection(self.state)
-            cu_gf_mid.cu_gf_deep_run(
+            self._cu_gf_mid.cu_gf_deep_run(
                 itf=itf, jtf=jtf, ktf=ktf, its=its, ite=ite, jts=jts, jte=jte, kts=kts, kte=kte,
                 dicycle=dicycle_m,
                 ichoice=ichoicem,
@@ -930,8 +1028,7 @@ class GFDriver:
 
         if ideep == 1:
 
-            cu_gf_deep = GFDeepConvection(self.state)
-            cu_gf_deep.cu_gf_deep_run(
+            self._cu_gf_deep.cu_gf_deep_run(
                 itf=itf, jtf=jtf, ktf=ktf, its=its, ite=ite, jts=jts, jte=jte, kts=kts, kte=kte,
                 dicycle=dicycle,
                 ichoice=ichoice,
