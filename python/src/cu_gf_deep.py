@@ -39,6 +39,7 @@ from cu_gf_stencils import (
     update_updraft_downdraft_properties,
     calculate_downdraft_massflux_detrainment_entrainment,
     cup_dd_moisture_stencil,
+    cup_up_aa0_stencil,
 )
 
 logger = logging.getLogger(__name__)
@@ -981,6 +982,36 @@ class GFDeepConvection:
             units="none",
             dtype=state.rkind,
         )
+        self.aa0: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.aa1: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.aa1_bl: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.dbyo_bl: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.xdby: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.xaa0: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
 
         # Lookup tables for constants
         self.alpha: Quantity = state.quantity_factory_table.zeros(
@@ -1171,6 +1202,12 @@ class GFDeepConvection:
             externals={},
         )
 
+        self._cup_up_aa0 = state.stencil_factory.from_dims_halo(
+            func=cup_up_aa0_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
         end_time = time.perf_counter()
         logging.basicConfig(filename="gf.log", level=logging.DEBUG)
         logger.debug(f"CU-GF deep convection setup time: {end_time - start_time} seconds")
@@ -1301,13 +1338,11 @@ class GFDeepConvection:
         pgcon = 0.0
         blqe = 0.0
         xff_mid = np.zeros((ite - its + 1, jte - jts + 1, 2))
-        aa1_bl = np.zeros((ite - its + 1, jte - jts + 1,))
         hkbo_bl = np.zeros((ite - its + 1, jte - jts + 1,))
         tau_bl = np.zeros((ite - its + 1, jte - jts + 1,))
         tau_ecmwf = np.zeros((ite - its + 1, jte - jts + 1,))
         wmean = np.zeros((ite - its + 1, jte - jts + 1,))
         hco_bl = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        dbyo_bl = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         xf_dicycle = np.zeros((ite - its + 1, jte - jts + 1,))
         chem = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1, nchem))
         chem_cup = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1, nchem))
@@ -1329,7 +1364,6 @@ class GFDeepConvection:
         massflx = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
 
         # Arrays for environmental and cloud properties
-        xdby = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         xhc = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
 
         # Arrays for detrainment, tendencies, and wind components
@@ -1346,9 +1380,6 @@ class GFDeepConvection:
 
         # Scalars and arrays for cloud work functions, energy, and other properties
         edt = np.zeros((ite - its + 1, jte - jts + 1,))
-        aa1 = np.zeros((ite - its + 1, jte - jts + 1,))
-        aa0 = np.zeros((ite - its + 1, jte - jts + 1,))
-        xaa0 = np.zeros((ite - its + 1, jte - jts + 1,))
         xaa0_ens = np.zeros((ite - its + 1, jte - jts + 1, 1))
         xhkb = np.zeros((ite - its + 1, jte - jts + 1,))
         xmb = np.zeros((ite - its + 1, jte - jts + 1,))
@@ -1610,6 +1641,12 @@ class GFDeepConvection:
             bu = self.bu,
             qrcdo = self.qrcdo,
             c1d = self.c1d,
+            aa0 = self.aa0,
+            aa1 = self.aa1,
+            aa1_bl = self.aa1_bl,
+            xaa0 = self.xaa0,
+            dbyo_bl = self.dbyo_bl,
+            xdby = self.xdby,
         )
 
         self._initialize_deep_convection(
@@ -2352,52 +2389,44 @@ class GFDeepConvection:
                     cupclw[i, j, k] = self.qrco.field[i, j, k]  # Direct translation of array assignment
                     cnvwt[i, j, k] = zuo[i, j, k] * cupclw[i, j, k] * G / dp
 
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{ktop[0]:>4}{kbcon[0]:>4}")
-        # print(f"{aa0[0]:>20.12E}{aa1[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{z[0,k]:>20.12E}{zu[0,k]:>20.12E}{dby[0,k]:>20.12E}{self.gamma_cup.field[0,k]:>20.12E}{self.t_cup.field[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{zo[0,k]:>20.12E}{zuo[0,k]:>20.12E}{self.dbyo.field[0,k]:>20.12E}{self.gammao_cup.field[0,k]:>20.12E}{self.tn_cup.field[0,k]:>20.12E}")
-        # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
-
-        # First call to cup_up_aa0
-        cup_up_aa0(
-            aa0, self.z.field, self.zu.field, self.dby.field, self.gamma_cup.field, self.t_cup.field,
-            kbcon, ktop, ierr,
-            itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte
+        self._cup_up_aa0(
+            aa0=self.aa0,
+            z=self.z,
+            zu=self.zu,
+            dby=self.dby,
+            gamma_cup=self.gamma_cup,
+            t_cup=self.t_cup,
+            kbcon=kbcon,
+            ktop=ktop,
+            ierr=ierr,
+            k_mask=self.k_mask,
         )
 
-        # Second call to cup_up_aa0
-        cup_up_aa0(
-            aa1, zo, zuo, self.dbyo.field, self.gammao_cup.field, self.tn_cup.field,
-            kbcon, ktop, ierr,
-            itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte
+        self._cup_up_aa0(
+            aa0=self.aa1,
+            z=zo,
+            zu=zuo,
+            dby=self.dbyo,
+            gamma_cup=self.gammao_cup,
+            t_cup=self.tn_cup,
+            kbcon=kbcon,
+            ktop=ktop,
+            ierr=ierr,
+            k_mask=self.k_mask,
         )
-
-        # Output variable match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{ktop[0]:>4}{kbcon[0]:>4}")
-        # print(f"{aa0[0]:>20.12E}{aa1[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{z[0,k]:>20.12E}{zu[0,k]:>20.12E}{dby[0,k]:>20.12E}{self.gamma_cup.field[0,k]:>20.12E}{self.t_cup.field[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{zo[0,k]:>20.12E}{zuo[0,k]:>20.12E}{self.dbyo.field[0,k]:>20.12E}{self.gammao_cup.field[0,k]:>20.12E}{self.tn_cup.field[0,k]:>20.12E}")
 
         # Loop over the range from `its` to `itf` (inclusive)
         for i in range(its, itf + 1):
             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                 if ierr[i, j] != 0:
                     continue  # Skip the iteration if there's an error
-                if aa1[i, j] == 0.0:
+                if self.aa1.field[i, j] == 0.0:
                     ierr[i, j] = 17
                     # The following block is executed only if OpenACC is not enabled
                     # ierrc[i, j] = "cloud work function zero"
 
         # Initialize arrays with zeros
-        aa1_bl[:, :] = 0.0
+        self.aa1_bl.field[:, :] = 0.0
         xf_dicycle[:, :] = 0.0
         tau_ecmwf[:, :] = 0.0
         iversion = 0
@@ -2487,8 +2516,8 @@ class GFDeepConvection:
 
                 # Calculate pcape from boundary layer (bl) forcing only
                 cup_up_aa1bl(
-                    aa1_bl, t, tn, q, qo, dtime,
-                    self.zo_cup.field, zuo, dbyo_bl, self.gammao_cup_bl.field, self.tn_cup_bl.field,
+                    self.aa1_bl.field, t, tn, q, qo, dtime,
+                    self.zo_cup.field, zuo, self.dbyo_bl.field, self.gammao_cup_bl.field, self.tn_cup_bl.field,
                     kbcon, ktop, ierr,
                     itf, jtf, ktf, its, ite, jts, jte, kts, kte
                 )
@@ -2502,7 +2531,7 @@ class GFDeepConvection:
                             # else:
                             # Multiply aa1_bl by the "time-scale" - tau_bl
                             # aa1_bl[i, j] = max(0.0, (aa1_bl[i, j] / t_star) * tau_bl[i, j])
-                            aa1_bl[i, j] = (aa1_bl[i, j] / t_star) * tau_bl[i, j]
+                            self.aa1_bl.field[i, j] = (self.aa1_bl.field[i, j] / t_star) * tau_bl[i, j]
                             # endif
             else:
                 # Version for real cloud-work function
@@ -2516,7 +2545,7 @@ class GFDeepConvection:
                     for i in range(its, itf + 1):
                         for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                             hco_bl[i, j, k] = 0.0
-                            dbyo_bl[i, j, k] = 0.0
+                            self.dbyo_bl.field[i, j, k] = 0.0
 
                 for i in range(its, itf + 1):
                     for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
@@ -2525,7 +2554,7 @@ class GFDeepConvection:
                                 hco_bl[i, j, k] = hkbo_bl[i, j]
                             k = kbcon[i, j]
                             hco_bl[i, j, k] = hkbo_bl[i, j]
-                            dbyo_bl[i, j, k] = hkbo_bl[i, j] - self.heso_cup_bl.field[i, j, k]
+                            self.dbyo_bl.field[i, j, k] = hkbo_bl[i, j] - self.heso_cup_bl.field[i, j, k]
 
                 # Update hco_bl and dbyo_bl for levels above the convective base
                 for i in range(its, itf + 1):  # Adjust loop to start at zero
@@ -2538,18 +2567,23 @@ class GFDeepConvection:
                                     self.up_massentro.field[i, j, k - 1] * self.heo_bl.field[i, j, k - 1]) /
                                     (zuo[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] + self.up_massentro.field[i, j, k - 1])
                                 )
-                                dbyo_bl[i, j, k] = hco_bl[i, j, k] - self.heso_cup_bl.field[i, j, k]
+                                self.dbyo_bl.field[i, j, k] = hco_bl[i, j, k] - self.heso_cup_bl.field[i, j, k]
 
                             for k in range(ktop[i, j] + 1, ktf + 1):  # Adjust range for zero-based indexing
                                 hco_bl[i, j, k] = self.heso_cup_bl.field[i, j, k]
-                                dbyo_bl[i, j, k] = 0.0
+                                self.dbyo_bl.field[i, j, k] = 0.0
 
-                # Call cup_up_aa0 to calculate work functions for updrafts
-                cup_up_aa0(
-                    aa1_bl, zo, zuo, dbyo_bl, self.gammao_cup_bl.field, self.tn_cup_bl.field,
-                    kbcon, ktop, ierr,
-                    itf, jtf, ktf,
-                    its, ite, jts, jte, kts, kte
+                self._cup_up_aa0(
+                    aa0=self.aa1_bl,
+                    z=zo,
+                    zu=zuo,
+                    dby=self.dbyo_bl,
+                    gamma_cup=self.gammao_cup_bl,
+                    t_cup=self.tn_cup_bl,
+                    kbcon=kbcon,
+                    ktop=ktop,
+                    ierr=ierr,
+                    k_mask=self.k_mask,
                 )
 
                 # Update aa1_bl based on boundary layer processes
@@ -2557,12 +2591,12 @@ class GFDeepConvection:
                     for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                         if ierr[i, j] == 0:
                             # Get the increment on aa0 due to boundary layer processes
-                            aa1_bl[i, j] = aa1_bl[i, j] - aa0[i, j]
+                            self.aa1_bl.field[i, j] = self.aa1_bl.field[i, j] - self.aa0.field[i, j]
                             # Multiply aa1_bl by the normalized time-scale (tau_bl / model_timestep)
-                            aa1_bl[i, j] = aa1_bl[i, j] * tau_bl[i, j] / dtime
+                            self.aa1_bl.field[i, j] = self.aa1_bl.field[i, j] * tau_bl[i, j] / dtime
 
         # Assign aa1 to axx
-        axx[:, :] = aa1[:, :]
+        axx[:, :] = self.aa1.field[:, :]
 
         # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
         # print(f"{ktop[0]:>4}{kbcon[0]:>4}{xland1[0]:>4}{AEROEVAP:>4}")
@@ -2834,7 +2868,7 @@ class GFDeepConvection:
             for i in range(its, itf + 1):  # Adjust loop to start at zero
                 for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                     xhc[i, j, k] = 0.0
-                    xdby[i, j, k] = 0.0
+                    self.xdby.field[i, j, k] = 0.0
 
         # Update xhc based on cloud base conditions
         for i in range(its, itf + 1):  # Adjust loop to start at zero
@@ -2866,38 +2900,31 @@ class GFDeepConvection:
                         xhc[i, j, k] += XLF * (1.0 - self.p_liq_ice.field[i, j, k]) * self.qrco.field[i, j, k]
 
                         # Update xdby
-                        xdby[i, j, k] = xhc[i, j, k] - self.xhes_cup.field[i, j, k]
+                        self.xdby.field[i, j, k] = xhc[i, j, k] - self.xhes_cup.field[i, j, k]
 
                     # Loop through levels above ktop
                     for k in range(ktop[i, j] + 1, ktf + 1):  # Adjust for zero-based indexing
                         xhc[i, j, k] = self.xhes_cup.field[i, j, k]
-                        xdby[i, j, k] = 0.0
+                        self.xdby.field[i, j, k] = 0.0
 
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{ktop[0]:>4}{kbcon[0]:>4}")
-        # print(f"{xaa0[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{xz[0,k]:>20.12E}{self.xzu.field[0,k]:>20.12E}{xdby[0,k]:>20.12E}{self.gamma_cup.field[0,k]:>20.12E}{self.xt_cup.field[0,k]:>20.12E}")
-
-        # Call cup_up_aa0 to calculate workfunctions for updraft
-        cup_up_aa0(
-            xaa0, self.xz.field, self.xzu.field, xdby, self.gamma_cup.field, self.xt_cup.field,
-            kbcon, ktop, ierr,
-            itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte
+        self._cup_up_aa0(
+            aa0=self.xaa0,
+            z=self.xz,
+            zu=self.xzu,
+            dby=self.xdby,
+            gamma_cup=self.gamma_cup,
+            t_cup=self.xt_cup,
+            kbcon=kbcon,
+            ktop=ktop,
+            ierr=ierr,
+            k_mask=self.k_mask,
         )
-
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{ktop[0]:>4}{kbcon[0]:>4}")
-        # print(f"{xaa0[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{xz[0,k]:>20.12E}{self.xzu.field[0,k]:>20.12E}{xdby[0,k]:>20.12E}{self.gamma_cup.field[0,k]:>20.12E}{self.xt_cup.field[0,k]:>20.12E}")
 
         # Parallel loop to update precipitation ensemble
         for i in range(its, itf + 1):  # Adjust loop to start at zero
             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                 if ierr[i, j] == 0:
-                    xaa0_ens[i, j, 0] = xaa0[i, j]
+                    xaa0_ens[i, j, 0] = self.xaa0.field[i, j]
                     for k in range(kts, ktop[i, j] + 1):  # Adjust range for zero-based indexing
                         for nens3 in range(MAXENS3):  # Loop over ensemble members
                             if nens3 == 6:
@@ -3042,14 +3069,14 @@ class GFDeepConvection:
 
         # Call cup_forcing_ens_3d to calculate cloud base mass flux
         cup_forcing_ens_3d(
-            self.closure_n.field, self.xland1.field, aa0, aa1, xaa0_ens, mbdt, dtime,
+            self.closure_n.field, self.xland1.field, self.aa0.field, self.aa1.field, xaa0_ens, mbdt, dtime,
             ierr, self.ierr2.field, self.ierr3.field, xf_ens, axx, forcing,
             MAXENS3, mconv, rand_clos,
             self.po_cup.field, ktop, omeg, zdo, zdm, k22, zuo, pr_ens, edto, edtm, kbcon,
             ichoice,
             imid, ipr, itf, jtf, ktf,
             its, ite, jts, jte, kts, kte,
-            dicycle, tau_ecmwf, aa1_bl, xf_dicycle
+            dicycle, tau_ecmwf, self.aa1_bl.field, xf_dicycle
         )
 
         # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
@@ -3894,44 +3921,6 @@ def cup_minimi(array, ks, kend, kt, ierr, itf, jtf, ktf, its, ite, jts, jte, kts
                         x[i, j] = array[i, j, k]
                         kt[i, j] = k
 
-def cup_up_aa0(aa0, z, zu, dby, gamma_cup, t_cup, kbcon, ktop, ierr, itf, jtf, ktf, its, ite, jts, jte, kts, kte):
-    """
-    Calculates the cloud work function for updrafts.
-
-    Parameters:
-        aa0 (ndarray): Output array for cloud work function (1D array of size ite - its + 1).
-        z (ndarray): Heights of model levels (2D array of size (ite - its + 1, jte - jts + 1, kte - kts + 1)).
-        zu (ndarray): Normalized updraft mass flux (2D array of size (ite - its + 1, jte - jts + 1, kte - kts + 1)).
-        dby (ndarray): Buoyancy term (2D array of size (ite - its + 1, jte - jts + 1, kte - kts + 1)).
-        gamma_cup (ndarray): Gamma on model cloud levels (2D array of size (ite - its + 1, jte - jts + 1, kte - kts + 1)).
-        t_cup (ndarray): Temperature on model cloud levels (2D array of size (ite - its + 1, jte - jts + 1, kte - kts + 1)).
-        kbcon (ndarray): Convective cloud base level (1D array of size ite - its + 1).
-        ktop (ndarray): Cloud top level (1D array of size ite - its + 1).
-        ierr (ndarray): Error values for each grid point (1D array of size ite - its + 1).
-        itf, ktf, its, ite, kts, kte (int): Grid dimensions.
-
-    Returns:
-        None: The `aa0` array is modified in place.
-    """
-    # Initialize aa0
-    aa0[:, :] = 0.0
-
-    # Calculate cloud work function
-    for k in range(kts + 1, ktf + 1):  # Adjust for zero-based indexing
-        for i in range(its, itf + 1):
-            for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-                if ierr[i, j] != 0:
-                    continue
-                if k < kbcon[i, j]:
-                    continue
-                if k > ktop[i, j]:
-                    continue
-                dz = z[i, j, k] - z[i, j, k - 1]
-                da = zu[i, j, k] * dz * (9.81 / (1004. * t_cup[i, j, k])) * dby[i, j, k - 1] / \
-                    (1. + gamma_cup[i, j, k])
-                aa0[i, j] += max(0.0, da)
-                if aa0[i, j] < 0.0:
-                    aa0[i, j] = 0.0
 
 def neg_check(name, j, dt, q, outq, outt, outu, outv, outqc, pret, its, ite, jts, jte, kts, kte, itf, jtf, ktf, ktop):
     """
