@@ -687,6 +687,10 @@ def initialize_deep_temporaries(
     xaa0: FloatFieldIJ, # type: ignore
     dbyo_bl: FloatField, # type: ignore
     xdby: FloatField, # type: ignore
+    xf_dicycle: FloatFieldIJ, # type: ignore
+    tau_ecmwf: FloatFieldIJ, # type: ignore
+    wmean: FloatFieldIJ, # type: ignore
+    tau_bl: FloatFieldIJ, # type: ignore
 ):
     """
     Initialize deep convection temporary variables.
@@ -780,6 +784,10 @@ def initialize_deep_temporaries(
         aa1 = 0.0
         aa1_bl = 0.0
         xaa0 = 0.0
+        xf_dicycle = 0.0
+        tau_ecmwf = 0.0
+        wmean = 0.0
+        tau_bl = 0.0
 
     with computation(PARALLEL), interval(...):
         z = 0.0
@@ -4172,3 +4180,52 @@ def cup_dd_moisture_stencil(
                 ierr = 7
             if bu >= 0.0 and iloop == 1:
                 ierr = 7
+
+def compute_cloud_water_and_cape_removal_timescale(
+    ktop: IntFieldIJ32, # type: ignore
+    po_cup: FloatField, # type: ignore
+    cupclw: FloatField, # type: ignore
+    qrco: FloatField, # type: ignore
+    cnvwt: FloatField, # type: ignore
+    zuo: FloatField, # type: ignore
+    aa1: FloatFieldIJ, # type: ignore
+    aa1_bl: FloatFieldIJ, # type: ignore
+    xf_dicycle: FloatFieldIJ, # type: ignore
+    tau_ecmwf: FloatFieldIJ, # type: ignore
+    wmean: FloatFieldIJ, # type: ignore
+    zo_cup: FloatField, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    dx: FloatFieldIJ, # type: ignore
+    tau_bl: FloatFieldIJ, # type: ignore
+    imid: int,
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+):
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            if k_mask <= ktop:
+                dp = 100.0 * (po_cup.at(K=0) - po_cup.at(K=1))
+                cupclw = qrco
+                cnvwt = zuo * cupclw * constants.G / dp
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            if aa1 == 0.0:
+                ierr = 17
+
+    with computation(FORWARD), interval(0, 1):
+        aa1_bl = 0.0
+        xf_dicycle = 0.0
+        tau_ecmwf = 0.0
+        tau_bl = 0.0
+        wmean = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            wmean = 3.0
+            if imid ==1:
+                wmean = 3.0
+
+            tau_ecmwf = (zo_cup.at(K=ktop) - zo_cup.at(K=kbcon)) / wmean
+            tau_ecmwf = max(tau_ecmwf, 720.0)
+            tau_ecmwf = tau_ecmwf * (1.0061 + 1.23e-2 * (dx / 1000.0))

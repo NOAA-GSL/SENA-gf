@@ -40,6 +40,7 @@ from cu_gf_stencils import (
     calculate_downdraft_massflux_detrainment_entrainment,
     cup_dd_moisture_stencil,
     cup_up_aa0_stencil,
+    compute_cloud_water_and_cape_removal_timescale,
 )
 
 logger = logging.getLogger(__name__)
@@ -1012,6 +1013,26 @@ class GFDeepConvection:
             units="none",
             dtype=state.rkind,
         )
+        self.tau_bl: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.tau_ecmwf: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.wmean: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.xf_dicycle: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
 
         # Lookup tables for constants
         self.alpha: Quantity = state.quantity_factory_table.zeros(
@@ -1208,6 +1229,12 @@ class GFDeepConvection:
             externals={},
         )
 
+        self._compute_cloud_water_and_cape_removal_timescale = state.stencil_factory.from_dims_halo(
+            func=compute_cloud_water_and_cape_removal_timescale,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
         end_time = time.perf_counter()
         logging.basicConfig(filename="gf.log", level=logging.DEBUG)
         logger.debug(f"CU-GF deep convection setup time: {end_time - start_time} seconds")
@@ -1339,11 +1366,7 @@ class GFDeepConvection:
         blqe = 0.0
         xff_mid = np.zeros((ite - its + 1, jte - jts + 1, 2))
         hkbo_bl = np.zeros((ite - its + 1, jte - jts + 1,))
-        tau_bl = np.zeros((ite - its + 1, jte - jts + 1,))
-        tau_ecmwf = np.zeros((ite - its + 1, jte - jts + 1,))
-        wmean = np.zeros((ite - its + 1, jte - jts + 1,))
         hco_bl = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        xf_dicycle = np.zeros((ite - its + 1, jte - jts + 1,))
         chem = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1, nchem))
         chem_cup = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1, nchem))
         chem_up = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1, nchem))
@@ -1647,6 +1670,10 @@ class GFDeepConvection:
             xaa0 = self.xaa0,
             dbyo_bl = self.dbyo_bl,
             xdby = self.xdby,
+            xf_dicycle = self.xf_dicycle,
+            tau_ecmwf = self.tau_ecmwf,
+            wmean = self.wmean,
+            tau_bl = self.tau_bl,
         )
 
         self._initialize_deep_convection(
@@ -2380,15 +2407,6 @@ class GFDeepConvection:
             found=self.found,
         )
 
-        for i in range(its, itf + 1):  # Adjust loop indices to start at 0
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] != 0:
-                    continue
-                for k in range(kts + 1, ktop[i, j] + 1):  # Adjust i index by adding `its`
-                    dp = 100.0 * (self.po_cup.field[i, j, 0] - self.po_cup.field[i, j, 1])  # Python uses 0-based indexing
-                    cupclw[i, j, k] = self.qrco.field[i, j, k]  # Direct translation of array assignment
-                    cnvwt[i, j, k] = zuo[i, j, k] * cupclw[i, j, k] * G / dp
-
         self._cup_up_aa0(
             aa0=self.aa0,
             z=self.z,
@@ -2415,38 +2433,26 @@ class GFDeepConvection:
             k_mask=self.k_mask,
         )
 
-        # Loop over the range from `its` to `itf` (inclusive)
-        for i in range(its, itf + 1):
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] != 0:
-                    continue  # Skip the iteration if there's an error
-                if self.aa1.field[i, j] == 0.0:
-                    ierr[i, j] = 17
-                    # The following block is executed only if OpenACC is not enabled
-                    # ierrc[i, j] = "cloud work function zero"
-
-        # Initialize arrays with zeros
-        self.aa1_bl.field[:, :] = 0.0
-        xf_dicycle[:, :] = 0.0
-        tau_ecmwf[:, :] = 0.0
-        iversion = 0
-
-        # Loop through the range (adjusted for Python's 0-based indexing)
-        for i in range(its, itf + 1):
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                # print(f"imid: {imid} ierr[i, j]: {ierr[i, j]}")
-                if ierr[i, j] == 0:
-                    # Mean vertical velocity
-                    wmean[i, j] = 3.0  # m/s
-                    if imid == 1:
-                        wmean[i, j] = 3.0
-
-                    # Time-scale for CAPE removal from Betchold et al. 2008
-                    tau_ecmwf[i, j] = (self.zo_cup.field[i, j, ktop[i, j]] - self.zo_cup.field[i, j, kbcon[i, j]]) / wmean[i, j]
-                    tau_ecmwf[i, j] = max(tau_ecmwf[i, j], 720.0)
-                    tau_ecmwf[i, j] = tau_ecmwf[i, j] * (1.0061 + 1.23e-2 * (dx[i, j] / 1000.0))  # dx must be in meters
-                # print(f"tau_ecmwf[{i}]: {tau_ecmwf[i, j]:>20.12E} imid: {imid}")
-        tau_bl[:, :] = 0.0
+        self._compute_cloud_water_and_cape_removal_timescale(
+            ktop=ktop,
+            po_cup=self.po_cup,
+            cupclw=cupclw,
+            qrco=self.qrco,
+            cnvwt=cnvwt,
+            zuo=zuo,
+            aa1=self.aa1,
+            aa1_bl=self.aa1_bl,
+            xf_dicycle=self.xf_dicycle,
+            tau_ecmwf=self.tau_ecmwf,
+            wmean=self.wmean,
+            zo_cup=self.zo_cup,
+            kbcon=kbcon,
+            dx=dx,
+            tau_bl=self.tau_bl,
+            imid=imid,
+            ierr=ierr,
+            k_mask=self.k_mask,
+        )
 
         if dicycle == 1:
             for i in range(its, itf + 1):
@@ -2455,10 +2461,10 @@ class GFDeepConvection:
                         if self.xland1.field[i, j] == 0:
                             # Over water
                             umean = 2.0 + ((0.5 * (us[i, j, 0]**2 + vs[i, j, 0]**2 + us[i, j, kbcon[i, j]]**2 + vs[i, j, kbcon[i, j]]**2))**0.5)
-                            tau_bl[i, j] = (self.zo_cup.field[i, j, kbcon[i, j]] - z1[i, j]) / umean
+                            self.tau_bl.field[i, j] = (self.zo_cup.field[i, j, kbcon[i, j]] - z1[i, j]) / umean
                         else:
                             # Over land
-                            tau_bl[i, j] = (self.zo_cup.field[i, j, self.ktopdby.field[i, j]] - self.zo_cup.field[i, j, kbcon[i, j]]) / wmean[i, j]
+                            self.tau_bl.field[i, j] = (self.zo_cup.field[i, j, self.ktopdby.field[i, j]] - self.zo_cup.field[i, j, kbcon[i, j]]) / self.wmean.field[i, j]
 
             # Get the profiles modified only by boundary layer tendencies
             for i in range(its, itf + 1):
@@ -2531,7 +2537,7 @@ class GFDeepConvection:
                             # else:
                             # Multiply aa1_bl by the "time-scale" - tau_bl
                             # aa1_bl[i, j] = max(0.0, (aa1_bl[i, j] / t_star) * tau_bl[i, j])
-                            self.aa1_bl.field[i, j] = (self.aa1_bl.field[i, j] / t_star) * tau_bl[i, j]
+                            self.aa1_bl.field[i, j] = (self.aa1_bl.field[i, j] / t_star) * self.tau_bl.field[i, j]
                             # endif
             else:
                 # Version for real cloud-work function
@@ -2593,7 +2599,7 @@ class GFDeepConvection:
                             # Get the increment on aa0 due to boundary layer processes
                             self.aa1_bl.field[i, j] = self.aa1_bl.field[i, j] - self.aa0.field[i, j]
                             # Multiply aa1_bl by the normalized time-scale (tau_bl / model_timestep)
-                            self.aa1_bl.field[i, j] = self.aa1_bl.field[i, j] * tau_bl[i, j] / dtime
+                            self.aa1_bl.field[i, j] = self.aa1_bl.field[i, j] * self.tau_bl.field[i, j] / dtime
 
         # Assign aa1 to axx
         axx[:, :] = self.aa1.field[:, :]
@@ -3076,7 +3082,7 @@ class GFDeepConvection:
             ichoice,
             imid, ipr, itf, jtf, ktf,
             its, ite, jts, jte, kts, kte,
-            dicycle, tau_ecmwf, self.aa1_bl.field, xf_dicycle
+            dicycle, self.tau_ecmwf.field, self.aa1_bl.field, self.xf_dicycle.field
         )
 
         # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
@@ -3158,7 +3164,7 @@ class GFDeepConvection:
             self.sig.field, self.closure_n.field, self.xland1.field, xmbm_in, xmbs_in,
             ichoice, imid, ipr, itf, jtf, ktf,
             its, ite, jts, jte, kts, kte,
-            dicycle, xf_dicycle
+            dicycle, self.xf_dicycle.field
         )
 
         # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
