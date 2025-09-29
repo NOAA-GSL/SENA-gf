@@ -42,6 +42,7 @@ from cu_gf_stencils import (
     cup_up_aa0_stencil,
     compute_cloud_water_and_cape_removal_timescale,
     cup_dd_edt_stencil,
+    get_melting_profile_stencil,
 )
 
 logger = logging.getLogger(__name__)
@@ -1079,6 +1080,16 @@ class GFDeepConvection:
             units="none",
             dtype=state.rkind,
         )
+        self.total_pwo_solid_phase: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.melting: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
 
         # Lookup tables for constants
         self.alpha: Quantity = state.quantity_factory_table.zeros(
@@ -1290,6 +1301,12 @@ class GFDeepConvection:
             },
         )
 
+        self._get_melting_profile = state.stencil_factory.from_dims_halo(
+            func=get_melting_profile_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
         end_time = time.perf_counter()
         logging.basicConfig(filename="gf.log", level=logging.DEBUG)
         logger.debug(f"CU-GF deep convection setup time: {end_time - start_time} seconds")
@@ -1482,9 +1499,6 @@ class GFDeepConvection:
         # Initialize ensemble arrays for each grid point and ensemble member
         xf_ens = np.zeros((ite - its + 1, jte - jts + 1, MAXENS3))  # maxens3 is used for the second dimension
         pr_ens = np.zeros((ite - its + 1, jte - jts + 1, MAXENS3))  # maxens3 is used for the second dimension
-
-        # Arrays for liquid/ice partitioning and melting layers
-        melting = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
 
         # Scalars for rain evaporation and energy calculations
         rain = 0.0
@@ -2679,28 +2693,18 @@ class GFDeepConvection:
             k_mask=self.k_mask,
         )
 
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"")
-        # print(f"{edto[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{self.tn_cup.field[0,k]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{self.p_liq_ice.field[0,k]:>20.12E}{self.melting_layer.field[0,k]:>20.12E}{self.qrco.field[0,k]:>20.12E}{self.pwo.field[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{self.pwdo.field[0,k]:>20.12E}{melting[0,k]:>20.12E}")
-
-        # Call get_melting_profile to get melting profile
-        get_melting_profile(
-            ierr, self.tn_cup.field, self.po_cup.field, self.p_liq_ice.field, self.melting_layer.field, self.qrco.field,
-            self.pwo.field, edto, self.pwdo.field, melting,
-            itf, jtf, ktf, its, ite, jts, jte, kts, kte, cumulus
+        self._get_melting_profile(
+            ierr=ierr,
+            po_cup=self.po_cup,
+            p_liq_ice=self.p_liq_ice,
+            melting_layer=self.melting_layer,
+            pwo=self.pwo,
+            edto=edto,
+            pwdo=self.pwdo,
+            melting=self.melting,
+            cumulus=cumulus,
+            total_pwo_solid_phase=self.total_pwo_solid_phase,
         )
-
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"")
-        # print(f"{edto[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{self.tn_cup.field[0,k]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{self.p_liq_ice.field[0,k]:>20.12E}{self.melting_layer.field[0,k]:>20.12E}{self.qrco.field[0,k]:>20.12E}{self.pwo.field[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{self.pwdo.field[0,k]:>20.12E}{melting[0,k]:>20.12E}")
 
         # Initialize ensemble variables
         for k in range(kts, ktf + 1):  # Adjust range for zero-based indexing
@@ -2824,7 +2828,7 @@ class GFDeepConvection:
                                         zdo[i, j, k] * (self.hcdo.field[i, j, k] - self.heo_cup.field[i, j, k])) * G / dp * edto[i, j]
 
                         dellah[i, j, k] += XLF * ((1.0 - self.p_liq_ice.field[i, j, k]) * 0.5 * (self.qrco.field[i, j, k + 1] + self.qrco.field[i, j, k]) -
-                                            melting[i, j, k]) * G / dp
+                                            self.melting.field[i, j, k]) * G / dp
 
                         detup = self.up_massdetro.field[i, j, k]
                         dz = self.zo_cup.field[i, j, k] - self.zo_cup.field[i, j, k - 1]
@@ -3616,111 +3620,6 @@ def rain_evap_below_cloudbase(itf, jtf, ktf, its, ite, jts, jte, kts, kte, ierr,
                 outt[i, j, k] += del_t
                 pre[i, j] -= evap_bcb[i, j, k]
 
-def cup_dd_edt(ierr, us, vs, z, ktop, kbcon, edt, p, pwav, 
-               pw, ccn, ccnclean, pwev, edtmax, edtmin, edtc, psum2, psumh, 
-               rho, aeroevap, pefc, xland1, itf, jtf, ktf, its, ite, jts, jte, kts, kte):
-    """
-    Calculates strength of downdraft based on wind shear and/or aerosol content.
-    """
-
-    # Local variables
-    import numpy as np
-
-    # Scalars
-    einc = 0.0
-    pef = 0.0
-    pefb = 0.0
-    prezk = 0.0
-    zkbc = 0.0
-    prop_c = 0.0
-    aeroadd = 0.0
-    alpha3 = 0.75
-    beta3 = -0.15
-
-    # Arrays
-    vshear = np.zeros((ite - its + 1, jte - jts + 1))
-    sdp = np.zeros((ite - its + 1, jte - jts + 1))
-    vws = np.zeros((ite - its + 1, jte - jts + 1))
-
-    # Initialize variables
-    prop_c = 0.0  # 10.386
-    alpha3 = 0.75
-    beta3 = -0.15
-    pefc[:] = 0.0
-    pefb = 0.0
-    pef = 0.0
-
-    # Determine downdraft strength in terms of wind shear
-    # Calculate an average wind shear over the depth of the cloud
-    for i in range(its, itf + 1):  # Zero-based indexing
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-            edt[i, j] = 0.0
-            vws[i, j] = 0.0
-            sdp[i, j] = 0.0
-            vshear[i, j] = 0.0
-
-    for i in range(its, itf + 1):  # Zero-based indexing
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-            edtc[i, j, 0] = 0.0  # Adjust for zero-based indexing
-
-    for kk in range(kts, ktf):  # Loop over vertical levels
-        for i in range(its, itf + 1):  # Zero-based indexing
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] != 0:
-                    continue
-                if kts <= kk <= min(ktop[i, j], ktf) and kk >= kbcon[i, j]:
-                    vws[i, j] += (
-                        abs((us[i, j, kk + 1] - us[i, j, kk]) / (z[i, j, kk + 1] - z[i, j, kk])) +
-                        abs((vs[i, j, kk + 1] - vs[i, j, kk]) / (z[i, j, kk + 1] - z[i, j, kk]))
-                    ) * (p[i, j, kk] - p[i, j, kk + 1])
-                    sdp[i, j] += p[i, j, kk] - p[i, j, kk + 1]
-                if kk == ktf - 1:
-                    vshear[i, j] = 1.0e3 * vws[i, j] / sdp[i, j]
-
-    for i in range(its, itf + 1):  # Zero-based indexing
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-            if ierr[i, j] == 0:
-                pef = (1.591 - 0.639 * vshear[i, j] + 0.0953 * (vshear[i, j]**2) -
-                    0.00496 * (vshear[i, j]**3))
-                pef = min(max(pef, 0.1), 0.9)  # Clamp pef between 0.1 and 0.9
-
-                # Cloud base precip efficiency
-                zkbc = z[i, j, kbcon[i, j]] * 3.281e-3
-                prezk = 0.02
-                if zkbc > 3.0:
-                    prezk = (0.96729352 + zkbc * (-0.70034167 + zkbc * (0.162179896 +
-                            zkbc * (-1.2569798e-2 + zkbc * (4.2772e-4 - zkbc * 5.44e-6)))))
-                if zkbc > 25.0:
-                    prezk = 2.4
-                pefb = 1.0 / (1.0 + prezk)
-                pefb = min(max(pefb, 0.1), 0.9)  # Clamp pefb between 0.1 and 0.9
-                pefb = pef
-
-                edt[i, j] = 1.0 - 0.5 * (pefb + pef)
-                if aeroevap > 1:
-                    pefb = 0.5
-                    if xland1[i, j] == 1:
-                        pefb = 0.3
-                    aeroadd = 0.0
-                    if psumh[i, j] > 0.0 and psum2[i, j] > 0.0:
-                        aeroadd = ((ccnclean)**beta3) * (psumh[i, j]**(alpha3 - 1))
-                        prop_c = pefb / aeroadd
-                        aeroadd = ((ccn[i, j])**beta3) * (psum2[i, j]**(alpha3 - 1))
-                        aeroadd = prop_c * aeroadd
-                        pefc[i, j] = aeroadd
-
-                        pefc[i, j] = min(max(pefc[i, j], 0.1), 0.9)  # Clamp pefc between 0.1 and 0.9
-                        edt[i, j] = 1.0 - pefc[i, j]
-
-                # edt here is 1 - precip efficiency
-                edtc[i, j, 0] = edt[i, j]  # Adjust for zero-based indexing
-
-    for i in range(its, itf + 1):  # Zero-based indexing
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-            if ierr[i, j] == 0:
-                edtc[i, j, 0] = -edtc[i, j, 0] * psum2[i, j] / pwev[i, j]  # Adjust for zero-based indexing
-                edtc[i, j, 0] = min(max(edtc[i, j, 0], edtmin[i, j]), edtmax[i, j])  # Clamp edtc[i, j, 0] between edtmin[i, j] and edtmax[i, j]
-
 
 def cup_forcing_ens_3d(closure_n, xland, aa0, aa1, xaa0, mbdt, dtime, ierr, ierr2, ierr3,
                        xf_ens, axx, forcing, maxens3, mconv, rand_clos,
@@ -4285,72 +4184,6 @@ def cup_up_aa1bl(aa0, t, tn, q, qo, dtime, z_cup, zu, dby, gamma_cup, t_cup, kbc
                         t[i, j, k] * (1.0 + 0.608 * q[i, j, k])) / dtime
                 aa0[i, j] += da
 
-
-def get_melting_profile(ierr, tn_cup, po_cup, p_liq_ice, melting_layer, qrco, 
-                        pwo, edto, pwdo, melting, itf, jtf, ktf, its, ite, jts, jte, kts, kte, 
-                        cumulus):
-    """
-    Calculates the melting profile.
-
-    Parameters:
-        ierr (array): Error flags for each column.
-        tn_cup, po_cup (2D arrays): Temperature and pressure profiles.
-        p_liq_ice (2D array): Liquid-ice partition.
-        melting_layer (2D array): Melting layer profile.
-        qrco, pwo, edto, pwdo (2D arrays): Precipitation and evaporation terms.
-        melting (2D array): Output array for melting profile.
-        itf, ktf, its, ite, kts, kte (int): Loop bounds.
-        cumulus (str): Type of cumulus (e.g., 'deep').
-        melt_glac (bool): Flag for enabling melting calculations.
-        g (float): Gravitational acceleration (m/s^2).
-
-    Returns:
-        None: Updates `melting` in place.
-    """
-    # Initialize local arrays
-    norm = np.zeros((itf - its + 1, jtf - jts + 1))
-    total_pwo_solid_phase = np.zeros((itf - its + 1, jtf - jts + 1))
-    pwo_solid_phase = np.zeros((itf - its + 1, jtf - jts + 1, kte - kts + 1))
-    pwo_eff = np.zeros((itf - its + 1, jtf - jts + 1, kte - kts + 1))
-
-    if constants.MELT_GLAC and cumulus == constants.CUMULUS_DEEP:
-        # Set melting to zero for columns without deep convection
-        for i in range(its, itf + 1):
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] > 0:
-                    melting[i, j, :] = 0.0
-
-        # Calculate for columns with deep convection
-        for k in range(kts, ktf):
-            for i in range(its, itf + 1):
-                for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                    if ierr[i, j] != 0:
-                        continue
-                    dp = 100.0 * (po_cup[i, j, k] - po_cup[i, j, k + 1])
-
-                    # Effective precipitation (after evaporation by downdraft)
-                    pwo_eff[i, j, k] = 0.5 * (pwo[i, j, k] + pwo[i, j, k + 1] + edto[i, j] * (pwdo[i, j, k] + pwdo[i, j, k + 1]))
-
-                    # Precipitation at solid phase (ice/snow)
-                    pwo_solid_phase[i, j, k] = (1.0 - p_liq_ice[i, j, k]) * pwo_eff[i, j, k]
-
-                    # Integrated precipitation at solid phase (ice/snow)
-                    total_pwo_solid_phase[i, j] += pwo_solid_phase[i, j, k] * dp / G
-
-        # Calculate melting profile
-        for k in range(kts, ktf + 1):
-            for i in range(its, itf + 1):
-                for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                    if ierr[i, j] != 0:
-                        continue
-                    melting[i, j, k] = melting_layer[i, j, k] * (
-                        total_pwo_solid_phase[i, j] / (100 * (po_cup[i, j, kts] - po_cup[i, j, ktf]) / G)
-                    )
-    else:
-        # No melting allowed in this run
-        melting[:, :, :] = 0.0
-
-import numpy as np
 
 def get_cloud_top(name, ktop, ierr, p_cup, entr_rate_2d, hkbo, heo, heso_cup, z_cup, 
                   kstabi, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kpbl, klcl, hcot):

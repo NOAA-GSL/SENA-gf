@@ -4308,3 +4308,46 @@ def cup_dd_edt_stencil(
             edtc = -edt * psum2 / pwev  # Adjust for zero-based indexing
             edtc = min(max(edtc, edtmin), edtmax)  # Clamp edtc[i, j, 0] between edtmin[i, j] and edtmax[i,j]
             edto = edtc
+
+def get_melting_profile_stencil(
+    ierr: IntFieldIJ32, # type: ignore
+    po_cup: FloatField, # type: ignore
+    p_liq_ice: FloatField, # type: ignore
+    melting_layer: FloatField, # type: ignore
+    pwo: FloatField, # type: ignore
+    edto: FloatFieldIJ, # type: ignore
+    pwdo: FloatField, # type: ignore
+    melting: FloatField, # type: ignore
+    cumulus: int, # type: ignore
+    total_pwo_solid_phase: FloatFieldIJ, # type: ignore
+):
+    """
+    Calculates the melting profile.
+    """
+    from __externals__ import ( # type: ignore
+        k_start,
+        k_end,
+    )
+
+    with computation(FORWARD), interval(0, 1):
+        if constants.MELT_GLAC and cumulus == constants.CUMULUS_DEEP:
+            if ierr > 0:
+                melting = 0.0
+        total_pwo_solid_phase = 0.0
+
+    with computation(FORWARD), interval(0, -1):
+        if constants.MELT_GLAC and cumulus == constants.CUMULUS_DEEP:
+            if ierr == 0:
+                dp = 100.0 * (po_cup - po_cup[0, 0, 1])
+                pwo_eff = 0.5 * (pwo + pwo[0, 0, 1] + edto * (pwdo + pwdo[0, 0, 1]))
+                pwo_solid_phase = (1.0 - p_liq_ice) * pwo_eff
+                total_pwo_solid_phase += pwo_solid_phase * dp / constants.G
+
+    with computation(FORWARD), interval(...):
+        if constants.MELT_GLAC and cumulus == constants.CUMULUS_DEEP:
+            if ierr == 0:
+                melting = melting_layer * (total_pwo_solid_phase / (100 * (po_cup.at(K=k_start) - po_cup.at(K=k_end - 1)) / constants.G))
+
+    with computation(PARALLEL), interval(...):
+        if not (constants.MELT_GLAC and cumulus == constants.CUMULUS_DEEP):
+            melting = 0.0
