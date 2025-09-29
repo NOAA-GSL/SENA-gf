@@ -41,6 +41,7 @@ from cu_gf_stencils import (
     cup_dd_moisture_stencil,
     cup_up_aa0_stencil,
     compute_cloud_water_and_cape_removal_timescale,
+    cup_dd_edt_stencil,
 )
 
 logger = logging.getLogger(__name__)
@@ -1033,6 +1034,51 @@ class GFDeepConvection:
             units="none",
             dtype=state.rkind,
         )
+        self.edt: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.psum: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.psumh: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.edtc: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.pefc: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.vws: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.sdp: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.vshear: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.pefb: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
 
         # Lookup tables for constants
         self.alpha: Quantity = state.quantity_factory_table.zeros(
@@ -1235,6 +1281,15 @@ class GFDeepConvection:
             externals={},
         )
 
+        self._cup_dd_edt = state.stencil_factory.from_dims_halo(
+            func=cup_dd_edt_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={
+                "alpha3": 0.75,
+                "beta3": -0.15,
+            },
+        )
+
         end_time = time.perf_counter()
         logging.basicConfig(filename="gf.log", level=logging.DEBUG)
         logger.debug(f"CU-GF deep convection setup time: {end_time - start_time} seconds")
@@ -1359,7 +1414,6 @@ class GFDeepConvection:
         nv = 0
 
         # Arrays
-        pefc = np.zeros((ite - its + 1, jte - jts + 1,))
         flg = np.zeros((ite - its + 1, jte - jts + 1,), dtype=bool)
         c1_max = 0.0
         pgcon = 0.0
@@ -1402,18 +1456,14 @@ class GFDeepConvection:
         pwo_ens = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1, 1))  # Dimensions: (ite - its + 1, jte - jts + 1, kte - kts + 1, 1)
 
         # Scalars and arrays for cloud work functions, energy, and other properties
-        edt = np.zeros((ite - its + 1, jte - jts + 1,))
         xaa0_ens = np.zeros((ite - its + 1, jte - jts + 1, 1))
         xhkb = np.zeros((ite - its + 1, jte - jts + 1,))
         xmb = np.zeros((ite - its + 1, jte - jts + 1,))
         ccnloss = np.zeros((ite - its + 1, jte - jts + 1,))
-        psum = np.zeros((ite - its + 1, jte - jts + 1,))
-        psumh = np.zeros((ite - its + 1, jte - jts + 1,))
         sigd = np.zeros((ite - its + 1, jte - jts + 1,))
 
         # Arrays for cloud properties and environmental parameters
         axx = np.zeros((ite - its + 1, jte - jts + 1,))
-        edtc = np.zeros((ite - its + 1, jte - jts + 1, 1))
 
         # Integer arrays for levels and indices
         turn = 0
@@ -2214,8 +2264,8 @@ class GFDeepConvection:
                 autoconv=AUTOCONV,
                 up_massentr=self.up_massentr,
                 up_massdetr=self.up_massdetr,
-                psum=psum,
-                psumh=psumh,
+                psum=self.psum,
+                psumh=self.psumh,
                 itest=1,
                 bdsp=self.bdsp,
                 qaver=self.qaver,
@@ -2259,8 +2309,8 @@ class GFDeepConvection:
                 autoconv=AUTOCONV,
                 up_massentr=self.up_massentr,
                 up_massdetr=self.up_massdetr,
-                psum=psum,
-                psumh=psumh,
+                psum=self.psum,
+                psumh=self.psumh,
                 itest=1,
                 bdsp=self.bdsp,
                 qaver=self.qaver,
@@ -2601,39 +2651,33 @@ class GFDeepConvection:
                             # Multiply aa1_bl by the normalized time-scale (tau_bl / model_timestep)
                             self.aa1_bl.field[i, j] = self.aa1_bl.field[i, j] * self.tau_bl.field[i, j] / dtime
 
-        # Assign aa1 to axx
-        axx[:, :] = self.aa1.field[:, :]
-
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{ktop[0]:>4}{kbcon[0]:>4}{xland1[0]:>4}{AEROEVAP:>4}")
-        # print(f"{edt[0]:>20.12E}{self.pwavo.field[0]:>20.12E}{self.pwevo.field[0]:>20.12E}{ccn[0]:>20.12E}{ccnclean:>20.12E}{edtmax[0]:>20.12E}{edtmin[0]:>20.12E}")
-        # print(f"{edtc[0,0]:>20.12E}{psum[0]:>20.12E}{psumh[0]:>20.12E}{pefc[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{zo[0,k]:>20.12E}{po[0,k]:>20.12E}{self.pwo.field[0,k]:>20.12E}{rho[0,k]:>20.12E}")
-
-        # Call cup_dd_edt to determine downdraft strength in terms of windshear
-        cup_dd_edt(
-            ierr, us, vs, zo, ktop, kbcon, edt, po, self.pwavo.field,
-            self.pwo.field, ccn, ccnclean, self.pwevo.field, self.edtmax.field, self.edtmin.field, edtc, psum, psumh,
-            rho, AEROEVAP, pefc, self.xland1.field, itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte
+        self._cup_dd_edt(
+            ierr=ierr,
+            us=us,
+            vs=vs,
+            z=zo,
+            ktop=ktop,
+            kbcon=kbcon,
+            edt=self.edt,
+            edto=edto,
+            p=po,
+            ccn=ccn,
+            ccnclean=ccnclean,
+            pwev=self.pwevo,
+            edtmax=self.edtmax,
+            edtmin=self.edtmin,
+            edtc=self.edtc,
+            psum2=self.psum,
+            psumh=self.psumh,
+            aeroevap=AEROEVAP,
+            pefc=self.pefc.field,
+            xland1=self.xland1,
+            vws=self.vws,
+            sdp=self.sdp,
+            vshear=self.vshear,
+            pefb=self.pefb,
+            k_mask=self.k_mask,
         )
-
-        # Output variable match
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{ktop[0]:>4}{kbcon[0]:>4}{xland1[0]:>4}{AEROEVAP:>4}")
-        # print(f"{edt[0]:>20.12E}{self.pwavo.field[0]:>20.12E}{self.pwevo.field[0]:>20.12E}{ccn[0]:>20.12E}{ccnclean:>20.12E}{edtmax[0]:>20.12E}{edtmin[0]:>20.12E}")
-        # print(f"{edtc[0,0]:>20.12E}{psum[0]:>20.12E}{psumh[0]:>20.12E}{pefc[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{us[0,k]:>20.12E}{vs[0,k]:>20.12E}{zo[0,k]:>20.12E}{po[0,k]:>20.12E}{self.pwo.field[0,k]:>20.12E}{rho[0,k]:>20.12E}")
-
-        # Update edto based on edtc
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] != 0:
-                    continue
-                edto[i, j] = edtc[i, j, 0]  # Adjusted for zero-based indexing
-
 
         # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
         # print(f"")
@@ -3059,6 +3103,9 @@ class GFDeepConvection:
                     mconv[i, j] += omeg[i, j, k] * dq / G
 
 
+        # Assign aa1 to axx
+        axx[:, :] = self.aa1.field[:, :]
+
         # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
         # print(f"{xland1[0]:>4}{MAXENS3:>4}{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{ichoice:>4}{imid:>4}{dicycle:>4}")
         # print(f"{closure_n[0]:>20.12E}{aa0[0]:>20.12E}{aa1[0]:>20.12E}{xaa0_ens[0, 0]:>20.12E}{mbdt:>20.12E}{dtime:>20.12E}")
@@ -3219,7 +3266,7 @@ class GFDeepConvection:
                     if ierr[i, j] == 0:
                         for k in range(kts, jmin[i, j] + 1):  # Adjust for zero-based indexing
                             if self.pwavo.field[i, j] != 0.0:
-                                pwdper[i, j, k] = -edtc[i, j, 0] * self.pwdo.field[i, j, k] / self.pwavo.field[i, j]
+                                pwdper[i, j, k] = -self.edtc.field[i, j] * self.pwdo.field[i, j, k] / self.pwavo.field[i, j]
                         pwdper[i, j, :] = 0.0
                         for nv in range(nchem):
                             for k in range(kts + 1, ktf + 1):  # Adjust for zero-based indexing
@@ -3376,9 +3423,9 @@ class GFDeepConvection:
                     qevap[i, j] = 0.0
                     flg[i, j] = True
                     if ierr[i, j] == 0:
-                        evef = edt[i, j] * evfact * self.sig.field[i, j]**2
+                        evef = self.edt.field[i, j] * evfact * self.sig.field[i, j]**2
                         if 0.5 < xland[i, j] < 1.5:
-                            evef = edt[i, j] * evfactl * self.sig.field[i, j]**2
+                            evef = self.edt.field[i, j] * evfactl * self.sig.field[i, j]**2
                         for k in range(ktop[i, j], -1, -1):  # Reverse loop for zero-based indexing
                             rain = self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
                             rn[i, j] += rain * xmb[i, j] * 0.001 * dtime
@@ -3407,7 +3454,7 @@ class GFDeepConvection:
                 if ierr[i, j] == 0:
                     if AEROEVAP > 1:
                         # Aerosol scavenging
-                        ccnloss[i, j] = ccn[i, j] * pefc[i, j] * xmb[i, j]
+                        ccnloss[i, j] = ccn[i, j] * self.pefc.field[i, j] * xmb[i, j]
                         ccn[i, j] -= ccnloss[i, j] * SCAV_FACTOR
 
         # Add heating due to kinetic energy dissipation (from ECMWF)

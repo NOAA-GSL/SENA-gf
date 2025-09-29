@@ -6,8 +6,8 @@ errflg = 0
 
 first_step = 1
 last_step = 576
-# first_step = 76
-# last_step = 77
+# first_step = 576
+# last_step = 576
 
 first_input = f"data/input_state_{first_step:04d}.nc"
 state = GFState()

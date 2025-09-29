@@ -4229,3 +4229,82 @@ def compute_cloud_water_and_cape_removal_timescale(
             tau_ecmwf = (zo_cup.at(K=ktop) - zo_cup.at(K=kbcon)) / wmean
             tau_ecmwf = max(tau_ecmwf, 720.0)
             tau_ecmwf = tau_ecmwf * (1.0061 + 1.23e-2 * (dx / 1000.0))
+
+def cup_dd_edt_stencil(
+    ierr: IntFieldIJ32, # type: ignore
+    us: FloatField, # type: ignore
+    vs: FloatField, # type: ignore
+    z: FloatField, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    edt: FloatFieldIJ, # type: ignore
+    edto: FloatFieldIJ, # type: ignore
+    p: FloatField, # type: ignore
+    ccn: FloatFieldIJ, # type: ignore
+    ccnclean: float,
+    pwev: FloatFieldIJ, # type: ignore
+    edtmax: FloatFieldIJ, # type: ignore
+    edtmin: FloatFieldIJ, # type: ignore
+    edtc: FloatFieldIJ, # type: ignore
+    psum2: FloatFieldIJ, # type: ignore
+    psumh: FloatFieldIJ, # type: ignore
+    aeroevap: int,
+    pefc: FloatFieldIJ, # type: ignore
+    xland1: IntFieldIJ32, # type: ignore
+    vws: FloatFieldIJ, # type: ignore
+    sdp: FloatFieldIJ, # type: ignore
+    vshear: FloatFieldIJ, # type: ignore
+    pefb: FloatFieldIJ, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+):
+    """
+    Calculates strength of downdraft based on wind shear and/or aerosol content.
+    """
+    from __externals__ import ( # type: ignore
+        k_start,
+        k_end,
+        alpha3,
+        beta3,
+    )
+
+    with computation(FORWARD), interval(0, 1):
+        edt = 0.0
+        vws = 0.0
+        sdp = 0.0
+        vshear = 0.0
+        edtc = 0.0
+
+    with computation(FORWARD), interval(0, -1):
+        if ierr == 0:
+            if k_mask <= min(ktop, k_end - 1) and k_mask >= kbcon:
+                vws += (
+                    abs((us[0, 0, 1] - us) / (z[0, 0, 1] - z)) +
+                    abs((vs[0, 0, 1] - vs) / (z[0, 0, 1] - z))
+                ) * (p - p[0, 0, 1])
+                sdp += p - p[0, 0, 1]
+            if k_mask == k_end - 2:
+                vshear = 1.0e3 * vws / sdp
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+
+            pefb = (1.591 - 0.639 * vshear + 0.0953 * (vshear**2) -
+                0.00496 * (vshear**3))
+            pefb = min(max(pefb, 0.1), 0.9)  # Clamp pef between 0.1 and 0.9
+
+            edt = 1.0 - 0.5 * (pefb + pefb)
+            if aeroevap > 1:
+                if xland1 == 1:
+                    pefb = 0.3
+                else:
+                    pefb = 0.5
+                if psumh > 0.0 and psum2 > 0.0:
+                    prop_c = pefb / (((ccnclean)**beta3) * (psumh**(alpha3 - 1)))
+                    pefc = prop_c * (((ccn)**beta3) * (psum2**(alpha3 - 1)))
+
+                    pefc = min(max(pefc, 0.1), 0.9)  # Clamp pefc between 0.1 and 0.9
+                    edt = 1.0 - pefc
+
+            edtc = -edt * psum2 / pwev  # Adjust for zero-based indexing
+            edtc = min(max(edtc, edtmin), edtmax)  # Clamp edtc[i, j, 0] between edtmin[i, j] and edtmax[i,j]
+            edto = edtc
