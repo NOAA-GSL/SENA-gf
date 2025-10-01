@@ -43,6 +43,7 @@ from cu_gf_stencils import (
     compute_cloud_water_and_cape_removal_timescale,
     cup_dd_edt_stencil,
     get_melting_profile_stencil,
+    update_ensemble_and_environmental_tendencies,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,6 @@ TCRIT = 258.0  # Critical temperature for water / ice conversion (K)
 C1 = 0.003  # Tuning constant for cloud water / ice detrainment
 IRAINEVAP = 1  # Parameter to enable / disable rainwater evaporation
 BETA_JB = 1.2  # Tuning constant for J. Brown closure
-PGCD = 0.1  # Parameter to modify momentum transport by downdrafts
 
 # Aerosol awareness (not fully implemented yet)
 AUTOCONV = 1  # Parameter for autoconversion
@@ -1090,6 +1090,56 @@ class GFDeepConvection:
             units="none",
             dtype=state.rkind,
         )
+        self.dellat_ens: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.dellaq_ens: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.dellaqc_ens: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.pwo_ens: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.dellu: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.dellv: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.dellah: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.dellat: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.dellaq: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.dellaqc: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
 
         # Lookup tables for constants
         self.alpha: Quantity = state.quantity_factory_table.zeros(
@@ -1307,6 +1357,13 @@ class GFDeepConvection:
             externals={},
         )
 
+        self._update_ensemble_and_environmental_tendencies = state.stencil_factory.from_dims_halo(
+            func=update_ensemble_and_environmental_tendencies,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        # Logging setup time
         end_time = time.perf_counter()
         logging.basicConfig(filename="gf.log", level=logging.DEBUG)
         logger.debug(f"CU-GF deep convection setup time: {end_time - start_time} seconds")
@@ -1401,7 +1458,6 @@ class GFDeepConvection:
         trash2 = 0.0
 
         # Scalars
-        mbdt = 0.0
         radius = 0.0
         depth_min = 0.0
         dh = 0.0
@@ -1459,18 +1515,6 @@ class GFDeepConvection:
 
         # Arrays for environmental and cloud properties
         xhc = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-
-        # Arrays for detrainment, tendencies, and wind components
-        dellah = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        dellaq = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        dellat = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        dellaqc = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        dellu = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        dellv = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-        dellat_ens = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1, 1))  # Dimensions: (ite - its + 1, jte - jts + 1, kte - kts + 1, 1)
-        dellaqc_ens = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1, 1))  # Dimensions: (ite - its + 1, jte - jts + 1, kte - kts + 1, 1)
-        dellaq_ens = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1, 1))  # Dimensions: (ite - its + 1, jte - jts + 1, kte - kts + 1, 1)
-        pwo_ens = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1, 1))  # Dimensions: (ite - its + 1, jte - jts + 1, kte - kts + 1, 1)
 
         # Scalars and arrays for cloud work functions, energy, and other properties
         xaa0_ens = np.zeros((ite - its + 1, jte - jts + 1, 1))
@@ -2706,181 +2750,51 @@ class GFDeepConvection:
             total_pwo_solid_phase=self.total_pwo_solid_phase,
         )
 
-        # Initialize ensemble variables
-        for k in range(kts, ktf + 1):  # Adjust range for zero-based indexing
-            for i in range(its, itf + 1):  # Adjust loop to start at zero
-                for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                    dellat_ens[i, j, k, 0] = 0.0
-                    dellaq_ens[i, j, k, 0] = 0.0
-                    dellaqc_ens[i, j, k, 0] = 0.0
-                    pwo_ens[i, j, k, 0] = 0.0
-
-        # Initialize environmental change variables
-        for k in range(kts, kte + 1):  # Adjust range for zero-based indexing
-            for i in range(its, itf + 1):  # Adjust loop to start at zero
-                for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                    dellu[i, j, k] = 0.0
-                    dellv[i, j, k] = 0.0
-                    dellah[i, j, k] = 0.0
-                    dellat[i, j, k] = 0.0
-                    dellaq[i, j, k] = 0.0
-                    dellaqc[i, j, k] = 0.0
-
-        # Calculate momentum tendencies and mass flux adjustments
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] != 0:
-                    continue
-                dp = 100.0 * (self.po_cup.field[i, j, 0] - self.po_cup.field[i, j, 1])  # Adjusted for zero-based indexing
-                dellu[i, j, 0] = PGCD * (edto[i, j] * zdo[i, j, 1] * self.ucd.field[i, j, 1] -
-                                        edto[i, j] * zdo[i, j, 1] * self.u_cup.field[i, j, 1]) * G / dp - \
-                                zuo[i, j, 1] * (self.uc.field[i, j, 1] - self.u_cup.field[i, j, 1]) * G / dp
-                dellv[i, j, 0] = PGCD * (edto[i, j] * zdo[i, j, 1] * self.vcd.field[i, j, 1] -
-                                        edto[i, j] * zdo[i, j, 1] * self.v_cup.field[i, j, 1]) * G / dp - \
-                                zuo[i, j, 1] * (self.vc.field[i, j, 1] - self.v_cup.field[i, j, 1]) * G / dp
-
-                for k in range(kts + 1, ktop[i, j] + 1):
-                    # These three are only used at or near mass detrainment and/or entrainment levels
-                    pgc = pgcon
-                    entupk = 0.0
-                    if k == k22[i, j] - 1:
-                        entupk = zuo[i, j, k + 1]
-                    detupk = 0.0
-                    entdoj = 0.0
-
-                    # Detrainment and entrainment for downdrafts
-                    detdo = edto[i, j] * self.dd_massdetro.field[i, j, k]
-                    entdo = edto[i, j] * self.dd_massentro.field[i, j, k]
-
-                    # Entrainment/detrainment for updraft
-                    entup = self.up_massentro.field[i, j, k]
-                    detup = self.up_massdetro.field[i, j, k]
-
-                    # Subsidence by downdrafts only
-                    subin = -zdo[i, j, k + 1] * edto[i, j]
-                    subdown = -zdo[i, j, k] * edto[i, j]
-
-                    # Special levels
-                    if k == ktop[i, j]:
-                        detupk = zuo[i, j, ktop[i, j]]
-                        subin = 0.0
-                        subdown = 0.0
-                        detdo = 0.0
-                        entdo = 0.0
-                        entup = 0.0
-                        detup = 0.0
-
-                    totmas = (
-                        subin - subdown + detup - entup - entdo +
-                        detdo - entupk - entdoj + detupk + zuo[i, j, k + 1] - zuo[i, j, k]
-                    )
-
-                    if abs(totmas) > 1.0e-6:
-                        # Debug output (only if not using OpenACC)
-                        # Uncomment the following lines if needed
-                        # print(f"totmas={k22[i, j]} {kbcon[i, j]} {k} {entup:.4e} {detup:.4e} {edto[i, j]:.2f} "
-                        #       f"{zdo[i, j, k + 1]:.4e} {self.dd_massdetro.field[i, j, k]:.4e} {self.dd_massentro.field[i, j, k]:.4e}")
-                        pass
-
-                    dp = 100.0 * (self.po_cup.field[i, j, k] - self.po_cup.field[i, j, k + 1])
-                    pgc = pgcon
-                    if k >= ktop[i, j]:
-                        pgc = 0.0
-
-                    dellu[i, j, k] = (
-                        -(zuo[i, j, k + 1] * (self.uc.field[i, j, k + 1] - self.u_cup.field[i, j, k + 1]) -
-                        zuo[i, j, k] * (self.uc.field[i, j, k] - self.u_cup.field[i, j, k])) * G / dp +
-                        (zdo[i, j, k + 1] * (self.ucd.field[i, j, k + 1] - self.u_cup.field[i, j, k + 1]) -
-                        zdo[i, j, k] * (self.ucd.field[i, j, k] - self.u_cup.field[i, j, k])) * G / dp * edto[i, j] * PGCD
-                    )
-
-                    dellv[i, j, k] = (
-                        -(zuo[i, j, k + 1] * (self.vc.field[i, j, k + 1] - self.v_cup.field[i, j, k + 1]) -
-                        zuo[i, j, k] * (self.vc.field[i, j, k] - self.v_cup.field[i, j, k])) * G / dp +
-                        (zdo[i, j, k + 1] * (self.vcd.field[i, j, k + 1] - self.v_cup.field[i, j, k + 1]) -
-                        zdo[i, j, k] * (self.vcd.field[i, j, k] - self.v_cup.field[i, j, k])) * G / dp * edto[i, j] * PGCD
-                    )
-
-        # Calculate tendencies for heat and moisture
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0:
-                    dp = 100.0 * (self.po_cup.field[i, j, 0] - self.po_cup.field[i, j, 1])  # Adjusted for zero-based indexing
-
-                    dellah[i, j, 0] = (edto[i, j] * zdo[i, j, 1] * self.hcdo.field[i, j, 1] -
-                                    edto[i, j] * zdo[i, j, 1] * self.heo_cup.field[i, j, 1]) * G / dp - \
-                                zuo[i, j, 1] * (self.hco.field[i, j, 1] - self.heo_cup.field[i, j, 1]) * G / dp
-
-                    dellaq[i, j, 0] = (edto[i, j] * zdo[i, j, 1] * self.qcdo.field[i, j, 1] -
-                                    edto[i, j] * zdo[i, j, 1] * self.qo_cup.field[i, j, 1]) * G / dp - \
-                                zuo[i, j, 1] * (self.qco.field[i, j, 1] - self.qo_cup.field[i, j, 1]) * G / dp
-
-                    g_rain = 0.5 * (self.pwo.field[i, j, 0] + self.pwo.field[i, j, 1]) * G / dp
-                    e_dn = -0.5 * (self.pwdo.field[i, j, 0] + self.pwdo.field[i, j, 1]) * G / dp * edto[i, j]  # self.pwdo.field < 0 and e_dn must > 0
-                    dellaq[i, j, 0] += e_dn - g_rain
-
-                    for k in range(kts + 1, ktop[i, j] + 1):  # Adjust range for zero-based indexing
-                        dp = 100.0 * (self.po_cup.field[i, j, k] - self.po_cup.field[i, j, k + 1])
-
-                        dellah[i, j, k] = -(zuo[i, j, k + 1] * (self.hco.field[i, j, k + 1] - self.heo_cup.field[i, j, k + 1]) -
-                                        zuo[i, j, k] * (self.hco.field[i, j, k] - self.heo_cup.field[i, j, k])) * G / dp + \
-                                    (zdo[i, j, k + 1] * (self.hcdo.field[i, j, k + 1] - self.heo_cup.field[i, j, k + 1]) -
-                                        zdo[i, j, k] * (self.hcdo.field[i, j, k] - self.heo_cup.field[i, j, k])) * G / dp * edto[i, j]
-
-                        dellah[i, j, k] += XLF * ((1.0 - self.p_liq_ice.field[i, j, k]) * 0.5 * (self.qrco.field[i, j, k + 1] + self.qrco.field[i, j, k]) -
-                                            self.melting.field[i, j, k]) * G / dp
-
-                        detup = self.up_massdetro.field[i, j, k]
-                        dz = self.zo_cup.field[i, j, k] - self.zo_cup.field[i, j, k - 1]
-                        if k < ktop[i, j]:  # Adjusted for zero-based indexing
-                            dellaqc[i, j, k] = zuo[i, j, k] * self.c1d.field[i, j, k] * self.qrco.field[i, j, k] * dz / dp * G
-                        else:
-                            dellaqc[i, j, k] = detup * 0.5 * (self.qrco.field[i, j, k + 1] + self.qrco.field[i, j, k]) * G / dp
-
-                        g_rain = 0.5 * (self.pwo.field[i, j, k] + self.pwo.field[i, j, k + 1]) * G / dp
-                        e_dn = -0.5 * (self.pwdo.field[i, j, k] + self.pwdo.field[i, j, k + 1]) * G / dp * edto[i, j]
-
-                        c_up = dellaqc[i, j, k] + (zuo[i, j, k + 1] * self.qrco.field[i, j, k + 1] - zuo[i, j, k] * self.qrco.field[i, j, k]) * G / dp + g_rain
-
-                        dellaq[i, j, k] = -(zuo[i, j, k + 1] * (self.qco.field[i, j, k + 1] - self.qo_cup.field[i, j, k + 1]) -
-                                        zuo[i, j, k] * (self.qco.field[i, j, k] - self.qo_cup.field[i, j, k])) * G / dp + \
-                                    (zdo[i, j, k + 1] * (self.qcdo.field[i, j, k + 1] - self.qo_cup.field[i, j, k + 1]) -
-                                        zdo[i, j, k] * (self.qcdo.field[i, j, k] - self.qo_cup.field[i, j, k])) * G / dp * edto[i, j] - \
-                                    c_up + e_dn
-
-        # Initialize mbdt
-        mbdt = 0.1
-
-        # Update xaa0_ens based on dellat_ens and dellaq_ens
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                xaa0_ens[i, j, 0] = 0.0
-
-        # Update xhe, xq, dellat, and xt based on environmental tendencies
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0:
-                    for k in range(kts, ktf + 1):  # Adjust range for zero-based indexing
-                        self.xhe.field[i, j, k] = dellah[i, j, k] * mbdt + self.heo.field[i, j, k]
-                        self.xq.field[i, j, k] = max(1.0e-16, dellaq[i, j, k] * mbdt + qo[i, j, k])
-                        dellat[i, j, k] = (1.0 / CP) * (dellah[i, j, k] - XLV * dellaq[i, j, k])
-                        self.xt.field[i, j, k] = dellat[i, j, k] * mbdt + tn[i, j, k]
-                        self.xt.field[i, j, k] = max(190.0, self.xt.field[i, j, k])
-
-                    # Smooth dellas (HCB)
-                    for k in range(kts + 1, ktf + 1):  # Adjust range for smoothing
-                        self.xt.field[i, j, k] = tn[i, j, k] + 0.25 * (dellat[i, j, k - 1] + 2.0 * dellat[i, j, k] + dellat[i, j, k + 1]) * mbdt
-                        self.xt.field[i, j, k] = max(190.0, self.xt.field[i, j, k])
-                        self.xq.field[i, j, k] = max(1.0e-16, qo[i, j, k] + 0.25 * (dellaq[i, j, k - 1] + 2.0 * dellaq[i, j, k] + dellaq[i, j, k + 1]) * mbdt)
-                        self.xhe.field[i, j, k] = self.heo.field[i, j, k] + 0.25 * (dellah[i, j, k - 1] + 2.0 * dellah[i, j, k] + dellah[i, j, k + 1]) * mbdt
-
-        # Update xhe, xq, and xt for the top level (ktf)
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0:
-                    self.xhe.field[i, j, ktf] = self.heo.field[i, j, ktf]  # Adjusted for zero-based indexing
-                    self.xq.field[i, j, ktf] = qo[i, j, ktf]
-                    self.xt.field[i, j, ktf] = tn[i, j, ktf]
+        self._update_ensemble_and_environmental_tendencies(
+            dellat_ens=self.dellat_ens,
+            dellaq_ens=self.dellaq_ens,
+            dellaqc_ens=self.dellaqc_ens,
+            pwo_ens=self.pwo_ens,
+            dellu=self.dellu,
+            dellv=self.dellv,
+            dellah=self.dellah,
+            dellat=self.dellat,
+            dellaq=self.dellaq,
+            dellaqc=self.dellaqc,
+            po_cup=self.po_cup,
+            edto=edto,
+            zdo=zdo,
+            ucd=self.ucd,
+            vcd=self.vcd,
+            uc=self.uc,
+            vc=self.vc,
+            u_cup=self.u_cup,
+            v_cup=self.v_cup,
+            zuo=zuo,
+            hcdo=self.hcdo,
+            hco=self.hco,
+            heo_cup=self.heo_cup,
+            qcdo=self.qcdo,
+            qco=self.qco,
+            qo_cup=self.qo_cup,
+            pwo=self.pwo,
+            pwdo=self.pwdo,
+            p_liq_ice=self.p_liq_ice,
+            qrco=self.qrco,
+            melting=self.melting,
+            up_massdetro=self.up_massdetro,
+            zo_cup=self.zo_cup,
+            c1d=self.c1d,
+            xhe=self.xhe,
+            heo=self.heo,
+            xq=self.xq,
+            qo=qo,
+            xt=self.xt,
+            tn=tn,
+            ktop=ktop,
+            k_mask=self.k_mask,
+            ierr=ierr,
+        )
 
         self._cup_env(
             z=self.xz,
@@ -2973,6 +2887,11 @@ class GFDeepConvection:
             ierr=ierr,
             k_mask=self.k_mask,
         )
+
+        # Update xaa0_ens based on dellat_ens and dellaq_ens
+        for i in range(its, itf + 1):  # Adjust loop to start at zero
+            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
+                xaa0_ens[i, j, 0] = 0.0
 
         # Parallel loop to update precipitation ensemble
         for i in range(its, itf + 1):  # Adjust loop to start at zero
@@ -3126,7 +3045,7 @@ class GFDeepConvection:
 
         # Call cup_forcing_ens_3d to calculate cloud base mass flux
         cup_forcing_ens_3d(
-            self.closure_n.field, self.xland1.field, self.aa0.field, self.aa1.field, xaa0_ens, mbdt, dtime,
+            self.closure_n.field, self.xland1.field, self.aa0.field, self.aa1.field, xaa0_ens, constants.MBDT, dtime,
             ierr, self.ierr2.field, self.ierr3.field, xf_ens, axx, forcing,
             MAXENS3, mconv, rand_clos,
             self.po_cup.field, ktop, omeg, zdo, zdm, k22, zuo, pr_ens, edto, edtm, kbcon,
@@ -3159,15 +3078,15 @@ class GFDeepConvection:
             for i in range(its, itf + 1):  # Adjust loop to start at zero
                 for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                     if ierr[i, j] == 0:
-                        dellat_ens[i, j, k, 0] = dellat[i, j, k]
-                        dellaq_ens[i, j, k, 0] = dellaq[i, j, k]
-                        dellaqc_ens[i, j, k, 0] = dellaqc[i, j, k]
-                        pwo_ens[i, j, k, 0] = self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
+                        self.dellat_ens.field[i, j, k] = self.dellat.field[i, j, k]
+                        self.dellaq_ens.field[i, j, k] = self.dellaq.field[i, j, k]
+                        self.dellaqc_ens.field[i, j, k] = self.dellaqc.field[i, j, k]
+                        self.pwo_ens.field[i, j, k] = self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
                     else:
-                        dellat_ens[i, j, k, 0] = 0.0
-                        dellaq_ens[i, j, k, 0] = 0.0
-                        dellaqc_ens[i, j, k, 0] = 0.0
-                        pwo_ens[i, j, k, 0] = 0.0
+                        self.dellat_ens.field[i, j, k] = 0.0
+                        self.dellaq_ens.field[i, j, k] = 0.0
+                        self.dellaqc_ens.field[i, j, k] = 0.0
+                        self.pwo_ens.field[i, j, k] = 0.0
 
         # Check if mid-level convection is enabled and closure choice is valid
         if imid == 1 and ichoice <= 2:
@@ -3207,9 +3126,9 @@ class GFDeepConvection:
 
         # Call cup_output_ens_3d to output ensemble results
         cup_output_ens_3d(
-            xff_mid, xf_ens, ierr, dellat_ens, dellaq_ens,
-            dellaqc_ens, outt, outq, outqc, dx,
-            zuo, pre, pwo_ens, xmb, ktop,
+            xff_mid, xf_ens, ierr, self.dellat_ens.field, self.dellaq_ens.field,
+            self.dellaqc_ens.field, outt, outq, outqc, dx,
+            zuo, pre, self.pwo_ens.field, xmb, ktop,
             edto, self.pwdo.field, 'deep', self.ierr2.field, self.ierr3.field,
             self.po_cup.field, pr_ens, MAXENS3,
             self.sig.field, self.closure_n.field, self.xland1.field, xmbm_in, xmbs_in,
@@ -3393,11 +3312,11 @@ class GFDeepConvection:
                     forcing[i, j, 5] = self.sig.field[i, j]  # Adjust index for zero-based indexing
                     pre[i, j] = max(pre[i, j], 0.0)
                     xmb_out[i, j] = xmb[i, j]
-                    outu[i, j, 0] = dellu[i, j, 0] * xmb[i, j]
-                    outv[i, j, 0] = dellv[i, j, 0] * xmb[i, j]
+                    outu[i, j, 0] = self.dellu.field[i, j, 0] * xmb[i, j]
+                    outv[i, j, 0] = self.dellv.field[i, j, 0] * xmb[i, j]
                     for k in range(kts + 1, ktop[i, j] + 1):  # Adjust for zero-based indexing
-                        outu[i, j, k] = 0.25 * (dellu[i, j, k - 1] + 2.0 * dellu[i, j, k] + dellu[i, j, k + 1]) * xmb[i, j]
-                        outv[i, j, k] = 0.25 * (dellv[i, j, k - 1] + 2.0 * dellv[i, j, k] + dellv[i, j, k + 1]) * xmb[i, j]
+                        outu[i, j, k] = 0.25 * (self.dellu.field[i, j, k - 1] + 2.0 * self.dellu.field[i, j, k] + self.dellu.field[i, j, k + 1]) * xmb[i, j]
+                        outv[i, j, k] = 0.25 * (self.dellv.field[i, j, k - 1] + 2.0 * self.dellv.field[i, j, k] + self.dellv.field[i, j, k + 1]) * xmb[i, j]
                 elif ierr[i, j] != 0 or pre[i, j] == 0.0:
                     ktop[i, j] = -1
                     for k in range(kts, kte + 1):  # Adjust for zero-based indexing
@@ -4075,10 +3994,10 @@ def cup_output_ens_3d(xff_mid, xf_ens, ierr, dellat, dellaq, dellaqc,
             if ierr[i, j] == 0:
                 dtpw = 0.0
                 for k in range(kts, ktop[i, j] + 1):  # Zero-based indexing
-                    dtpw += pw[i, j, k, 0]  # Adjusted for zero-based indexing
-                    outtem[i, j, k] = xmb[i, j] * dellat[i, j, k, 0]
-                    outq[i, j, k] = xmb[i, j] * dellaq[i, j, k, 0]
-                    outqc[i, j, k] = xmb[i, j] * dellaqc[i, j, k, 0]
+                    dtpw += pw[i, j, k]  # Adjusted for zero-based indexing
+                    outtem[i, j, k] = xmb[i, j] * dellat[i, j, k]
+                    outq[i, j, k] = xmb[i, j] * dellaq[i, j, k]
+                    outqc[i, j, k] = xmb[i, j] * dellaqc[i, j, k]
                 pre[i, j] += xmb[i, j] * dtpw
 
 

@@ -4351,3 +4351,163 @@ def get_melting_profile_stencil(
     with computation(PARALLEL), interval(...):
         if not (constants.MELT_GLAC and cumulus == constants.CUMULUS_DEEP):
             melting = 0.0
+
+
+def update_ensemble_and_environmental_tendencies(
+    dellat_ens: FloatField, # type: ignore
+    dellaq_ens: FloatField, # type: ignore
+    dellaqc_ens: FloatField, # type: ignore
+    pwo_ens: FloatField, # type: ignore
+    dellu: FloatField, # type: ignore
+    dellv: FloatField, # type: ignore
+    dellah: FloatField, # type: ignore
+    dellat: FloatField, # type: ignore
+    dellaq: FloatField, # type: ignore
+    dellaqc: FloatField, # type: ignore
+    po_cup: FloatField, # type: ignore
+    edto: FloatFieldIJ, # type: ignore
+    zdo: FloatField, # type: ignore
+    ucd: FloatField, # type: ignore
+    vcd: FloatField, # type: ignore
+    uc: FloatField, # type: ignore
+    vc: FloatField, # type: ignore
+    u_cup: FloatField, # type: ignore
+    v_cup: FloatField, # type: ignore
+    zuo: FloatField, # type: ignore
+    hcdo: FloatField, # type: ignore
+    hco: FloatField, # type: ignore
+    heo_cup: FloatField, # type: ignore
+    qcdo: FloatField, # type: ignore
+    qco: FloatField, # type: ignore
+    qo_cup: FloatField, # type: ignore
+    pwo: FloatField, # type: ignore
+    pwdo: FloatField, # type: ignore
+    p_liq_ice: FloatField, # type: ignore
+    qrco: FloatField, # type: ignore
+    melting: FloatField, # type: ignore
+    up_massdetro: FloatField, # type: ignore
+    zo_cup: FloatField, # type: ignore
+    c1d: FloatField, # type: ignore
+    xhe: FloatField, # type: ignore
+    heo: FloatField, # type: ignore
+    xq: FloatField, # type: ignore
+    qo: FloatField, # type: ignore
+    xt: FloatField, # type: ignore
+    tn: FloatField, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+):
+    """
+    Updates ensemble and environmental tendencies after convection calculations.
+    """
+
+    # Initialize ensemble variables and environmental change variables
+    with computation(PARALLEL), interval(...):
+        dellat_ens = 0.0
+        dellaq_ens = 0.0
+        dellaqc_ens = 0.0
+        pwo_ens = 0.0
+        dellu = 0.0
+        dellv = 0.0
+        dellah = 0.0
+        dellat = 0.0
+        dellaq = 0.0
+        dellaqc = 0.0
+
+    # Calculate momentum tendencies and mass flux adjustments
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            dp = 100.0 * (po_cup - po_cup[0, 0, 1])
+            dellu = (
+                constants.PGCD * (edto * zdo[0, 0, 1] * ucd[0, 0, 1] -
+                edto * zdo[0, 0, 1] * u_cup[0, 0, 1]) * constants.G / dp -
+                zuo[0, 0, 1] * (uc[0, 0, 1] - u_cup[0, 0, 1]) * constants.G / dp
+            )
+            dellv = (
+                constants.PGCD * (edto * zdo[0, 0, 1] * vcd[0, 0, 1] -
+                edto * zdo[0, 0, 1] * v_cup[0, 0, 1]) * constants.G / dp -
+                zuo[0, 0, 1] * (vc[0, 0, 1] - v_cup[0, 0, 1]) * constants.G / dp
+            )
+
+    # Calculate momentum tendencies and mass flux adjustments
+    with computation(FORWARD), interval(1, -1):
+        if ierr == 0:
+            if k_mask <= ktop:
+                dp = 100.0 * (po_cup - po_cup[0, 0, 1])
+                dellu = (
+                    -(zuo[0, 0, 1] * (uc[0, 0, 1] - u_cup[0, 0, 1]) -
+                    zuo * (uc - u_cup)) * constants.G / dp +
+                    (zdo[0, 0, 1] * (ucd[0, 0, 1] - u_cup[0, 0, 1]) -
+                    zdo * (ucd - u_cup)) * constants.G / dp * edto * constants.PGCD
+                )
+                dellv = (
+                    -(zuo[0, 0, 1] * (vc[0, 0, 1] - v_cup[0, 0, 1]) -
+                    zuo * (vc - v_cup)) * constants.G / dp +
+                    (zdo[0, 0, 1] * (vcd[0, 0, 1] - v_cup[0, 0, 1]) -
+                    zdo * (vcd - v_cup)) * constants.G / dp * edto * constants.PGCD
+                )
+
+    # Calculate tendencies for heat and moisture
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            dp = 100.0 * (po_cup - po_cup[0, 0, 1])
+            dellah = (edto * zdo[0, 0, 1] * hcdo[0, 0, 1] -
+                 edto * zdo[0, 0, 1] * heo_cup[0, 0, 1]) * constants.G / dp - \
+                 zuo[0, 0, 1] * (hco[0, 0, 1] - heo_cup[0, 0, 1]) * constants.G / dp
+            dellaq = (edto * zdo[0, 0, 1] * qcdo[0, 0, 1] -
+                 edto * zdo[0, 0, 1] * qo_cup[0, 0, 1]) * constants.G / dp - \
+                 zuo[0, 0, 1] * (qco[0, 0, 1] - qo_cup[0, 0, 1]) * constants.G / dp
+            g_rain = 0.5 * (pwo + pwo[0, 0, 1]) * constants.G / dp
+            e_dn = -0.5 * (pwdo + pwdo[0, 0, 1]) * constants.G / dp * edto  # pwdo < 0 and e_dn must > 0
+            dellaq += e_dn - g_rain
+
+    # Calculate tendencies for heat and moisture
+    with computation(FORWARD), interval(1, -1):
+        if ierr == 0:
+            if k_mask <= ktop:
+                dp = 100.0 * (po_cup - po_cup[0, 0, 1])
+                dellah = -(zuo[0, 0, 1] * (hco[0, 0, 1] - heo_cup[0, 0, 1]) -
+                         zuo * (hco - heo_cup)) * constants.G / dp + \
+                         (zdo[0, 0, 1] * (hcdo[0, 0, 1] - heo_cup[0, 0, 1]) -
+                         zdo * (hcdo - heo_cup)) * constants.G / dp * edto
+                dellah += constants.XLF * ((1.0 - p_liq_ice) * 0.5 * (qrco + qrco[0, 0, 1]) -
+                         melting) * constants.G / dp
+                detup = up_massdetro
+                dz = zo_cup - zo_cup[0, 0, -1]
+                if k_mask < ktop:  # Adjusted for zero-based indexing
+                    dellaqc = zuo * c1d * qrco * dz / dp * constants.G
+                else:
+                    dellaqc = detup * 0.5 * (qrco + qrco[0, 0, 1]) * constants.G / dp
+                g_rain = 0.5 * (pwo + pwo[0, 0, 1]) * constants.G / dp
+                e_dn = -0.5 * (pwdo + pwdo[0, 0, 1]) * constants.G / dp * edto
+                c_up = dellaqc + (zuo[0, 0, 1] * qrco[0, 0, 1] - zuo * qrco) * constants.G / dp + g_rain
+                dellaq = -(zuo[0, 0, 1] * (qco[0, 0, 1] - qo_cup[0, 0, 1]) -
+                         zuo * (qco - qo_cup)) * constants.G / dp + \
+                         (zdo[0, 0, 1] * (qcdo[0, 0, 1] - qo_cup[0, 0, 1]) -
+                         zdo * (qcdo - qo_cup)) * constants.G / dp * edto - \
+                         c_up + e_dn
+
+    # Update xhe, xq, dellat, and xt based on environmental tendencies
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            xhe = dellah * constants.MBDT + heo
+            xq = max(1.0e-16, dellaq * constants.MBDT + qo)
+            dellat = (1.0 / constants.CP) * (dellah - constants.XLV * dellaq)
+            xt = dellat * constants.MBDT + tn
+            xt = max(190.0, xt)
+
+    # Update xhe, xq, dellat, and xt based on environmental tendencies
+    with computation(PARALLEL), interval(1, -1):
+        if ierr == 0:
+            xt = tn + 0.25 * (dellat[0, 0, -1] + 2.0 * dellat + dellat[0, 0, 1]) * constants.MBDT
+            xt = max(190.0, xt)
+            xq = max(1.0e-16, qo + 0.25 * (dellaq[0, 0, -1] + 2.0 * dellaq + dellaq[0, 0, 1]) * constants.MBDT)
+            xhe = heo + 0.25 * (dellah[0, 0, -1] + 2.0 * dellah + dellah[0, 0, 1]) * constants.MBDT
+
+    # Update xhe, xq, and xt for the top level
+    with computation(FORWARD), interval(-2, -1):
+        if ierr == 0:
+            xhe = heo
+            xq = qo
+            xt = tn

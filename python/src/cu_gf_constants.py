@@ -48,3 +48,5 @@ ZCUTDOWN = 4000.0 # Set height (m) above which no downdrafts are allowed to orig
 BDISPM = 0.366  # Default value for BDISP over land
 BDISPC = 0.146  # Default value for BDISP over ocean
 C0_ICECONV = 0.01  # Parameter for ice convection
+PGCD = 0.1  # Parameter to modify momentum transport by downdrafts
+MBDT = 0.1
