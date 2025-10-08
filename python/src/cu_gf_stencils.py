@@ -4511,3 +4511,95 @@ def update_ensemble_and_environmental_tendencies(
             xhe = heo
             xq = qo
             xt = tn
+
+def cup_up_aa1bl_stencil(
+    aa0: FloatFieldIJ, # type: ignore
+    t: FloatField, # type: ignore
+    tn: FloatField, # type: ignore
+    q: FloatField, # type: ignore
+    qo: FloatField, # type: ignore
+    dtime: float,
+    z_cup: FloatField, # type: ignore
+    kbcon: FloatField, # type: ignore
+    ierr: int, # type: ignore
+    k_mask: int, # type: ignore
+):
+
+    """
+    Calculates the cloud work function based on boundary layer forcing.
+    """
+
+    with computation(FORWARD), interval(0, 1):
+        aa0 = 0.0
+
+    with computation(FORWARD), interval(0, -1):
+        if ierr == 0:
+            if k_mask >= kbcon:
+                dz = (z_cup[0, 0, 1] - z_cup) * constants.G
+                da = dz * (tn * (1.0 + 0.608 * qo) - t * (1.0 + 0.608 * q)) / dtime
+                aa0 += da
+
+def update_moist_static_energy_and_buoyancy(
+    xhc: FloatField, # type: ignore
+    xdby: FloatField, # type: ignore
+    add_x: FloatFieldIJ, # type: ignore
+    zqexec: FloatFieldIJ, # type: ignore
+    ztexec: FloatFieldIJ, # type: ignore
+    xhkb: FloatFieldIJ, # type: ignore
+    xhe_cup: FloatField, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    start_level: IntFieldIJ32, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    xzu: FloatField, # type: ignore
+    up_massdetro: FloatField, # type: ignore
+    up_massentro: FloatField, # type: ignore
+    xhe: FloatField, # type: ignore
+    p_liq_ice: FloatField, # type: ignore
+    qrco: FloatField, # type: ignore
+    xhes_cup: FloatField, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+):
+    """
+    Updates moist static energy and buoyancy after convection calculations.
+    """
+
+    with computation(PARALLEL), interval(...):
+        xhc = 0.0
+        xdby = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            add_x = constants.XLV * zqexec + constants.CP * ztexec
+            xhkb = get_cloud_bc(
+                array=xhe_cup,
+                k22=k22,
+                add_x=add_x,
+            )
+
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            if k_mask < start_level:
+                xhc = xhe_cup
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            xhc[0, 0, start_level] = xhkb
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            if k_mask > start_level and k_mask <= ktop:
+                xhc = (
+                    (xhc[0, 0, -1] * xzu[0, 0, -1] -
+                    0.5 * up_massdetro[0, 0, -1] * xhc[0, 0, -1] +
+                    up_massentro[0, 0, -1] * xhe[0, 0, -1]) /
+                    (xzu[0, 0, -1] - 0.5 * up_massdetro[0, 0, -1] + up_massentro[0, 0, -1])
+                )
+                xhc += constants.XLF * (1.0 - p_liq_ice) * qrco
+                xdby = xhc - xhes_cup
+
+    with computation(FORWARD), interval(1, None):
+        if ierr == 0:
+            if k_mask > ktop:
+                xhc = xhes_cup
+                xdby = 0.0

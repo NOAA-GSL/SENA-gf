@@ -44,6 +44,8 @@ from cu_gf_stencils import (
     cup_dd_edt_stencil,
     get_melting_profile_stencil,
     update_ensemble_and_environmental_tendencies,
+    cup_up_aa1bl_stencil,
+    update_moist_static_energy_and_buoyancy,
 )
 
 logger = logging.getLogger(__name__)
@@ -1140,6 +1142,16 @@ class GFDeepConvection:
             units="none",
             dtype=state.rkind,
         )
+        self.xhc: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.xhkb: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
 
         # Lookup tables for constants
         self.alpha: Quantity = state.quantity_factory_table.zeros(
@@ -1363,6 +1375,18 @@ class GFDeepConvection:
             externals={},
         )
 
+        self._cup_up_aa1bl = state.stencil_factory.from_dims_halo(
+            func=cup_up_aa1bl_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        self._update_moist_static_energy_and_buoyancy = state.stencil_factory.from_dims_halo(
+            func=update_moist_static_energy_and_buoyancy,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
         # Logging setup time
         end_time = time.perf_counter()
         logging.basicConfig(filename="gf.log", level=logging.DEBUG)
@@ -1513,12 +1537,9 @@ class GFDeepConvection:
         pwdper = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         massflx = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
 
-        # Arrays for environmental and cloud properties
-        xhc = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
 
         # Scalars and arrays for cloud work functions, energy, and other properties
         xaa0_ens = np.zeros((ite - its + 1, jte - jts + 1, 1))
-        xhkb = np.zeros((ite - its + 1, jte - jts + 1,))
         xmb = np.zeros((ite - its + 1, jte - jts + 1,))
         ccnloss = np.zeros((ite - its + 1, jte - jts + 1,))
         sigd = np.zeros((ite - its + 1, jte - jts + 1,))
@@ -2625,16 +2646,22 @@ class GFDeepConvection:
 
 
             if iversion == 1:
+
+                self._cup_up_aa1bl(
+                    aa0=self.aa1_bl,
+                    t=t,
+                    tn=tn,
+                    q=q,
+                    qo=qo,
+                    dtime=dtime,
+                    z_cup=self.zo_cup,
+                    kbcon=kbcon,
+                    ierr=ierr,
+                    k_mask=self.k_mask,
+                )
+
                 # ECMWF version
                 t_star = 1.0
-
-                # Calculate pcape from boundary layer (bl) forcing only
-                cup_up_aa1bl(
-                    self.aa1_bl.field, t, tn, q, qo, dtime,
-                    self.zo_cup.field, zuo, self.dbyo_bl.field, self.gammao_cup_bl.field, self.tn_cup_bl.field,
-                    kbcon, ktop, ierr,
-                    itf, jtf, ktf, its, ite, jts, jte, kts, kte
-                )
 
                 for i in range(its, itf + 1):
                     for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
@@ -2831,49 +2858,27 @@ class GFDeepConvection:
             z1=z1,
         )
 
-        # Initialize xhc and xdby to zero
-        for k in range(kts, ktf + 1):  # Adjust range for zero-based indexing
-            for i in range(its, itf + 1):  # Adjust loop to start at zero
-                for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                    xhc[i, j, k] = 0.0
-                    self.xdby.field[i, j, k] = 0.0
-
-        # Update xhc based on cloud base conditions
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0:
-                    x_add = XLV * self.zqexec.field[i, j] + CP * self.ztexec.field[i, j]
-                    xhkb[i, j] = get_cloud_bc(kte, self.xhe_cup.field[i, j, :kte + 1], xhkb[i, j], k22[i, j], x_add)
-                    for k in range(self.start_level.field[i, j]):  # Loop from 0 to start_level[i, j] - 2
-                        xhc[i, j, k] = self.xhe_cup.field[i, j, k]
-                    k = self.start_level.field[i, j]
-                    xhc[i, j, k] = xhkb[i, j]
-
-        # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
-
-        # Update xhc and xdby based on environmental tendencies
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0:
-                    # Loop through levels from start_level + 1 to ktop
-                    for k in range(self.start_level.field[i, j] + 1, ktop[i, j] + 1):  # Adjust for zero-based indexing
-                        xhc[i, j, k] = (
-                            (xhc[i, j, k - 1] * self.xzu.field[i, j, k - 1] -
-                            0.5 * self.up_massdetro.field[i, j, k - 1] * xhc[i, j, k - 1] +
-                            self.up_massentro.field[i, j, k - 1] * self.xhe.field[i, j, k - 1]) /
-                            (self.xzu.field[i, j, k - 1] - 0.5 * self.up_massdetro.field[i, j, k - 1] + self.up_massentro.field[i, j, k - 1])
-                        )
-
-                        # Include glaciation effects on xhc
-                        xhc[i, j, k] += XLF * (1.0 - self.p_liq_ice.field[i, j, k]) * self.qrco.field[i, j, k]
-
-                        # Update xdby
-                        self.xdby.field[i, j, k] = xhc[i, j, k] - self.xhes_cup.field[i, j, k]
-
-                    # Loop through levels above ktop
-                    for k in range(ktop[i, j] + 1, ktf + 1):  # Adjust for zero-based indexing
-                        xhc[i, j, k] = self.xhes_cup.field[i, j, k]
-                        self.xdby.field[i, j, k] = 0.0
+        self._update_moist_static_energy_and_buoyancy(
+            xhc=self.xhc,
+            xdby=self.xdby,
+            add_x=self.x_add,
+            zqexec=self.zqexec,
+            ztexec=self.ztexec,
+            xhkb=self.xhkb,
+            xhe_cup=self.xhe_cup,
+            k22=k22,
+            start_level=self.start_level,
+            ktop=ktop,
+            xzu=self.xzu,
+            up_massdetro=self.up_massdetro,
+            up_massentro=self.up_massentro,
+            xhe=self.xhe,
+            p_liq_ice=self.p_liq_ice,
+            qrco=self.qrco,
+            xhes_cup=self.xhes_cup,
+            ierr=ierr,
+            k_mask=self.k_mask,
+        )
 
         self._cup_up_aa0(
             aa0=self.xaa0,
@@ -4060,48 +4065,6 @@ def get_cloud_bc(mzp, array, x_aver, k22, add) -> float:
     x_aver += add
 
     return x_aver
-
-
-def cup_up_aa1bl(aa0, t, tn, q, qo, dtime, z_cup, zu, dby, gamma_cup, t_cup, kbcon, ktop, ierr, 
-                 itf, jtf, ktf, its, ite, jts, jte, kts, kte):
-    """
-    Calculates the cloud work function based on boundary layer forcing.
-
-    Parameters:
-        aa0 (array): Cloud work function (output).
-        t (array): Environmental temperature.
-        tn (array): Temperature with forcing effects.
-        q (array): Environmental mixing ratio.
-        qo (array): Mixing ratio with forcing effects.
-        dtime (float): Time step.
-        z_cup (array): Heights of model levels.
-        zu (array): Normalized updraft mass flux.
-        dby (array): Buoyancy term.
-        gamma_cup (array): Gamma on model cloud levels.
-        t_cup (array): Temperature on model cloud levels.
-        kbcon (array): Cloud base level.
-        ktop (array): Cloud top level.
-        ierr (array): Error flag.
-        itf, ktf, its, ite, kts, kte (int): Loop bounds.
-
-    Returns:
-        None: Updates `aa0` in place.
-    """
-    # Initialize aa0
-    for i in range(its, itf + 1):
-        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-            aa0[i, j] = 0.0
-
-    # Calculate cloud work function
-    for i in range(its, itf + 1):
-        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-            for k in range(kts, kbcon[i, j] + 1):  # Match Fortran loop range
-                if ierr[i, j] != 0:
-                    continue
-                dz = (z_cup[i, j, k + 1] - z_cup[i, j, k]) * 9.81  # Gravitational acceleration
-                da = dz * (tn[i, j, k] * (1.0 + 0.608 * qo[i, j, k]) -
-                        t[i, j, k] * (1.0 + 0.608 * q[i, j, k])) / dtime
-                aa0[i, j] += da
 
 
 def get_cloud_top(name, ktop, ierr, p_cup, entr_rate_2d, hkbo, heo, heso_cup, z_cup, 
