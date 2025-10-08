@@ -46,6 +46,7 @@ from cu_gf_stencils import (
     update_ensemble_and_environmental_tendencies,
     cup_up_aa1bl_stencil,
     update_moist_static_energy_and_buoyancy,
+    cup_maximi_stencil,
 )
 
 logger = logging.getLogger(__name__)
@@ -1383,6 +1384,12 @@ class GFDeepConvection:
 
         self._update_moist_static_energy_and_buoyancy = state.stencil_factory.from_dims_halo(
             func=update_moist_static_energy_and_buoyancy,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        self._cup_maximi = state.stencil_factory.from_dims_halo(
+            func=cup_maximi_stencil,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
         )
@@ -2935,24 +2942,14 @@ class GFDeepConvection:
                 self.ierr3.field[i, j] = ierr[i, j]
                 self.k22x.field[i, j] = k22[i, j]
 
-        # Call cup_maximi to determine maximum indices
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{self.kbmax.field[0]:>4}{self.k22x.field[0]:>4}")
-        # print(f"")
-        # for k in range(kte+1):
-        #     print(f"{self.heo_cup.field[0,k]:>20.12E}")
-
-        cup_maximi(
-            self.heo_cup.field, 1, self.kbmax.field, self.k22x.field, ierr,
-            itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte
+        self._cup_maximi(
+            array=self.heo_cup,
+            ks=1,
+            ke=self.kbmax,
+            maxx=self.k22x,
+            ierr=ierr,
+            k_mask=self.k_mask,
         )
-
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{self.kbmax.field[0]:>4}{self.k22x.field[0]:>4}")
-        # print(f"")
-        # for k in range(kte+1):
-        #     print(f"{self.heo_cup.field[0,k]:>20.12E}")
 
         # Set loop iteration and call cup_kbcon to determine convective cloud base
         iloop_in = 2
@@ -3736,68 +3733,6 @@ def cup_forcing_ens_3d(closure_n, xland, aa0, aa1, xaa0, mbdt, dtime, ierr, ierr
         xf_dicycle[:, :] = 0.0
 
 
-def cup_maximi(array, ks, ke, maxx, ierr, itf, jtf, ktf, its, ite, jts, jte, kts, kte):
-    """
-    Determines the level at which the maximum value in an array occurs.
-
-    Parameters:
-        array (ndarray): Input 2D array with dimensions (ite - its + 1, jte - jts + 1, kte - kts + 1).
-        ks (int): Starting level for the search.
-        ke (ndarray): Ending level for each grid point.
-        maxx (ndarray): Output array of indices where the maximum value occurs for each grid point.
-        ierr (ndarray): Error values for each grid point.
-        itf, ktf, its, ite, kts, kte (int): Grid dimensions.
-
-    Returns:
-        None: The `maxx` array is modified in place.
-    """
-    # Initialize local array x with zeros
-    x = np.zeros((ite - its + 1, jte - jts + 1), dtype=array.dtype)
-
-    # Iterate over each grid point
-    for i in range(its, itf + 1):
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-            maxx[i, j] = ks  # Initialize maxx with the starting level ks
-            if ierr[i, j] == 0:
-                x[i, j] = array[i, j, ks]  # Initialize x[i, j] with the value at level ks
-                for k in range(ks, ke[i, j] + 1):  # Iterate from ks to ke[i, j]
-                    xar = array[i, j, k]
-                    if xar >= x[i, j]:
-                        x[i, j] = xar
-                        maxx[i, j] = k
-
-
-def cup_minimi(array, ks, kend, kt, ierr, itf, jtf, ktf, its, ite, jts, jte, kts, kte):
-    """
-    Determines the level at which the minimum value in an array occurs.
-
-    Parameters:
-        array (ndarray): Input 2D array with dimensions (ite - its + 1, jte - jts + 1, kte - kts + 1).
-        ks (ndarray): Starting level for the search (1D array).
-        kend (ndarray): Ending level for each grid point (1D array).
-        kt (ndarray): Output array of indices where the minimum value occurs for each grid point.
-        ierr (ndarray): Error values for each grid point.
-        itf, ktf, its, ite, kts, kte (int): Grid dimensions.
-
-    Returns:
-        None: The `kt` array is modified in place.
-    """
-    # Initialize local array x with zeros
-    x = np.zeros((ite - its + 1, jte - jts + 1), dtype=array.dtype)
-
-    # Iterate over each grid point
-    for i in range(its, itf + 1):
-        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-            kt[i, j] = ks[i, j]  # Initialize kt with the starting level ks
-            if ierr[i, j] == 0:
-                x[i, j] = array[i, j, ks[i, j]]  # Initialize x[i, j] with the value at level ks[i, j]
-                kstop = max(ks[i, j] + 1, kend[i, j])  # Determine the stopping level
-                for k in range(ks[i, j] + 1, kstop + 1):  # Iterate from ks[i, j] + 1 to kstop
-                    if array[i, j, k] < x[i, j]:
-                        x[i, j] = array[i, j, k]
-                        kt[i, j] = k
-
-
 def neg_check(name, j, dt, q, outq, outt, outu, outv, outqc, pret, its, ite, jts, jte, kts, kte, itf, jtf, ktf, ktop):
     """
     Checks for negative or excessive tendencies and corrects them in a mass-conserving way.
@@ -4004,129 +3939,3 @@ def cup_output_ens_3d(xff_mid, xf_ens, ierr, dellat, dellaq, dellaqc,
                     outq[i, j, k] = xmb[i, j] * dellaq[i, j, k]
                     outqc[i, j, k] = xmb[i, j] * dellaqc[i, j, k]
                 pre[i, j] += xmb[i, j] * dtpw
-
-
-def satvap(temp2):
-    """
-    Calculates the saturation vapor pressure based on temperature.
-    
-    Parameters:
-        temp2 (float): Temperature in Kelvin.
-    
-    Returns:
-        float: Saturation vapor pressure.
-    """
-    temp = temp2 - 273.155
-    if temp < -20.0:  # Ice saturation
-        toot = 273.16 / temp2
-        toto = 1 / toot
-        eilog = (-9.09718 * (toot - 1) 
-                 - 3.56654 * (math.log(toot) / math.log(10)) 
-                 + 0.876793 * (1 - toto) 
-                 + (math.log(6.1071) / math.log(10)))
-        satvap = 10 ** eilog
-    else:  # Water saturation
-        tsot = 373.16 / temp2
-        ewlog = (-7.90298 * (tsot - 1) 
-                 + 5.02808 * (math.log(tsot) / math.log(10)))
-        ewlog2 = (ewlog 
-                  - 1.3816e-07 * (10 ** (11.344 * (1 - (1 / tsot))) - 1))
-        ewlog3 = (ewlog2 
-                  + 0.0081328 * (10 ** (-3.49149 * (tsot - 1)) - 1))
-        ewlog4 = ewlog3 + (math.log(1013.246) / math.log(10))
-        satvap = 10 ** ewlog4
-    
-    return satvap
-
-def get_cloud_bc(mzp, array, x_aver, k22, add) -> float:
-    """
-    Calculates the average value of a variable at the updraft originating level.
-
-    Parameters:
-        mzp (int): Maximum vertical levels.
-        array (list or numpy array): Input array of values.
-        x_aver (float): Output variable to store the calculated average.
-        k22 (int): Updraft originating level.
-        add (float): Value to add to the calculated average.
-
-    Returns:
-        None: The result is stored in `x_aver`.
-    """
-    # Define the order of averaging
-    order_aver = 3  # Average between k22, k22-1, and k22-2
-    local_order_aver = min(k22 + 1, order_aver)
-
-    # Calculate the average
-    x_aver = 0.0
-    for i in range(local_order_aver):
-        x_aver += array[k22 - i]
-
-    x_aver /= float(local_order_aver)
-    x_aver += add
-
-    return x_aver
-
-
-def get_cloud_top(name, ktop, ierr, p_cup, entr_rate_2d, hkbo, heo, heso_cup, z_cup, 
-                  kstabi, k22, kbcon, its, ite, itf, jts, jte, jtf, kts, kte, ktf, zuo, kpbl, klcl, hcot):
-    """
-    Calculates the cloud top height.
-
-    Parameters:
-
-        name (str): Type of convection (e.g., 'shallow', 'mid', 'deep').
-        ktop (array): Output array for cloud top levels.
-        ierr (array): Error flags for each column.
-        p_cup, entr_rate_2d, hkbo, heo, heso_cup, z_cup (2D arrays): Profiles for pressure, entrainment rates, etc.
-        kstabi, k22, kbcon, kpbl, klcl (1D arrays): Indices for various levels.
-        its, ite, itf, kts, kte, ktf (int): Loop bounds.
-        zuo (2D array): Updraft mass flux.
-        hcot (2D array): Output array for cloud top heights.
-
-    Returns:
-        None: Updates `ktop` and `hcot` in place.
-    """
-    FIND_KTOP_OPTION = 1  # Option for finding cloud top
-
-    dbythresh = 0.8  # Threshold for determining cloud top
-    dby = np.zeros(kte - kts + 1)
-
-    if name in ['shallow', 'mid']:
-        dbythresh = 1.0
-
-    for i in range(its, itf + 1):
-        for j in range(jts, jtf + 1):
-            kfinalzu = ktf - 2
-            ktop[i, j] = kfinalzu
-            if ierr[i, j] == 0:
-                dby[:] = 0.0
-
-                start_level = kbcon[i, j]
-                hcot[i, j, kts:start_level + 1] = hkbo[i, j]
-
-                dz = z_cup[i, j, start_level] - z_cup[i, j, start_level - 1]
-                dby[start_level] = (hcot[i, j, start_level] - heso_cup[i, j, start_level]) * dz
-
-                for k in range(start_level + 1, ktf - 1):
-                    dz = z_cup[i, j, k] - z_cup[i, j, k - 1]
-                    hcot[i, j, k] = ((1.0 - 0.5 * entr_rate_2d[i, j, k - 1] * dz) * hcot[i, j, k - 1] +
-                                entr_rate_2d[i, j, k - 1] * dz * heo[i, j, k - 1]) / \
-                                (1.0 + 0.5 * entr_rate_2d[i, j, k - 1] * dz)
-                    dby[k] = dby[k - 1] + (hcot[i, j, k] - heso_cup[i, j, k]) * dz
-
-                if FIND_KTOP_OPTION == 0:
-                    for k in range(np.argmax(dby), ktf - 1):
-                        if dby[k] < dbythresh * np.max(dby):
-                            kfinalzu = k - 1
-                            ktop[i, j] = kfinalzu
-                            break
-                else:
-                    for k in range(start_level + 1, ktf - 1):
-                        if hcot[i, j, k] < heso_cup[i, j, k]:
-                            kfinalzu = k - 1
-                            ktop[i, j] = kfinalzu
-                            break
-
-                if kfinalzu <= kbcon[i, j] + 1:
-                    ierr[i, j] = 41
-

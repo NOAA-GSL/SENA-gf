@@ -4603,3 +4603,24 @@ def update_moist_static_energy_and_buoyancy(
             if k_mask > ktop:
                 xhc = xhes_cup
                 xdby = 0.0
+
+def cup_maximi_stencil(
+    array: FloatField, # type: ignore
+    ks: int,
+    ke: IntFieldIJ32, # type: ignore
+    maxx: IntFieldIJ32, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+):
+    """
+    Determines the level at which the maximum value in an array occurs.
+    """
+
+    with computation(FORWARD), interval(0, 1):
+        maxx = ks
+
+    with computation(FORWARD), interval(1, -1):
+        if ierr == 0:
+            if k_mask >= ks and k_mask <= ke:
+                if array.at(K=k_mask) > array.at(K=maxx):
+                    maxx = k_mask
