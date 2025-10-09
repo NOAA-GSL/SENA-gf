@@ -5,7 +5,11 @@ from ndsl.quantity import Quantity
 from ndsl.constants import X_DIM, Y_DIM, Z_DIM
 from gf_state import GFState
 
-from cu_gf_stencils import (initialize_driver, initialize_driver_temporaries)
+from cu_gf_stencils import (
+    initialize_driver,
+    initialize_driver_temporaries,
+    neg_check_stencil,
+)
 import cu_gf_constants as constants
 from cu_gf_sh import GFShallowConvection
 from cu_gf_deep import GFDeepConvection
@@ -462,6 +466,11 @@ class GFDriver:
             dtype=state.ikind,
         )
         self.jmin.field[:, :] = -1
+        self.qmemf: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="n/a",
+            dtype=state.rkind,
+        )
 
         # Initialize a k-mask for selecting "this vertical level"
         self.k_mask: Quantity = state.quantity_factory.zeros(
@@ -504,6 +513,12 @@ class GFDriver:
 
         self._initialize_driver_temporaries = state.stencil_factory.from_dims_halo(
             func=initialize_driver_temporaries,
+            compute_dims=(X_DIM, Y_DIM, Z_DIM),
+            externals={},
+        )
+
+        self._neg_check = state.stencil_factory.from_dims_halo(
+            func=neg_check_stencil,
             compute_dims=(X_DIM, Y_DIM, Z_DIM),
             externals={},
         )
@@ -718,24 +733,7 @@ class GFDriver:
         trcflx_in1 = np.zeros(km)  # Tracer flux
         clw_in1 = np.zeros(km)  # Cloud water input
 
-        massflx = np.zeros(km)  # Mass flux array
-        trcflx_in1 = np.zeros(km)  # Tracer flux array
-        clw_in1 = np.zeros(km)  # Cloud water input array
-
         cnvwts = np.zeros((im, jm, km))  # Convective tendencies (shallow convection)
-
-        massflx = np.zeros(km)  # Mass flux
-        trcflx_in1 = np.zeros(km)  # Tracer flux
-        clw_in1 = np.zeros(km)  # Cloud water input
-
-        clw_ten = np.zeros((im, jm, km))  # Cloud water tendencies
-        po_cup = np.zeros(km)  # Pressure at cloud levels
-
-        po_cup = np.zeros(km)  # Pressure at cloud levels
-
-        massflx = np.zeros(km)  # Mass flux array
-        trcflx_in1 = np.zeros(km)  # Tracer flux array
-        clw_in1 = np.zeros(km)  # Cloud water input array
 
         cliw_idx = 0
 
@@ -938,9 +936,19 @@ class GFDriver:
                             self.ierr.field[i, j] = 555
 
             # Call `neg_check` for GF shallow convection
-            neg_check(
-                "shallow", ipn, dt, self.qcheck.field, self.outqs.field, self.outts.field, self.outus.field, self.outvs.field, self.outqcs.field, self.prets.field,
-                its, ite, jts, jte, kts, kte, itf, jtf, ktf, self.ktops.field
+            self._neg_check(
+                cumulus=constants.CUMULUS_SHALLOW,
+                dt=dt,
+                q=self.qcheck,
+                outq=self.outqs,
+                outt=self.outts,
+                outu=self.outus,
+                outv=self.outvs,
+                outqc=self.outqcs,
+                pret=self.prets,
+                ktop=self.ktops,
+                qmemf=self.qmemf,
+                k_mask=self.k_mask,
             )
 
         ipr = 0
@@ -1021,9 +1029,19 @@ class GFDriver:
                         self.qcheck.field[i, j, k] = self.qv.field[i, j, k] + self.outqs.field[i, j, k] * dt
 
             # Call `neg_check` for middle GF convection
-            neg_check(
-                "mid", ipn, dt, self.qcheck.field, self.outqm.field, self.outtm.field, self.outum.field, self.outvm.field,
-                self.outqcm.field, self.pretm.field, its, ite, jts, jte, kts, kte, itf, jtf, ktf, self.ktopm.field
+            self._neg_check(
+                cumulus=constants.CUMULUS_MID,
+                dt=dt,
+                q=self.qcheck,
+                outq=self.outqm,
+                outt=self.outtm,
+                outu=self.outum,
+                outv=self.outvm,
+                outqc=self.outqcm,
+                pret=self.pretm,
+                ktop=self.ktopm,
+                qmemf=self.qmemf,
+                k_mask=self.k_mask,
             )
 
         if ideep == 1:
@@ -1105,9 +1123,19 @@ class GFDriver:
                         self.qcheck.field[i, j, k] = self.qv.field[i, j, k] + (self.outqs.field[i, j, k] + self.outqm.field[i, j, k]) * dt
 
             # Call `neg_check` for deep GF convection
-            neg_check(
-                "deep", ipn, dt, self.qcheck.field, self.outq.field, self.outt.field, self.outu.field, self.outv.field,
-                self.outqc.field, self.pret.field, its, ite, jts, jte, kts, kte, itf, jtf, ktf, self.ktop.field
+            self._neg_check(
+                cumulus=constants.CUMULUS_DEEP,
+                dt=dt,
+                q=self.qcheck,
+                outq=self.outq,
+                outt=self.outt,
+                outu=self.outu,
+                outv=self.outv,
+                outqc=self.outqc,
+                pret=self.pret,
+                ktop=self.ktop,
+                qmemf=self.qmemf,
+                k_mask=self.k_mask,
             )
 
         # Initialize `kcnv` and update related arrays

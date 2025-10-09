@@ -3464,20 +3464,20 @@ def fct1d3(ktop, n, dt, z, tracr, massflx, trflx_in, dellac, g):
 
     for k in range(ktop + 1):  # Adjust for zero-based indexing
         dtovdz[k] = 0.01 * dt / abs(z[k + 1] - z[k]) * g  # Time step / grid spacing
-        if z[k] == z[k + 1]:
-            error = True
+        # if z[k] == z[k + 1]:
+        #     error = True
 
     for k in range(1, ktop + 1):  # Start from 1 for zero-based indexing
         if massflx[k] >= 0.0:
             flx_lo[k] = massflx[k] * tracr[k - 1]  # Low-order flux, upstream
         else:
             flx_lo[k] = massflx[k] * tracr[k]      # Low-order flux, upstream
-        antifx[k] = trflx_in[k] - flx_lo[k]        # Antidiffusive flux
+        # antifx[k] = trflx_in[k] - flx_lo[k]        # Antidiffusive flux
 
     flx_lo[0] = trflx_in[0]
     flx_lo[ktop + 1] = trflx_in[ktop + 1]
-    antifx[0] = 0.0
-    antifx[ktop + 1] = 0.0
+    # antifx[0] = 0.0
+    # antifx[ktop + 1] = 0.0
 
     for k in range(ktop + 1):  # Adjust for zero-based indexing
         totlout[k] = max(0.0, flx_lo[k + 1]) - min(0.0, flx_lo[k])  # Total flux out
@@ -3495,7 +3495,7 @@ def fct1d3(ktop, n, dt, z, tracr, massflx, trflx_in, dellac, g):
         flx_lo[ktop + 1] = flx_lo[ktop + 1] * clipout[ktop]
 
     for k in range(ktop + 1):  # Adjust for zero-based indexing
-        soln_lo[k] = tracr[k] - (flx_lo[k + 1] - flx_lo[k]) * dtovdz[k]  # Low-order solution
+        # soln_lo[k] = tracr[k] - (flx_lo[k + 1] - flx_lo[k]) * dtovdz[k]  # Low-order solution
         dellac[k] = -(flx_lo[k + 1] - flx_lo[k]) * dtovdz[k] / dt
 
 
@@ -3688,86 +3688,6 @@ def cup_forcing_ens_3d(closure_n, xland, aa0, aa1, xaa0, mbdt, dtime, ierr, ierr
                 xf_dicycle[i, j] = xf_ens[i, j, 9] - xf_dicycle[i, j]  # Adjusted for zero-based indexing
     else:
         xf_dicycle[:, :] = 0.0
-
-
-def neg_check(name, j, dt, q, outq, outt, outu, outv, outqc, pret, its, ite, jts, jte, kts, kte, itf, jtf, ktf, ktop):
-    """
-    Checks for negative or excessive tendencies and corrects them in a mass-conserving way.
-
-    Parameters:
-        name (str): Name of the convection type ('shallow', 'mid', etc.).
-        j (int): Index for debugging or tracking.
-        dt (float): Time step.
-        q (ndarray): Input array of specific humidity (2D array).
-        outq, outt, outu, outv, outqc (ndarray): Output tendency arrays (2D arrays).
-        pret (ndarray): Precipitation array (1D array).
-        its, ite, kts, kte, itf, ktf (int): Grid dimensions and flags.
-        ktop (ndarray): Top level of convection for each grid point (1D array).
-
-    Returns:
-        None: The arrays `outq`, `outt`, `outu`, `outv`, `outqc`, and `pret` are modified in place.
-    """
-
-    # itf = (itf + 1) * (jtf + 1) - 1
-    # ite = itf
-
-    # Initialize thresholds
-    thresh = 300.01
-    names = 1.0
-    if name in ['shallow', 'mid']:
-        thresh = 148.01
-        names = 1.0
-    scalef = 86400.0
-
-    # First check on vertical heating rate
-    for i in range(its, itf + 1):
-        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-            if ktop[i, j] <= 1:
-                continue
-            icheck = 0
-            qmemf = 1.0
-            qmem = 0.0
-            for k in range(kts, ktop[i, j] + 1):
-                qmem = outt[i, j, k] * scalef
-                if qmem > thresh:
-                    qmem2 = thresh / qmem
-                    qmemf = min(qmemf, qmem2)
-                    icheck = 1
-                if qmem < -0.5 * thresh * names:
-                    qmem2 = -0.5 * names * thresh / qmem
-                    qmemf = min(qmemf, qmem2)
-                    icheck = 2
-            for k in range(kts, ktop[i, j] + 1):
-                outq[i, j, k] *= qmemf
-                outt[i, j, k] *= qmemf
-                outu[i, j, k] *= qmemf
-                outv[i, j, k] *= qmemf
-                outqc[i, j, k] *= qmemf
-            pret[i, j] *= qmemf
-
-    # Check for negative tendencies
-    thresh = 1.0e-32
-    for i in range(its, itf + 1):
-        for j in range(jts, jtf + 1):  # Adjusted to retain the same number of iterations
-            if ktop[i, j] <= 1:
-                continue
-            qmemf = 1.0
-            for k in range(kts, ktop[i, j] + 1):
-                qmem = outq[i, j, k]
-                if abs(qmem) > 0.0 and q[i, j, k] > 1.0e-6:
-                    qtest = q[i, j, k] + outq[i, j, k] * dt
-                    if qtest < thresh:
-                        qmem1 = abs(outq[i, j, k])
-                        qmem2 = abs((thresh - q[i, j, k]) / dt)
-                        qmemf = min(qmemf, qmem2 / qmem1)
-                        qmemf = max(0.0, qmemf)
-            for k in range(kts, ktop[i, j] + 1):
-                outq[i, j, k] *= qmemf
-                outt[i, j, k] *= qmemf
-                outu[i, j, k] *= qmemf
-                outv[i, j, k] *= qmemf
-                outqc[i, j, k] *= qmemf
-            pret[i, j] *= qmemf
 
 
 def cup_output_ens_3d(xff_mid, xf_ens, ierr, dellat, dellaq, dellaqc,

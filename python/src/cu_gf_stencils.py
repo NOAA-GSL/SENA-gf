@@ -4672,3 +4672,85 @@ def rain_evap_below_cloudbase_stencil(
                             outq += del_q
                             outt += del_t
                             pre -= evap_bcb
+
+def neg_check_stencil(
+    cumulus: int,
+    dt: float,
+    q: FloatField, # type: ignore
+    outq: FloatField, # type: ignore
+    outt: FloatField, # type: ignore
+    outu: FloatField, # type: ignore
+    outv: FloatField, # type: ignore
+    outqc: FloatField, # type: ignore
+    pret: FloatFieldIJ, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    qmemf: FloatFieldIJ, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+):
+    """
+    Checks for negative or excessive tendencies and corrects them in a mass-conserving way.
+    """
+
+    with computation(PARALLEL), interval(...):
+        if cumulus==constants.CUMULUS_DEEP:
+            thresh = 300.01
+        else:
+            thresh = 148.01
+        names = 1.0
+        scalef = 86400.0
+        qmem = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        qmemf = 1.0
+
+    with computation(FORWARD), interval(...):
+        if ktop > 1:
+            if k_mask <= ktop:
+                qmem = outt * scalef
+                if qmem > thresh:
+                    qmem2 = thresh / qmem
+                    qmemf = min(qmemf, qmem2)
+                if qmem < -0.5 * thresh * names:
+                    qmem2 = -0.5 * names * thresh / qmem
+                    qmemf = min(qmemf, qmem2)
+
+    with computation(PARALLEL), interval(...):
+        if ktop > 1:
+            if k_mask <= ktop:
+                outq *= qmemf
+                outt *= qmemf
+                outu *= qmemf
+                outv *= qmemf
+                outqc *= qmemf
+
+    with computation(FORWARD), interval(0, 1):
+        if ktop > 1:
+            pret *= qmemf
+
+    with computation(FORWARD), interval(...):
+        thresh = 1.0e-32
+        qmemf = 1.0
+
+    with computation(FORWARD), interval(...):
+        if ktop > 1:
+            if k_mask <= ktop:
+                if abs(outq) > 0.0 and q > 1.0e-6:
+                    qtest = q + outq * dt
+                    if qtest < thresh:
+                        qmem1 = abs(outq)
+                        qmem2 = abs((thresh - q) / dt)
+                        qmemf = min(qmemf, qmem2 / qmem1)
+                        qmemf = max(0.0, qmemf)
+
+    with computation(PARALLEL), interval(...):
+        if ktop > 1:
+            if k_mask <= ktop:
+                outq *= qmemf
+                outt *= qmemf
+                outu *= qmemf
+                outv *= qmemf
+                outqc *= qmemf
+
+    with computation(FORWARD), interval(0, 1):
+        if ktop > 1:
+            pret *= qmemf
