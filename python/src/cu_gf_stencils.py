@@ -4624,3 +4624,51 @@ def cup_maximi_stencil(
             if k_mask >= ks and k_mask <= ke:
                 if array.at(K=k_mask) > array.at(K=maxx):
                     maxx = k_mask
+
+def rain_evap_below_cloudbase_stencil(
+    ierr: IntFieldIJ32, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    psur: FloatFieldIJ, # type: ignore
+    xland: FloatFieldIJ, # type: ignore
+    qo_cup: FloatField, # type: ignore
+    po_cup: FloatField, # type: ignore
+    qes_cup: FloatField, # type: ignore
+    pre: FloatFieldIJ, # type: ignore
+    outt: FloatField, # type: ignore
+    outq: FloatField, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+):
+    from __externals__ import ( # type: ignore
+        alp1,
+        alp2,
+        alp3,
+        c_conv,
+    )
+
+    with computation(PARALLEL), interval(...):
+        net_prec_bcb = 0.0
+        evap_bcb = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        net_prec_bcb[0, 0, kbcon] = pre
+
+    with computation(BACKWARD), interval(0, -1):
+        if ierr == 0:
+            if k_mask < kbcon:
+                q_deficit = max(0.0, (0.9 * xland + 0.7 * (1 - xland)) * qes_cup - qo_cup)
+                if q_deficit < 1.e-6:
+                    net_prec_bcb = net_prec_bcb[0, 0, 1]
+                else:
+                    dp = 100.0 * (po_cup - po_cup[0, 0, 1])
+                    evap_bcb = (c_conv * alp1 * q_deficit *
+                                (sqrt(po_cup / psur) / alp2 * net_prec_bcb[0, 0, 1] / c_conv)**alp3)
+                    evap_bcb *= dp / constants.G
+
+                    if (net_prec_bcb[0, 0, 1] - evap_bcb) >= 0.0:
+                        if (pre - evap_bcb) >= 0.0:
+                            net_prec_bcb = net_prec_bcb[0, 0, 1] - evap_bcb
+                            del_q = evap_bcb * constants.G / dp
+                            del_t = -evap_bcb * constants.G / dp * (constants.XLV / constants.CP)
+                            outq += del_q
+                            outt += del_t
+                            pre -= evap_bcb

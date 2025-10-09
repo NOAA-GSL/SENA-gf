@@ -47,6 +47,7 @@ from cu_gf_stencils import (
     cup_up_aa1bl_stencil,
     update_moist_static_energy_and_buoyancy,
     cup_maximi_stencil,
+    rain_evap_below_cloudbase_stencil,
 )
 
 logger = logging.getLogger(__name__)
@@ -1392,6 +1393,16 @@ class GFDeepConvection:
             func=cup_maximi_stencil,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
+        )
+        self._rain_evap_below_cloud_base = state.stencil_factory.from_dims_halo(
+            func=rain_evap_below_cloudbase_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={
+                "alp1": 5.44e-4,
+                "alp2": 5.09e-3,
+                "alp3": 0.5777,
+                "c_conv": 0.05,
+            },
         )
 
         # Logging setup time
@@ -3150,18 +3161,19 @@ class GFDeepConvection:
         # for k in range(MAXENS3):
         #     print(f"{xf_ens[0,k]:>20.12E}{pr_ens[0,k]:>20.12E}")
 
-        # print("pre(1): ", pre[0], "xmb(0): ", xmb[0])
-
-        # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
-
-        # Call rain_evap_below_cloudbase to calculate evaporation below cloud base
-        rain_evap_below_cloudbase(
-            itf, jtf, ktf, its, ite, jts, jte,
-            kts, kte, ierr, kbcon, xmb, psur, xland, self.qo_cup.field,
-            self.po_cup.field, self.qes_cup.field, self.pwavo.field, edto, self.pwevo.field, pre, outt, outq
+        self._rain_evap_below_cloud_base(
+            ierr=ierr,
+            kbcon=kbcon,
+            psur=psur,
+            xland=xland,
+            qo_cup=self.qo_cup,
+            po_cup=self.po_cup,
+            qes_cup=self.qes_cup,
+            pre=pre,
+            outt=outt,
+            outq=outq,
+            k_mask=self.k_mask,
         )
-        # print("pre(1): ", pre[0], "xmb(0): ", xmb[0])
-        # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
 
         if do_smoke_transport and nchem > 0:
             # Initialize tracers if they exist
@@ -3485,61 +3497,6 @@ def fct1d3(ktop, n, dt, z, tracr, massflx, trflx_in, dellac, g):
     for k in range(ktop + 1):  # Adjust for zero-based indexing
         soln_lo[k] = tracr[k] - (flx_lo[k + 1] - flx_lo[k]) * dtovdz[k]  # Low-order solution
         dellac[k] = -(flx_lo[k + 1] - flx_lo[k]) * dtovdz[k] / dt
-
-
-def rain_evap_below_cloudbase(itf, jtf, ktf, its, ite, jts, jte, kts, kte, ierr, kbcon, xmb, psur, xland, qo_cup, 
-                              po_cup, qes_cup, pwavo, edto, pwevo, pre, outt, outq):
-    import numpy as np
-
-    # Constants
-    alp1 = 5.44e-4  # 1/sec
-    alp2 = 5.09e-3  # unitless
-    alp3 = 0.5777   # unitless
-    c_conv = 0.05   # conv fraction area, unitless
-    g = 9.81        # gravitational acceleration (m/s^2)
-    xlv = 2.5e6     # latent heat of vaporization (J/kg)
-    cp = 1004.0     # specific heat capacity of air (J/kg/K)
-
-    # Initialize arrays
-    evap_bcb = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-    net_prec_bcb = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-    tot_evap_bcb = np.zeros((ite - its + 1, jte - jts + 1))
-
-    for i in range(its, itf + 1):  # Zero-based indexing
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-            if ierr[i, j] != 0:
-                continue
-
-            RH_cr = 0.9 * xland[i, j] + 0.7 * (1 - xland[i, j])
-            k = kbcon[i, j]
-            net_prec_bcb[i, j, k] = pre[i, j]
-
-            for k in range(kbcon[i, j] - 1, kts - 1, -1):  # Reverse loop
-                q_deficit = max(0.0, RH_cr * qes_cup[i, j, k] - qo_cup[i, j, k])
-
-                if q_deficit < 1.e-6:
-                    net_prec_bcb[i, j, k] = net_prec_bcb[i, j, k + 1]
-                    continue
-
-                dp = 100.0 * (po_cup[i, j, k] - po_cup[i, j, k + 1])
-                evap_bcb[i, j, k] = c_conv * alp1 * q_deficit * \
-                                    (np.sqrt(po_cup[i, j, k] / psur[i, j]) / alp2 * net_prec_bcb[i, j, k + 1] / c_conv)**alp3
-                evap_bcb[i, j, k] *= dp / g
-
-                if (net_prec_bcb[i, j, k + 1] - evap_bcb[i, j, k]) < 0.0:
-                    continue
-                if (pre[i, j] - evap_bcb[i, j, k]) < 0.0:
-                    continue
-
-                net_prec_bcb[i, j, k] = net_prec_bcb[i, j, k + 1] - evap_bcb[i, j, k]
-                tot_evap_bcb[i, j] += evap_bcb[i, j, k]
-
-                del_q = evap_bcb[i, j, k] * g / dp
-                del_t = -evap_bcb[i, j, k] * g / dp * (xlv / cp)
-
-                outq[i, j, k] += del_q
-                outt[i, j, k] += del_t
-                pre[i, j] -= evap_bcb[i, j, k]
 
 
 def cup_forcing_ens_3d(closure_n, xland, aa0, aa1, xaa0, mbdt, dtime, ierr, ierr2, ierr3,
