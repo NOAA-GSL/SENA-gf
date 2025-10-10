@@ -15,6 +15,7 @@ from gf_state import GFState
 
 from cu_gf_stencils import (
     initialize_deep_temporaries,
+    initialize_deep_ens_temporaries,
     initialize_deep_convection,
     cup_env_stencil,
     cup_env_clev_stencil,
@@ -48,6 +49,9 @@ from cu_gf_stencils import (
     update_moist_static_energy_and_buoyancy,
     cup_maximi_stencil,
     rain_evap_below_cloudbase_stencil,
+    cup_output_ens_3d_part1_stencil,
+    cup_output_ens_3d_part2_stencil,
+    cup_output_ens_3d_part3_stencil,
 )
 
 logger = logging.getLogger(__name__)
@@ -1154,6 +1158,37 @@ class GFDeepConvection:
             units="none",
             dtype=state.rkind,
         )
+        self.xmb: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.dtpw: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.pr_ens: Quantity = state.quantity_factory_ens.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.xf_ens: Quantity = state.quantity_factory_ens.zeros(
+            dims=[X_DIM, Y_DIM, Z_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.xmb_ave: Quantity = state.quantity_factory_ens.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.clos_wei: Quantity = state.quantity_factory_ens.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+
 
         # Lookup tables for constants
         self.alpha: Quantity = state.quantity_factory_table.zeros(
@@ -1190,6 +1225,12 @@ class GFDeepConvection:
 
         self._initialize_deep_temporaries = state.stencil_factory.from_dims_halo(
             func=initialize_deep_temporaries,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        self._initialize_deep_ens_temporaries = state.stencil_factory_ens.from_dims_halo(
+            func=initialize_deep_ens_temporaries,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
         )
@@ -1405,6 +1446,22 @@ class GFDeepConvection:
             },
         )
 
+        self._cup_output_ens_3d_part1 = state.stencil_factory.from_dims_halo(
+            func=cup_output_ens_3d_part1_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+        self._cup_output_ens_3d_part2 = state.stencil_factory_ens.from_dims_halo(
+            func=cup_output_ens_3d_part2_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+        self._cup_output_ens_3d_part3 = state.stencil_factory.from_dims_halo(
+            func=cup_output_ens_3d_part3_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
         # Logging setup time
         end_time = time.perf_counter()
         logging.basicConfig(filename="gf.log", level=logging.DEBUG)
@@ -1533,7 +1590,8 @@ class GFDeepConvection:
         c1_max = 0.0
         pgcon = 0.0
         blqe = 0.0
-        xff_mid = np.zeros((ite - its + 1, jte - jts + 1, 2))
+        xff_mid0 = 0.0
+        xff_mid1 = 0.0
         hkbo_bl = np.zeros((ite - its + 1, jte - jts + 1,))
         hco_bl = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         chem = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1, nchem))
@@ -1558,7 +1616,6 @@ class GFDeepConvection:
 
         # Scalars and arrays for cloud work functions, energy, and other properties
         xaa0_ens = np.zeros((ite - its + 1, jte - jts + 1, 1))
-        xmb = np.zeros((ite - its + 1, jte - jts + 1,))
         ccnloss = np.zeros((ite - its + 1, jte - jts + 1,))
         sigd = np.zeros((ite - its + 1, jte - jts + 1,))
 
@@ -1578,10 +1635,6 @@ class GFDeepConvection:
         qevap = np.zeros((ite - its + 1, jte - jts + 1,))
         rn = np.zeros((ite - its + 1, jte - jts + 1,))
         qcond = np.zeros((ite - its + 1, jte - jts + 1,))
-
-        # Initialize ensemble arrays for each grid point and ensemble member
-        xf_ens = np.zeros((ite - its + 1, jte - jts + 1, MAXENS3))  # maxens3 is used for the second dimension
-        pr_ens = np.zeros((ite - its + 1, jte - jts + 1, MAXENS3))  # maxens3 is used for the second dimension
 
         # Scalars for rain evaporation and energy calculations
         rain = 0.0
@@ -1821,6 +1874,11 @@ class GFDeepConvection:
             tau_ecmwf = self.tau_ecmwf,
             wmean = self.wmean,
             tau_bl = self.tau_bl,
+        )
+
+        self._initialize_deep_ens_temporaries(
+            pr_ens=self.pr_ens,
+            xf_ens=self.xf_ens,
         )
 
         self._initialize_deep_convection(
@@ -2924,27 +2982,27 @@ class GFDeepConvection:
                     for k in range(kts, ktop[i, j] + 1):  # Adjust range for zero-based indexing
                         for nens3 in range(MAXENS3):  # Loop over ensemble members
                             if nens3 == 6:
-                                pr_ens[i, j, nens3] += self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
+                                self.pr_ens.field[i, j, nens3] += self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
                             elif nens3 == 7:
-                                pr_ens[i, j, nens3] += self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
+                                self.pr_ens.field[i, j, nens3] += self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
                             elif nens3 == 8:
-                                pr_ens[i, j, nens3] += self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
+                                self.pr_ens.field[i, j, nens3] += self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
                             else:
-                                pr_ens[i, j, nens3] += self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
+                                self.pr_ens.field[i, j, nens3] += self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
 
                     # Check for small normalized condensate
-                    if pr_ens[i, j, 6] < 1.e-6:  # Adjust index for zero-based indexing
+                    if self.pr_ens.field[i, j, 6] < 1.e-6:  # Adjust index for zero-based indexing
                         ierr[i, j] = 18
                         # Optional error message for non-OpenACC environments
                         # ierrc[i, j] = "total normalized condensate too small"
                         # ierrc[i, j] = "total normalized condensate too small"
                         for nens3 in range(MAXENS3):
-                            pr_ens[i, j, nens3] = 0.0
+                            self.pr_ens.field[i, j, nens3] = 0.0
 
                     # Ensure precipitation ensemble values are above threshold
                     for nens3 in range(MAXENS3):
-                        if pr_ens[i, j, nens3] < 1.e-5:
-                            pr_ens[i, j, nens3] = 0.0
+                        if self.pr_ens.field[i, j, nens3] < 1.e-5:
+                            self.pr_ens.field[i, j, nens3] = 0.0
 
         # Initialize auxiliary variables for error handling and indices
         for i in range(its, itf + 1):  # Adjust loop to start at zero
@@ -3059,9 +3117,9 @@ class GFDeepConvection:
         # Call cup_forcing_ens_3d to calculate cloud base mass flux
         cup_forcing_ens_3d(
             self.closure_n.field, self.xland1.field, self.aa0.field, self.aa1.field, xaa0_ens, constants.MBDT, dtime,
-            ierr, self.ierr2.field, self.ierr3.field, xf_ens, axx, forcing,
+            ierr, self.ierr2.field, self.ierr3.field, self.xf_ens.field, axx, forcing,
             MAXENS3, mconv, rand_clos,
-            self.po_cup.field, ktop, omeg, zdo, zdm, k22, zuo, pr_ens, edto, edtm, kbcon,
+            self.po_cup.field, ktop, omeg, zdo, zdm, k22, zuo, self.pr_ens.field, edto, edtm, kbcon,
             ichoice,
             imid, ipr, itf, jtf, ktf,
             its, ite, jts, jte, kts, kte,
@@ -3106,8 +3164,8 @@ class GFDeepConvection:
             # Update boundary layer quantities
             for i in range(its, itf + 1):  # Adjust loop to start at zero
                 for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                    xff_mid[i, j, 0] = 0.0
-                    xff_mid[i, j, 1] = 0.0
+                    xff_mid0 = 0.0
+                    xff_mid1 = 0.0
                     if ierr[i, j] == 0:
                         blqe = 0.0
                         trash = 0.0
@@ -3115,51 +3173,52 @@ class GFDeepConvection:
                             for k in range(kpbl[i, j] + 1):  # Loop through boundary layer levels
                                 blqe += 100.0 * dhdt[i, j, k] * (self.po_cup.field[i, j, k] - self.po_cup.field[i, j, k + 1]) / G
                             trash = max((self.hco.field[i, j, kbcon[i, j]] - self.heo_cup.field[i, j, kbcon[i, j]]), 1.0e1)
-                            xff_mid[i, j, 0] = max(0.0, blqe / trash)
-                            xff_mid[i, j, 0] = min(0.1, xff_mid[i, j, 0])
-                        xff_mid[i, j, 1] = min(0.1, 0.03 * self.zws.field[i, j])
-                        forcing[i, j, 0] = xff_mid[i, j, 0]
-                        forcing[i, j, 1] = xff_mid[i, j, 1]
-
-        # print("pre(1): ", pre[0], "xmb(0): ", xmb[0])
-        # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
-
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{MAXENS3:>4}{ichoice:>4}{imid:>4}{ipr:>4}{dicycle:>4}{xland1[0]:>4}")
-        # print(f"{xff_mid[0,1]:>20.12E}{xff_mid[0,1]:>20.12E}{dx[0]:>20.12E}{xmb[0]:>20.12E}{closure_n[0]:>20.12E}{sig[0]:>20.12E}{xmbm_in[0]:>20.12E}{xmbs_in[0]:>20.12E}")
-        # print(f"{xf_dicycle[0]:>20.12E}{pre[0]:>20.12E}{edto[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{dellat_ens[0,k,0]:>20.12E}{dellaq_ens[0,k,0]:>20.12E}{dellaqc_ens[0,k,0]:>20.12E}{outt[0,k]:>20.12E}{outq[0,k]:>20.12E}")
-        # print("")
-        # for k in range(kte+1):
-        #     print(f"{outqc[0,k]:>20.12E}{zuo[0,k]:>20.12E}{pwo_ens[0,k,0]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{self.pwdo.field[0,k]:>20.12E}")
-        # for k in range(MAXENS3):
-        #     print(f"{xf_ens[0,k]:>20.12E}{pr_ens[0,k]:>20.12E}")
-
+                            xff_mid0 = max(0.0, blqe / trash)
+                            xff_mid0 = min(0.1, xff_mid0)
+                        xff_mid1 = min(0.1, 0.03 * self.zws.field[i, j])
+                        forcing[i, j, 0] = xff_mid0
+                        forcing[i, j, 1] = xff_mid1
 
         # Call cup_output_ens_3d to output ensemble results
-        cup_output_ens_3d(
-            xff_mid, xf_ens, ierr, self.dellat_ens.field, self.dellaq_ens.field,
-            self.dellaqc_ens.field, outt, outq, outqc, dx,
-            zuo, pre, self.pwo_ens.field, xmb, ktop,
-            edto, self.pwdo.field, 'deep', self.ierr2.field, self.ierr3.field,
-            self.po_cup.field, pr_ens, MAXENS3,
-            self.sig.field, self.closure_n.field, self.xland1.field, xmbm_in, xmbs_in,
-            ichoice, imid, ipr, itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte,
-            dicycle, self.xf_dicycle.field
+        self._cup_output_ens_3d_part1(
+            outtem=outt,
+            outq=outq,
+            outqc=outqc,
+            pre=pre,
+            xmb=self.xmb,
         )
-
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{MAXENS3:>4}{ichoice:>4}{imid:>4}{ipr:>4}{dicycle:>4}{xland1[0]:>4}")
-        # print(f"{xff_mid[0,1]:>20.12E}{xff_mid[0,1]:>20.12E}{dx[0]:>20.12E}{xmb[0]:>20.12E}{closure_n[0]:>20.12E}{sig[0]:>20.12E}{xmbm_in[0]:>20.12E}{xmbs_in[0]:>20.12E}")
-        # print(f"{xf_dicycle[0]:>20.12E}{pre[0]:>20.12E}{edto[0]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{dellat_ens[0,k,0]:>20.12E}{dellaq_ens[0,k,0]:>20.12E}{dellaqc_ens[0,k,0]:>20.12E}{outt[0,k]:>20.12E}{outq[0,k]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{outqc[0,k]:>20.12E}{zuo[0,k]:>20.12E}{pwo_ens[0,k,0]:>20.12E}{self.po_cup.field[0,k]:>20.12E}{self.pwdo.field[0,k]:>20.12E}")
-        # for k in range(MAXENS3):
-        #     print(f"{xf_ens[0,k]:>20.12E}{pr_ens[0,k]:>20.12E}")
+        self._cup_output_ens_3d_part2(
+            pr_ens=self.pr_ens,
+            xf_ens=self.xf_ens,
+            imid=imid,
+            ichoice=ichoice,
+            xmb_ave=self.xmb_ave,
+            xmb=self.xmb,
+            xmbs_in=xmbs_in,
+            dicycle=dicycle,
+            xf_dicycle=self.xf_dicycle,
+            clos_wei=self.clos_wei,
+            sig=self.sig,
+            closure_n=self.closure_n,
+            xff_mid0=xff_mid0,
+            xff_mid1=xff_mid1,
+            ierr=ierr,
+        )
+        self._cup_output_ens_3d_part3(
+            dtpw=self.dtpw,
+            pw=self.pwo_ens,
+            ktop=ktop,
+            outtem=outt,
+            outq=outq,
+            outqc=outqc,
+            pre=pre,
+            xmb=self.xmb,
+            dellat=self.dellat,
+            dellaq=self.dellaq,
+            dellaqc=self.dellaqc,
+            ierr=ierr,
+            k_mask=self.k_mask,
+        )
 
         self._rain_evap_below_cloud_base(
             ierr=ierr,
@@ -3246,7 +3305,7 @@ class GFDeepConvection:
                             for k in range(ktf):  # Adjust range for zero-based indexing
                                 dp = 100.0 * (self.po_cup.field[i, j, k] - self.po_cup.field[i, j, k + 1])
                                 chem_psum[i, j, nv] += chem_pw[i, j, k, nv] * G
-                            chem_psum[i, j, nv] *= xmb[i, j] * dtime
+                            chem_psum[i, j, nv] *= self.xmb.field[i, j] * dtime
 
             dellac[:, :, :, :] = 0.0
 
@@ -3255,10 +3314,10 @@ class GFDeepConvection:
                     for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                         if ierr[i, j] == 0:
                             dp = 100.0 * (self.po_cup.field[i, j, 0] - self.po_cup.field[i, j, 1])
-                            dellac[i, j, 0, nv] += (edto[i, j] * zdo[i, j, 1] * chem_down[i, j, 1, nv]) * G / dp * xmb[i, j]
+                            dellac[i, j, 0, nv] += (edto[i, j] * zdo[i, j, 1] * chem_down[i, j, 1, nv]) * G / dp * self.xmb.field[i, j]
                             if k22[i, j] == 1:
                                 entupk = zuo[i, j, 1]
-                                dellac[i, j, 0, nv] -= entupk * chem_cup[i, j, 1, nv] * G / dp * xmb[i, j]
+                                dellac[i, j, 0, nv] -= entupk * chem_cup[i, j, 1, nv] * G / dp * self.xmb.field[i, j]
                             for k in range(kts + 1, ktop[i, j]):  # Adjust for zero-based indexing
                                 detup = 0.0
                                 detdo = 0.0
@@ -3276,8 +3335,8 @@ class GFDeepConvection:
                                 if k == jmin[i, j]:
                                     entdoj = edto[i, j] * zdo[i, j, k] * chem_cup[i, j, k, nv]
                                 # Mass budget
-                                dellac[i, j, k, nv] += (detup + detdo - entdo - entup - entdoj) * G / dp * xmb[i, j]
-                            dellac[i, j, ktop[i, j], nv] = zuo[i, j, ktop[i, j]] * chem_up[i, j, ktop[i, j], nv] * G / dp * xmb[i, j]
+                                dellac[i, j, k, nv] += (detup + detdo - entdo - entup - entdoj) * G / dp * self.xmb.field[i, j]
+                            dellac[i, j, ktop[i, j], nv] = zuo[i, j, ktop[i, j]] * chem_up[i, j, ktop[i, j], nv] * G / dp * self.xmb.field[i, j]
 
             # fct for subsidence
             dellac2[:, :, :, :] = 0.0
@@ -3293,7 +3352,7 @@ class GFDeepConvection:
                             for k in range(kts, ktop[i, j] + 1):  # Adjust for zero-based indexing
                                 dp = 100.0 * (self.po_cup.field[i, j, k] - self.po_cup.field[i, j, k + 1])
                                 dtime_max = min(dtime_max, 0.5 * dp)
-                                massflx[i, j, k] = -xmb[i, j] * (zuo[i, j, k] - edto[i, j] * zdo[i, j, k])
+                                massflx[i, j, k] = -self.xmb.field[i, j] * (zuo[i, j, k] - edto[i, j] * zdo[i, j, k])
                                 trcflx_in[k] = massflx[i, j, k] * chem_cup[i, j, k, nv]
                             trcflx_in[0] = 0.0
                             massflx[i, j, 0] = 0.0
@@ -3325,12 +3384,12 @@ class GFDeepConvection:
                 if ierr[i, j] == 0 and pre[i, j] > 0.0:
                     forcing[i, j, 5] = self.sig.field[i, j]  # Adjust index for zero-based indexing
                     pre[i, j] = max(pre[i, j], 0.0)
-                    xmb_out[i, j] = xmb[i, j]
-                    outu[i, j, 0] = self.dellu.field[i, j, 0] * xmb[i, j]
-                    outv[i, j, 0] = self.dellv.field[i, j, 0] * xmb[i, j]
+                    xmb_out[i, j] = self.xmb.field[i, j]
+                    outu[i, j, 0] = self.dellu.field[i, j, 0] * self.xmb.field[i, j]
+                    outv[i, j, 0] = self.dellv.field[i, j, 0] * self.xmb.field[i, j]
                     for k in range(kts + 1, ktop[i, j] + 1):  # Adjust for zero-based indexing
-                        outu[i, j, k] = 0.25 * (self.dellu.field[i, j, k - 1] + 2.0 * self.dellu.field[i, j, k] + self.dellu.field[i, j, k + 1]) * xmb[i, j]
-                        outv[i, j, k] = 0.25 * (self.dellv.field[i, j, k - 1] + 2.0 * self.dellv.field[i, j, k] + self.dellv.field[i, j, k + 1]) * xmb[i, j]
+                        outu[i, j, k] = 0.25 * (self.dellu.field[i, j, k - 1] + 2.0 * self.dellu.field[i, j, k] + self.dellu.field[i, j, k + 1]) * self.xmb.field[i, j]
+                        outv[i, j, k] = 0.25 * (self.dellv.field[i, j, k - 1] + 2.0 * self.dellv.field[i, j, k] + self.dellv.field[i, j, k + 1]) * self.xmb.field[i, j]
                 elif ierr[i, j] != 0 or pre[i, j] == 0.0:
                     ktop[i, j] = -1
                     for k in range(kts, kte + 1):  # Adjust for zero-based indexing
@@ -3353,7 +3412,7 @@ class GFDeepConvection:
                     if ierr[i, j] == 0:
                         for k in range(ktop[i, j], -1, -1):  # Reverse loop for zero-based indexing
                             rain = self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
-                            rntot[i, j] += rain * xmb[i, j] * 0.001 * dtime
+                            rntot[i, j] += rain * self.xmb.field[i, j] * 0.001 * dtime
 
             for i in range(its, itf + 1):  # Adjust loop to start at zero
                 for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
@@ -3365,7 +3424,7 @@ class GFDeepConvection:
                             evef = self.edt.field[i, j] * evfactl * self.sig.field[i, j]**2
                         for k in range(ktop[i, j], -1, -1):  # Reverse loop for zero-based indexing
                             rain = self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
-                            rn[i, j] += rain * xmb[i, j] * 0.001 * dtime
+                            rn[i, j] += rain * self.xmb.field[i, j] * 0.001 * dtime
                             if flg[i, j]:
                                 q1 = qo[i, j, k] + (outq[i, j, k]) * dtime
                                 t1 = tn[i, j, k] + (outt[i, j, k]) * dtime
@@ -3391,7 +3450,7 @@ class GFDeepConvection:
                 if ierr[i, j] == 0:
                     if AEROEVAP > 1:
                         # Aerosol scavenging
-                        ccnloss[i, j] = ccn[i, j] * self.pefc.field[i, j] * xmb[i, j]
+                        ccnloss[i, j] = ccn[i, j] * self.pefc.field[i, j] * self.xmb.field[i, j]
                         ccn[i, j] -= ccnloss[i, j] * SCAV_FACTOR
 
         # Add heating due to kinetic energy dissipation (from ECMWF)
@@ -3688,131 +3747,3 @@ def cup_forcing_ens_3d(closure_n, xland, aa0, aa1, xaa0, mbdt, dtime, ierr, ierr
                 xf_dicycle[i, j] = xf_ens[i, j, 9] - xf_dicycle[i, j]  # Adjusted for zero-based indexing
     else:
         xf_dicycle[:, :] = 0.0
-
-
-def cup_output_ens_3d(xff_mid, xf_ens, ierr, dellat, dellaq, dellaqc,
-                      outtem, outq, outqc, dx, zu, pre, pw, xmb, ktop,
-                      edt, pwd, name, ierr2, ierr3, p_cup, pr_ens,
-                      maxens3, sig, closure_n, xland1, xmbm_in, xmbs_in,
-                      ichoice, imid, ipr, itf, jtf, ktf,
-                      its, ite, jts, jte, kts, kte,
-                      dicycle, xf_dicycle):
-    """
-    Calculates final output fields including physical tendencies, precipitation, and mass-flux.
-
-    Parameters:
-        xff_mid (ndarray): Mid-level forcing array (2D array of size (ite - its + 1, jte - jts + 1, 2)).
-        xf_ens (ndarray): Ensemble mass fluxes (3D array of size (ite - its + 1, jte - jts + 1, maxens3)).
-        ierr (ndarray): Error values for each grid point (1D array of size ite - its + 1).
-        dellat, dellaq, dellaqc (ndarray): Change of temperature, q, and qc per unit mass flux (3D arrays).
-        outtem, outq, outqc (ndarray): Output tendencies for temperature, q, and qc (2D arrays).
-        dx, zu, pre, pw, xmb (ndarray): Various input/output arrays for calculations.
-        ktop (ndarray): Top level of convection for each grid point (1D array of size ite - its + 1).
-        edt, pwd, sig, closure_n (ndarray): Additional input/output arrays.
-        p_cup, pr_ens (ndarray): Pressure and precipitation ensemble arrays.
-        maxens3 (int): Maximum number of ensembles.
-        xland1 (ndarray): Land-sea mask (1D array).
-        ichoice, imid, ipr, itf, ktf, its, ite, kts, kte (int): Grid dimensions and flags.
-        dicycle (int): Diurnal cycle flag.
-        xf_dicycle (ndarray): Diurnal cycle mass flux (1D array).
-
-    Returns:
-        None: The arrays are modified in place.
-    """
-    # Initialize local variables
-    pre2 = np.zeros((ite - its + 1, jte - jts + 1), dtype=np.float64)  # Array for precipitation adjustments
-    xmb_ave = np.zeros((ite - its + 1, jte - jts + 1), dtype=np.float64)  # Array for average mass flux
-    pwtot = np.zeros((ite - its + 1, jte - jts + 1), dtype=np.float64)  # Array for total precipitable water
-
-    # Scalars for calculations
-    clos_wei = 0.0
-    dtt = 0.0
-    dp = 0.0
-    dtq = 0.0
-    dtqc = 0.0
-    dtpw = 0.0
-    dtpwd = 0.0
-
-    # Initialize `outtem`, `outq`, and `outqc` arrays to 0
-    for k in range(kts, kte + 1):  # Adjust for zero-based indexing
-        for i in range(its, ite + 1):  # Zero-based indexing for i loop
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                outtem[i, j, k] = 0.0
-                outq[i, j, k] = 0.0
-                outqc[i, j, k] = 0.0
-
-    # Initialize `pre` and `xmb` arrays to 0
-    for i in range(its, itf + 1):  # Zero-based indexing for i loop
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-            pre[i, j] = 0.0
-            xmb[i, j] = 0.0
-
-    # Check and update `xf_ens` based on `pr_ens`
-    for i in range(its, itf + 1):  # Zero-based indexing for i loop
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-            if ierr[i, j] == 0:
-                for n in range(maxens3):  # Zero-based indexing for n loop
-                    if pr_ens[i, j, n] <= 0.0:
-                        xf_ens[i, j, n] = 0.0
-
-    if imid == 0:
-        # print("pre(1): ", pre[0], "xmb(0): ", xmb[0], "xf_dicycle(0): ", xf_dicycle[0], "closure_n(0): ", closure_n[0])
-
-        # Kernel for deep convection
-        for i in range(its, itf + 1):  # Zero-based indexing
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0:
-                    k = 0
-                    xmb_ave[i, j] = 0.0
-                    for n in range(maxens3):  # Zero-based indexing for ensembles
-                        k += 1
-                        xmb_ave[i, j] += xf_ens[i, j, n]
-                    xmb_ave[i, j] /= float(k)
-                    if dicycle == 2:
-                        xmb_ave[i, j] -= max(0.0, xmbs_in[i, j])
-                        xmb_ave[i, j] = max(0.0, xmb_ave[i, j])
-                    elif dicycle == 1:
-                        xmb_ave[i, j] -= xf_dicycle[i, j]
-                        xmb_ave[i, j] = max(0.0, xmb_ave[i, j])
-                    clos_wei = 16.0 / max(1.0, closure_n[i, j])
-                    xmb_ave[i, j] = min(xmb_ave[i, j], 100.0)
-                    xmb[i, j] = clos_wei * sig[i, j] * xmb_ave[i, j]
-                    if xmb[i, j] < 1.0e-16:
-                        ierr[i, j] = 19
-    else:
-        # Kernel for mid-level convection
-        for i in range(its, itf + 1):  # Zero-based indexing
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                xmb_ave[i, j] = 0.0
-                if ierr[i, j] == 0:
-                    if ichoice == 1 or ichoice == 2:
-                        xmb_ave[i, j] = sig[i, j] * xff_mid[i, j, ichoice - 1]
-                    elif ichoice > 2:
-                        k = 0
-                        for n in range(maxens3):  # Zero-based indexing for ensembles
-                            k += 1
-                            xmb_ave[i, j] += xf_ens[i, j, n]
-                        xmb_ave[i, j] /= float(k)
-                    elif ichoice == 0:
-                        xmb_ave[i, j] = 0.5 * sig[i, j] * (xff_mid[i, j, 0] + xff_mid[i, j, 1])  # Zero-based indexing
-                    if dicycle == 2:
-                        xmb[i, j] = max(0.0, xmb_ave[i, j] - xmbs_in[i, j])
-                    elif dicycle == 1:
-                        xmb[i, j] = xmb_ave[i, j] - xf_dicycle[i, j]
-                        xmb[i, j] = max(0.0, xmb[i, j])
-                    elif dicycle == 0:
-                        xmb[i, j] = max(0.0, xmb_ave[i, j])
-
-    # print("pre(1): ", pre[0], "xmb(0): ", xmb[0], "xf_dicycle(0): ", xf_dicycle[0], "closure_n(0): ", closure_n[0])
-
-    # Loop over grid points to calculate tendencies and precipitation
-    for i in range(its, itf + 1):  # Zero-based indexing
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-            if ierr[i, j] == 0:
-                dtpw = 0.0
-                for k in range(kts, ktop[i, j] + 1):  # Zero-based indexing
-                    dtpw += pw[i, j, k]  # Adjusted for zero-based indexing
-                    outtem[i, j, k] = xmb[i, j] * dellat[i, j, k]
-                    outq[i, j, k] = xmb[i, j] * dellaq[i, j, k]
-                    outqc[i, j, k] = xmb[i, j] * dellaqc[i, j, k]
-                pre[i, j] += xmb[i, j] * dtpw

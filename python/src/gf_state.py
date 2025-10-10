@@ -5,6 +5,8 @@ from ndsl import StencilFactory, QuantityFactory
 from ndsl.boilerplate import get_factories_single_tile
 from ndsl.constants import X_DIM, Y_DIM, Z_DIM
 
+import cu_gf_constants as constants
+
 class GFState:
     # def __init__(self, rkind=np.float64, ikind=np.int32, backend="numpy"):
     def __init__(self, rkind=np.float64, ikind=np.int32, backend="dace:cpu"):
@@ -949,6 +951,7 @@ class GFState:
         if not self.is_allocated:
             self.stencil_factory, self.quantity_factory = get_factories_single_tile(self.im, self.jm, self.km, 0, backend=self.backend)
             self.stencil_factory_table, self.quantity_factory_table = get_factories_single_tile(1, 1, 30, 0, backend=self.backend)
+            self.stencil_factory_ens, self.quantity_factory_ens = get_factories_single_tile(self.im, self.jm, constants.MAXENS3, 0, backend=self.backend)
 
             # Get garea
             self.garea = self.quantity_factory.zeros(

@@ -885,6 +885,18 @@ def initialize_deep_temporaries(
         dbyo_bl = 0.0
         xdby = 0.0
 
+def initialize_deep_ens_temporaries(
+  pr_ens: FloatField, # type: ignore
+  xf_ens: FloatField, # type: ignore
+):
+    """
+    Initialize deep convection temporary ens variables.
+    """
+
+    with computation(PARALLEL), interval(...):
+        pr_ens = 0.0
+        xf_ens = 0.0
+
 
 def initialize_driver(
     aod_gf: FloatFieldIJ, # type: ignore
@@ -4754,3 +4766,149 @@ def neg_check_stencil(
     with computation(FORWARD), interval(0, 1):
         if ktop > 1:
             pret *= qmemf
+
+
+def cup_output_ens_3d_part1_stencil(
+    outtem: FloatField, # type: ignore
+    outq: FloatField, # type: ignore
+    outqc: FloatField, # type: ignore
+    pre: FloatFieldIJ, # type: ignore
+    xmb: FloatFieldIJ, # type: ignore
+):
+    """
+    Calculates final output fields including physical tendencies, precipitation, and mass-flux.
+    """
+
+    with computation(PARALLEL), interval(...):
+        outtem = 0.0
+        outq = 0.0
+        outqc = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        pre = 0.0
+        xmb = 0.0
+
+
+def cup_output_ens_3d_part2_stencil(
+    pr_ens: FloatField, # type: ignore
+    xf_ens: FloatField, # type: ignore
+    imid: int, # type: ignore
+    ichoice: int, # type: ignore
+    xmb_ave: FloatFieldIJ, # type: ignore
+    xmb: FloatFieldIJ, # type: ignore
+    xmbs_in: FloatFieldIJ, # type: ignore
+    dicycle: int, # type: ignore
+    xf_dicycle: FloatFieldIJ, # type: ignore
+    clos_wei: FloatFieldIJ, # type: ignore
+    sig: FloatFieldIJ, # type: ignore
+    closure_n: FloatFieldIJ, # type: ignore
+    xff_mid0: float, # type: ignore
+    xff_mid1: float, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+):
+    """
+    Calculates final output fields including physical tendencies, precipitation, and mass-flux.
+    """
+
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            if pr_ens <= 0.0:
+                xf_ens = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        xmb = 0.0
+        xmb_ave = 0.0
+        clos_wei = 0.0
+
+    with computation(FORWARD), interval(...):
+        if imid == 0:
+            if ierr == 0:
+                xmb_ave += xf_ens
+
+    with computation(FORWARD), interval(0, 1):
+        if imid == 0:
+            if ierr == 0:
+                xmb_ave /= constants.MAXENS3
+
+    with computation(FORWARD), interval(0, 1):
+        if imid == 0:
+            if ierr == 0:
+                if dicycle == 2:
+                    xmb_ave -= max(0.0, xmbs_in)
+                    xmb_ave = max(0.0, xmb_ave)
+                elif dicycle == 1:
+                    xmb_ave -= xf_dicycle
+                    xmb_ave = max(0.0, xmb_ave)
+                clos_wei = 16.0 / max(1.0, closure_n)
+                xmb_ave = min(xmb_ave, 100.0)
+                xmb = clos_wei * sig * xmb_ave
+                if xmb < 1.0e-16:
+                    ierr = 19
+
+    with computation(FORWARD), interval(0, 1):
+        if imid != 0:
+            if ierr == 0:
+                if ichoice == 1:
+                    xmb_ave = sig * xff_mid0
+                elif ichoice == 2:
+                    xmb_ave = sig * xff_mid1
+
+    with computation(FORWARD), interval(...):
+        if imid !=0:
+            if ierr == 0:
+                if ichoice > 2:
+                    xmb_ave += xf_ens
+
+    with computation(FORWARD), interval(0, 1):
+        if imid != 0:
+            if ierr == 0:
+                if ichoice > 2:
+                    xmb_ave /= constants.MAXENS3
+
+    with computation(FORWARD), interval(0, 1):
+        if imid != 0:
+            if ierr == 0:
+                if ichoice == 0:
+                    xmb_ave = 0.5 * sig * (xff_mid0 + xff_mid1)  # Zero-based indexing
+                if dicycle == 2:
+                    xmb = max(0.0, xmb_ave - xmbs_in)
+                elif dicycle == 1:
+                    xmb = xmb_ave - xf_dicycle
+                    xmb = max(0.0, xmb)
+                elif dicycle == 0:
+                    xmb = max(0.0, xmb_ave)
+
+
+def cup_output_ens_3d_part3_stencil(
+    dtpw: FloatFieldIJ, # type: ignore
+    pw: FloatField, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    outtem: FloatField, # type: ignore
+    outq: FloatField, # type: ignore
+    outqc: FloatField, # type: ignore
+    pre: FloatFieldIJ, # type: ignore
+    xmb: FloatFieldIJ, # type: ignore
+    dellat: FloatField, # type: ignore
+    dellaq: FloatField, # type: ignore
+    dellaqc: FloatField, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+):
+    """
+    Calculates final output fields including physical tendencies, precipitation, and mass-flux.
+    """
+
+    with computation(FORWARD), interval(0, 1):
+        dtpw = 0.0
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if k_mask <= ktop:
+                dtpw += pw
+                outtem = xmb * dellat
+                outq = xmb * dellaq
+                outqc = xmb * dellaqc
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            pre += xmb * dtpw

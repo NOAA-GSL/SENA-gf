@@ -50,3 +50,4 @@ BDISPC = 0.146  # Default value for BDISP over ocean
 C0_ICECONV = 0.01  # Parameter for ice convection
 PGCD = 0.1  # Parameter to modify momentum transport by downdrafts
 MBDT = 0.1
+MAXENS3 = 16  # Maximum number of ensembles for closures

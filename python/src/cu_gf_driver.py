@@ -1,6 +1,6 @@
 import numpy as np
 
-from cu_gf_deep import neg_check, fct1d3
+from cu_gf_deep import fct1d3
 from ndsl.quantity import Quantity
 from ndsl.constants import X_DIM, Y_DIM, Z_DIM
 from gf_state import GFState
