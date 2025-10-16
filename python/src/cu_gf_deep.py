@@ -52,6 +52,8 @@ from cu_gf_stencils import (
     cup_output_ens_3d_part1_stencil,
     cup_output_ens_3d_part2_stencil,
     cup_output_ens_3d_part3_stencil,
+    cup_forcing_ens_3d_part1_stencil,
+    cup_forcing_ens_3d_part2_stencil,
 )
 
 logger = logging.getLogger(__name__)
@@ -1188,7 +1190,31 @@ class GFDeepConvection:
             units="none",
             dtype=state.rkind,
         )
-
+        self.xaa0_ens: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.xomg: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.xk: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.ens_adj: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.count: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.ikind,
+        )
 
         # Lookup tables for constants
         self.alpha: Quantity = state.quantity_factory_table.zeros(
@@ -1462,6 +1488,17 @@ class GFDeepConvection:
             externals={},
         )
 
+        self._cup_forcing_ens_3d_part1 = state.stencil_factory.from_dims_halo(
+            func=cup_forcing_ens_3d_part1_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+        self._cup_forcing_ens_3d_part2 = state.stencil_factory_ens.from_dims_halo(
+            func=cup_forcing_ens_3d_part2_stencil,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
         # Logging setup time
         end_time = time.perf_counter()
         logging.basicConfig(filename="gf.log", level=logging.DEBUG)
@@ -1548,7 +1585,6 @@ class GFDeepConvection:
         # Real (floating-point) variables
         dz = 0.0
         dzo = 0.0
-        mbdt = 0.0
         radius = 0.0
         depth_min = 0.0
         zkbmax = 0.0
@@ -1615,7 +1651,6 @@ class GFDeepConvection:
 
 
         # Scalars and arrays for cloud work functions, energy, and other properties
-        xaa0_ens = np.zeros((ite - its + 1, jte - jts + 1, 1))
         ccnloss = np.zeros((ite - its + 1, jte - jts + 1,))
         sigd = np.zeros((ite - its + 1, jte - jts + 1,))
 
@@ -2972,13 +3007,13 @@ class GFDeepConvection:
         # Update xaa0_ens based on dellat_ens and dellaq_ens
         for i in range(its, itf + 1):  # Adjust loop to start at zero
             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                xaa0_ens[i, j, 0] = 0.0
+                self.xaa0_ens.field[i, j] = 0.0
 
         # Parallel loop to update precipitation ensemble
         for i in range(its, itf + 1):  # Adjust loop to start at zero
             for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
                 if ierr[i, j] == 0:
-                    xaa0_ens[i, j, 0] = self.xaa0.field[i, j]
+                    self.xaa0_ens.field[i, j] = self.xaa0.field[i, j]
                     for k in range(kts, ktop[i, j] + 1):  # Adjust range for zero-based indexing
                         for nens3 in range(MAXENS3):  # Loop over ensemble members
                             if nens3 == 6:
@@ -3100,48 +3135,45 @@ class GFDeepConvection:
         # Assign aa1 to axx
         axx[:, :] = self.aa1.field[:, :]
 
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{xland1[0]:>4}{MAXENS3:>4}{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{ichoice:>4}{imid:>4}{dicycle:>4}")
-        # print(f"{closure_n[0]:>20.12E}{aa0[0]:>20.12E}{aa1[0]:>20.12E}{xaa0_ens[0, 0]:>20.12E}{mbdt:>20.12E}{dtime:>20.12E}")
-        # print(f"{axx[0]:>20.12E}{mconv[0]:>20.12E}{edto[0]:>20.12E}{edtm[0]:>20.12E}")
-        # print(f"{tau_ecmwf[0]:>20.12E}{aa1_bl[0]:>20.12E}{xf_dicycle[0]:>20.12E}")
-        # for n in range(4):
-        #     print(f"{rand_clos[0,n]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{self.po_cup.field[0,k]:>20.12E}{omeg[0,k]:>20.12E}{zdo[0,k]:>20.12E}{zdm[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
-        # for k in range(10):
-        #     print(f"{forcing[0,k]:>20.12E}")
-        # for k in range(MAXENS3):
-        #     print(f"{xf_ens[0,k]:>20.12E}{pr_ens[0,k]:>20.12E}")
-
-        # Call cup_forcing_ens_3d to calculate cloud base mass flux
-        cup_forcing_ens_3d(
-            self.closure_n.field, self.xland1.field, self.aa0.field, self.aa1.field, xaa0_ens, constants.MBDT, dtime,
-            ierr, self.ierr2.field, self.ierr3.field, self.xf_ens.field, axx, forcing,
-            MAXENS3, mconv, rand_clos,
-            self.po_cup.field, ktop, omeg, zdo, zdm, k22, zuo, self.pr_ens.field, edto, edtm, kbcon,
-            ichoice,
-            imid, ipr, itf, jtf, ktf,
-            its, ite, jts, jte, kts, kte,
-            dicycle, self.tau_ecmwf.field, self.aa1_bl.field, self.xf_dicycle.field
+        self._cup_forcing_ens_3d_part1(
+            omeg=omeg,
+            zd=zdo,
+            zdm=zdm,
+            zu=zuo,
+            edt=edto,
+            edtm=edtm,
+            kbcon=kbcon,
+            ierr=ierr,
+            xomg=self.xomg,
+            k_mask=self.k_mask,
+            count=self.count,
         )
 
-        # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
-
-        # Looks good
-        # print(f"{its:>4}{itf:>4}{ite:>4}{kts:>4}{ktf:>4}{kte:>4}")
-        # print(f"{xland1[0]:>4}{MAXENS3:>4}{ktop[0]:>4}{k22[0]:>4}{kbcon[0]:>4}{ichoice:>4}{imid:>4}{dicycle:>4}")
-        # print(f"{closure_n[0]:>20.12E}{aa0[0]:>20.12E}{aa1[0]:>20.12E}{xaa0_ens[0, 0]:>20.12E}{mbdt:>20.12E}{dtime:>20.12E}")
-        # print(f"{axx[0]:>20.12E}{mconv[0]:>20.12E}{edto[0]:>20.12E}{edtm[0]:>20.12E}")
-        # print(f"{tau_ecmwf[0]:>20.12E}{aa1_bl[0]:>20.12E}{xf_dicycle[0]:>20.12E}")
-        # for n in range(4):
-        #     print(f"{rand_clos[0,n]:>20.12E}")
-        # for k in range(kte+1):
-        #     print(f"{self.po_cup.field[0,k]:>20.12E}{omeg[0,k]:>20.12E}{zdo[0,k]:>20.12E}{zdm[0,k]:>20.12E}{zuo[0,k]:>20.12E}")
-        # for k in range(10):
-        #     print(f"{forcing[0,k]:>20.12E}")
-        # for k in range(MAXENS3):
-        #     print(f"{xf_ens[0,k]:>20.12E}{pr_ens[0,k]:>20.12E}")
+        self._cup_forcing_ens_3d_part2(
+            xland=self.xland1,
+            aa0=self.aa0,
+            aa1=self.aa1,
+            xaa0=self.xaa0_ens,
+            dtime=dtime,
+            ierr=ierr,
+            ierr2=self.ierr2.field,
+            ierr3=self.ierr3.field,
+            xf_ens=self.xf_ens,
+            forcing=forcing,
+            mconv=mconv,
+            rand_clos=rand_clos,
+            pr_ens=self.pr_ens,
+            ichoice=ichoice,
+            dicycle=dicycle,
+            tau_ecmwf=self.tau_ecmwf,
+            aa1_bl=self.aa1_bl,
+            xf_dicycle=self.xf_dicycle,
+            xomg=self.xomg,
+            xk=self.xk,
+            ens_adj=self.ens_adj,
+            k_mask=self.k_mask,
+            count=self.count,
+        )
 
         # print("pre(1): ", pre[0], "xmb(0): ", xmb[0])
         # Update ensemble tendencies and precipitation
@@ -3556,194 +3588,3 @@ def fct1d3(ktop, n, dt, z, tracr, massflx, trflx_in, dellac, g):
     for k in range(ktop + 1):  # Adjust for zero-based indexing
         # soln_lo[k] = tracr[k] - (flx_lo[k + 1] - flx_lo[k]) * dtovdz[k]  # Low-order solution
         dellac[k] = -(flx_lo[k + 1] - flx_lo[k]) * dtovdz[k] / dt
-
-
-def cup_forcing_ens_3d(closure_n, xland, aa0, aa1, xaa0, mbdt, dtime, ierr, ierr2, ierr3,
-                       xf_ens, axx, forcing, maxens3, mconv, rand_clos,
-                       p_cup, ktop, omeg, zd, zdm, k22, zu, pr_ens, edt, edtm, kbcon,
-                       ichoice, imid, ipr, itf, jtf, ktf, its, ite, jts, jte, kts, kte,
-                       dicycle, tau_ecmwf, aa1_bl, xf_dicycle):
-    """
-    Calculates an ensemble of closures and the resulting ensemble average to determine cloud base mass flux.
-    """
-
-    # Scalars
-    xff_dicycle = 0.0
-    a1 = 0.0
-    a_ave = 0.0
-    xff0 = 0.0
-    xomg = 0.0
-
-    # Arrays
-    xff_ens3 = np.zeros(maxens3)  # Ensemble forcing values
-    xk = np.zeros(1)  # Placeholder for a single value
-    kloc = np.zeros((itf - its + 1, jtf - jts + 1), dtype=int)  # Location array
-    ens_adj = np.ones((itf - its + 1, jtf - jts + 1))  # Adjustment array
-
-    for i in range(its, itf + 1):  # Zero-based indexing
-        for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-            kloc[i, j] = 0  # Initialize kloc to 1
-            if ierr[i, j] == 0:
-                kloc[i, j] = kbcon[i, j]  # Assign kbcon to kloc
-                ens_adj[i, j] = 1.0  # Initialize ensemble adjustment to 1.0
-                xff_ens3[:] = 0.0
-                a_ave = axx[i, j]
-                a_ave = max(0.0, a_ave)
-                a_ave = min(a_ave, aa1[i, j])
-                a_ave = max(0.0, a_ave)  # Ensure a_ave is within valid bounds
-                xff0 = (aa1[i, j] - aa0[i, j]) / dtime
-                # print(f"xff0 = {xff0:>20.12E}, aa0 = {aa0[i, j]:>20.12E}, aa1 = {aa1[i, j]:>20.12E}, dtime = {dtime:>20.12E}")
-                xff_ens3[0] = max(0.0, xff0)  # Adjusted for zero-based indexing
-                xff_ens3[1] = max(0.0, xff0)
-                xff_ens3[2] = max(0.0, xff0)
-                xff_ens3[15] = max(0.0, xff0)
-                forcing[i, j, 0] = xff_ens3[1]  # Adjusted for zero-based indexing
-
-                xomg = 0.0
-                kk = 0
-                xff_ens3[3] = 0.0  # Adjusted for zero-based indexing
-                xff_ens3[4] = 0.0
-                xff_ens3[5] = 0.0
-                for k in range(kbcon[i, j] - 1, kbcon[i, j] + 2):  # Adjust for zero-based indexing
-                    if zu[i, j, k] > 0.0:
-                        xomg -= omeg[i, j, k] / 9.81 / max(0.3, (1.0 - (edt[i, j] * zd[i, j, k] - edtm[i, j] * zdm[i, j, k]) / zu[i, j, k]))
-                        kk += 1
-                if kk > 0:
-                    xff_ens3[3] = xomg / float(kk)
-
-                xff_ens3[3] = BETA_JB * xff_ens3[3]
-                xff_ens3[4] = xff_ens3[3]
-                xff_ens3[5] = xff_ens3[3]
-                forcing[i, j, 1] = xff_ens3[3]  # Adjusted for zero-based indexing
-                if xff_ens3[3] < 0.0:
-                    xff_ens3[3] = 0.0
-                if xff_ens3[4] < 0.0:
-                    xff_ens3[4] = 0.0
-                if xff_ens3[5] < 0.0:
-                    xff_ens3[5] = 0.0
-                xff_ens3[13] = xff_ens3[3]
-
-                xff_ens3[6] = mconv[i, j]
-                xff_ens3[7] = mconv[i, j]
-                xff_ens3[8] = mconv[i, j]
-                xff_ens3[14] = mconv[i, j]
-                forcing[i, j, 2] = xff_ens3[7]  # Adjusted for zero-based indexing
-
-                xff_ens3[9] = aa1[i, j] / tau_ecmwf[i, j]
-                xff_ens3[10] = aa1[i, j] / tau_ecmwf[i, j]
-                xff_ens3[11] = aa1[i, j] / tau_ecmwf[i, j]
-                xff_ens3[12] = aa1[i, j] / tau_ecmwf[i, j]
-                forcing[i, j, 3] = xff_ens3[9]  # Adjusted for zero-based indexing
-
-                if ichoice == 0:
-                    if xff0 < 0.0:
-                        xff_ens3[0] = 0.0  # Adjusted for zero-based indexing
-                        xff_ens3[1] = 0.0
-                        xff_ens3[2] = 0.0
-                        xff_ens3[9] = 0.0
-                        xff_ens3[10] = 0.0
-                        xff_ens3[11] = 0.0
-                        xff_ens3[12] = 0.0
-                        xff_ens3[15] = 0.0
-
-                xk[0] = (xaa0[i, j, 0] - aa1[i, j]) / mbdt
-                # print(f"xk[0] = {xk[0]:>20.12E}, xaa0 = {xaa0[i, j, 0]:>20.12E}, aa1 = {aa1[i, j]:>20.12E}, mbdt = {mbdt:>20.12E}")
-                forcing[i, j, 7] = mbdt * xk[0] / aa1[i, j]
-
-                if xk[0] < 0.0 and xk[0] > -0.01 * mbdt:
-                    xk[0] = -0.01 * mbdt
-                if xk[0] >= 0.0 and xk[0] < 1.0e-2:
-                    xk[0] = 1.0e-2
-
-                if xland[i, j] < 0.1:
-                    if ierr2[i, j] > 0 or ierr3[i, j] > 0:
-                        for idx in range(maxens3):  # Adjusted for zero-based indexing
-                            xff_ens3[idx] = ens_adj[i, j] * xff_ens3[idx]
-
-                if xk[0] < 0.0:  # Adjusted for zero-based indexing
-                    if xff_ens3[0] > 0.0:
-                        xf_ens[i, j, 0] = max(0.0, -xff_ens3[0] / xk[0])
-                    if xff_ens3[1] > 0.0:
-                        xf_ens[i, j, 1] = max(0.0, -xff_ens3[1] / xk[0])
-                    if xff_ens3[2] > 0.0:
-                        xf_ens[i, j, 2] = max(0.0, -xff_ens3[2] / xk[0])
-                    if xff_ens3[15] > 0.0:
-                        xf_ens[i, j, 15] = max(0.0, -xff_ens3[15] / xk[0])
-                    xf_ens[i, j, 0] += xf_ens[i, j, 0] * rand_clos[i, j, 0]
-                    xf_ens[i, j, 1] += xf_ens[i, j, 1] * rand_clos[i, j, 0]
-                    xf_ens[i, j, 2] += xf_ens[i, j, 2] * rand_clos[i, j, 0]
-                    xf_ens[i, j, 15] += xf_ens[i, j, 15] * rand_clos[i, j, 0]
-                else:
-                    xff_ens3[0] = 0.0
-                    xff_ens3[1] = 0.0
-                    xff_ens3[2] = 0.0
-                    xff_ens3[15] = 0.0
-
-                xf_ens[i, j, 3] = max(0.0, xff_ens3[3])
-                xf_ens[i, j, 4] = max(0.0, xff_ens3[4])
-                xf_ens[i, j, 5] = max(0.0, xff_ens3[5])
-                xf_ens[i, j, 13] = max(0.0, xff_ens3[13])
-
-                a1 = max(1.e-3, pr_ens[i, j, 6])
-                xf_ens[i, j, 6] = max(0.0, xff_ens3[6] / a1)
-                a1 = max(1.e-3, pr_ens[i, j, 7])
-                xf_ens[i, j, 7] = max(0.0, xff_ens3[7] / a1)
-                a1 = max(1.e-3, pr_ens[i, j, 8])
-                xf_ens[i, j, 8] = max(0.0, xff_ens3[8] / a1)
-                a1 = max(1.e-3, pr_ens[i, j, 14])
-                xf_ens[i, j, 14] = max(0.0, xff_ens3[14] / a1)
-
-                xf_ens[i, j, 3] = xf_ens[i, j, 3] + xf_ens[i, j, 3] * rand_clos[i, j, 1]
-                xf_ens[i, j, 4] = xf_ens[i, j, 4] + xf_ens[i, j, 4] * rand_clos[i, j, 1]
-                xf_ens[i, j, 5] = xf_ens[i, j, 5] + xf_ens[i, j, 5] * rand_clos[i, j, 1]
-                xf_ens[i, j, 13] = xf_ens[i, j, 13] + xf_ens[i, j, 13] * rand_clos[i, j, 1]
-
-                xf_ens[i, j, 6] = xf_ens[i, j, 6] + xf_ens[i, j, 6] * rand_clos[i, j, 2]
-                xf_ens[i, j, 7] = xf_ens[i, j, 7] + xf_ens[i, j, 7] * rand_clos[i, j, 2]
-                xf_ens[i, j, 8] = xf_ens[i, j, 8] + xf_ens[i, j, 8] * rand_clos[i, j, 2]
-                xf_ens[i, j, 14] = xf_ens[i, j, 14] + xf_ens[i, j, 14] * rand_clos[i, j, 2]
-
-                if xk[0] < 0.0:
-                    xf_ens[i, j, 9] = max(0.0, -xff_ens3[9] / xk[0])
-                    xf_ens[i, j, 10] = max(0.0, -xff_ens3[10] / xk[0])
-                    xf_ens[i, j, 11] = max(0.0, -xff_ens3[11] / xk[0])
-                    xf_ens[i, j, 12] = max(0.0, -xff_ens3[12] / xk[0])
-                    xf_ens[i, j, 9] = xf_ens[i, j, 9] + xf_ens[i, j, 9] * rand_clos[i, j, 3]
-                    xf_ens[i, j, 10] = xf_ens[i, j, 10] + xf_ens[i, j, 10] * rand_clos[i, j, 3]
-                    xf_ens[i, j, 11] = xf_ens[i, j, 11] + xf_ens[i, j, 11] * rand_clos[i, j, 3]
-                    xf_ens[i, j, 12] = xf_ens[i, j, 12] + xf_ens[i, j, 12] * rand_clos[i, j, 3]
-                else:
-                    xf_ens[i, j, 9] = 0.0
-                    xf_ens[i, j, 10] = 0.0
-                    xf_ens[i, j, 11] = 0.0
-                    xf_ens[i, j, 12] = 0.0
-
-                if ichoice >= 1:
-                    for n in range(maxens3):  # Adjusted for zero-based indexing
-                        xf_ens[i, j, n] = xf_ens[i, j, ichoice - 1]  # Adjust ichoice for zero-based indexing
-
-            elif ierr[i, j] != 20 and ierr[i, j] != 0:
-                for n in range(maxens3):  # Iterate over all ensemble members
-                    xf_ens[i, j, n] = 0.0
-
-
-    if dicycle == 1:
-        for i in range(its, itf + 1):  # Adjust for zero-based indexing
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                xf_dicycle[i, j] = 0.0
-                if ierr[i, j] != 0:
-                    continue
-
-                xk = (xaa0[i, j, 0] - aa1[i, j]) / mbdt  # Adjusted for zero-based indexing
-                if xk < 0.0 and xk > -0.01 * mbdt:
-                    xk = -0.01 * mbdt
-                if xk >= 0.0 and xk < 1.0e-2:
-                    xk = 1.0e-2
-
-                xff_dicycle = (aa1[i, j] - aa1_bl[i, j]) / tau_ecmwf[i, j]
-                if xk < 0.0:
-                    xf_dicycle[i, j] = max(0.0, -xff_dicycle / xk)
-
-                xf_dicycle[i, j] = xf_ens[i, j, 9] - xf_dicycle[i, j]  # Adjusted for zero-based indexing
-    else:
-        xf_dicycle[:, :] = 0.0

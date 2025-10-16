@@ -4912,3 +4912,211 @@ def cup_output_ens_3d_part3_stencil(
     with computation(FORWARD), interval(0, 1):
         if ierr == 0:
             pre += xmb * dtpw
+
+
+def cup_forcing_ens_3d_part1_stencil(
+    omeg: FloatField, # type: ignore
+    zd: FloatField, # type: ignore
+    zdm: FloatField, # type: ignore
+    zu: FloatField, # type: ignore
+    edt: FloatFieldIJ, # type: ignore
+    edtm: FloatFieldIJ, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    xomg: FloatFieldIJ, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    count: IntFieldIJ32, # type: ignore
+):
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            xomg = 0.0
+            count = 0
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if k_mask >= kbcon - 1 and k_mask <= kbcon + 1:
+                if zu > 0.0:
+                    xomg -= omeg / constants.G / max(0.3, (1.0 - (edt * zd - edtm * zdm) / zu))
+                    count += 1
+
+
+def cup_forcing_ens_3d_part2_stencil(
+    xland: IntFieldIJ32, # type: ignore
+    aa0: FloatFieldIJ, # type: ignore
+    aa1: FloatFieldIJ, # type: ignore
+    xaa0: FloatFieldIJ, # type: ignore
+    dtime: float,
+    ierr: IntFieldIJ32, # type: ignore
+    ierr2: IntFieldIJ32, # type: ignore
+    ierr3: IntFieldIJ32, # type: ignore
+    xf_ens: FloatField, # type: ignore
+    forcing: FloatField, # type: ignore
+    mconv: FloatFieldIJ, # type: ignore
+    rand_clos: FloatField, # type: ignore
+    pr_ens: FloatField, # type: ignore
+    ichoice: int, # type: ignore
+    dicycle: int, # type: ignore
+    tau_ecmwf: FloatFieldIJ, # type: ignore
+    aa1_bl: FloatFieldIJ, # type: ignore
+    xf_dicycle: FloatFieldIJ, # type: ignore
+    xomg: FloatFieldIJ, # type: ignore
+    xk: FloatFieldIJ, # type: ignore
+    ens_adj: FloatFieldIJ, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    count: IntFieldIJ32, # type: ignore
+):
+    """
+    Calculates an ensemble of closures and the resulting ensemble average to determine cloud base mass flux.
+    """
+
+    with computation(FORWARD), interval(0, 1):
+        ens_adj = 1.0
+        xk = 0.0
+
+    with computation(PARALLEL), interval(...):
+        xff_ens3 = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            xff_ens3[0, 0,  0] = max(0.0, (aa1 - aa0) / dtime)
+            xff_ens3[0, 0,  1] = max(0.0, (aa1 - aa0) / dtime)
+            xff_ens3[0, 0,  2] = max(0.0, (aa1 - aa0) / dtime)
+            xff_ens3[0, 0,  3] = 0.0
+            xff_ens3[0, 0,  4] = 0.0
+            xff_ens3[0, 0,  5] = 0.0
+            xff_ens3[0, 0, 15] = max(0.0, (aa1 - aa0) / dtime)
+            forcing[0, 0, 0] = max(0.0, (aa1 - aa0) / dtime)
+
+            if count > 0:
+                xff_ens3[0, 0, 3] = xomg / float(count)
+
+            xff_ens3[0, 0, 3] = constants.BETA_JB * xff_ens3[0, 0, 3]
+            xff_ens3[0, 0, 4] = xff_ens3[0, 0, 3]
+            xff_ens3[0, 0, 5] = xff_ens3[0, 0, 3]
+            forcing[0, 0, 1] = xff_ens3[0, 0, 3]
+            if xff_ens3[0, 0, 3] < 0.0:
+                xff_ens3[0, 0, 3] = 0.0
+            if xff_ens3[0, 0, 4] < 0.0:
+                xff_ens3[0, 0, 4] = 0.0
+            if xff_ens3[0, 0, 5] < 0.0:
+                xff_ens3[0, 0, 5] = 0.0
+            xff_ens3[0, 0, 13] = xff_ens3[0, 0, 3]
+
+            xff_ens3[0, 0, 6] = mconv
+            xff_ens3[0, 0, 7] = mconv
+            xff_ens3[0, 0, 8] = mconv
+            xff_ens3[0, 0, 14] = mconv
+            forcing[0, 0, 2] = xff_ens3[0, 0, 7]
+
+            xff_ens3[0, 0, 9] = aa1 / tau_ecmwf
+            xff_ens3[0, 0, 10] = aa1 / tau_ecmwf
+            xff_ens3[0, 0, 11] = aa1 / tau_ecmwf
+            xff_ens3[0, 0, 12] = aa1 / tau_ecmwf
+            forcing[0, 0, 3] = xff_ens3[0, 0, 9]
+
+            if ichoice == 0:
+                if ((aa1 - aa0) / dtime) < 0.0:
+                    xff_ens3[0, 0, 0] = 0.0
+                    xff_ens3[0, 0, 1] = 0.0
+                    xff_ens3[0, 0, 2] = 0.0
+                    xff_ens3[0, 0, 9] = 0.0
+                    xff_ens3[0, 0, 10] = 0.0
+                    xff_ens3[0, 0, 11] = 0.0
+                    xff_ens3[0, 0, 12] = 0.0
+                    xff_ens3[0, 0, 15] = 0.0
+
+            xk = (xaa0 - aa1) / constants.MBDT
+            forcing[0, 0, 7] = constants.MBDT * xk / aa1
+
+            if xk < 0.0 and xk > -0.01 * constants.MBDT:
+                xk = -0.01 * constants.MBDT
+            if xk >= 0.0 and xk < 1.0e-2:
+                xk = 1.0e-2
+
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            if xland < 0.1:
+                if ierr2 > 0 or ierr3 > 0:
+                    xff_ens3 = ens_adj * xff_ens3
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            if xk < 0.0:
+                if xff_ens3[0, 0, 0] > 0.0:
+                    xf_ens[0, 0, 0] = max(0.0, -xff_ens3[0, 0, 0] / xk)
+                if xff_ens3[0, 0, 1] > 0.0:
+                    xf_ens[0, 0, 1] = max(0.0, -xff_ens3[0, 0, 1] / xk)
+                if xff_ens3[0, 0, 2] > 0.0:
+                    xf_ens[0, 0, 2] = max(0.0, -xff_ens3[0, 0, 2] / xk)
+                if xff_ens3[0, 0, 15] > 0.0:
+                    xf_ens[0, 0, 15] = max(0.0, -xff_ens3[0, 0, 15] / xk)
+                xf_ens[0, 0, 0] += xf_ens[0, 0, 0] * rand_clos
+                xf_ens[0, 0, 1] += xf_ens[0, 0, 1] * rand_clos
+                xf_ens[0, 0, 2] += xf_ens[0, 0, 2] * rand_clos
+                xf_ens[0, 0, 15] += xf_ens[0, 0, 15] * rand_clos
+            else:
+                xff_ens3[0, 0, 0] = 0.0
+                xff_ens3[0, 0, 1] = 0.0
+                xff_ens3[0, 0, 2] = 0.0
+                xff_ens3[0, 0, 15] = 0.0
+
+            xf_ens[0, 0, 3] = max(0.0, xff_ens3[0, 0, 3])
+            xf_ens[0, 0, 4] = max(0.0, xff_ens3[0, 0, 4])
+            xf_ens[0, 0, 5] = max(0.0, xff_ens3[0, 0, 5])
+            xf_ens[0, 0, 13] = max(0.0, xff_ens3[0, 0, 13])
+
+            xf_ens[0, 0, 6] = max(0.0, xff_ens3[0, 0, 6] / max(1.e-3, pr_ens[0, 0, 6]))
+            xf_ens[0, 0, 7] = max(0.0, xff_ens3[0, 0, 7] / max(1.e-3, pr_ens[0, 0, 7]))
+            xf_ens[0, 0, 8] = max(0.0, xff_ens3[0, 0, 8] / max(1.e-3, pr_ens[0, 0, 8]))
+            xf_ens[0, 0, 14] = max(0.0, xff_ens3[0, 0, 14] / max(1.e-3, pr_ens[0, 0, 14]))
+
+            xf_ens[0, 0, 3] += xf_ens[0, 0, 3] * rand_clos[0, 0, 1]
+            xf_ens[0, 0, 4] += xf_ens[0, 0, 4] * rand_clos[0, 0, 1]
+            xf_ens[0, 0, 5] += xf_ens[0, 0, 5] * rand_clos[0, 0, 1]
+            xf_ens[0, 0, 13] += xf_ens[0, 0, 13] * rand_clos[0, 0, 1]
+
+            xf_ens[0, 0, 6] += xf_ens[0, 0, 6] * rand_clos[0, 0, 2]
+            xf_ens[0, 0, 7] += xf_ens[0, 0, 7] * rand_clos[0, 0, 2]
+            xf_ens[0, 0, 8] += xf_ens[0, 0, 8] * rand_clos[0, 0, 2]
+            xf_ens[0, 0, 14] += xf_ens[0, 0, 14] * rand_clos[0, 0, 2]
+
+            if xk < 0.0:
+                xf_ens[0, 0, 9] = max(0.0, -xff_ens3[0, 0, 9] / xk)
+                xf_ens[0, 0, 10] = max(0.0, -xff_ens3[0, 0, 10] / xk)
+                xf_ens[0, 0, 11] = max(0.0, -xff_ens3[0, 0, 11] / xk)
+                xf_ens[0, 0, 12] = max(0.0, -xff_ens3[0, 0, 12] / xk)
+                xf_ens[0, 0, 9] += xf_ens[0, 0, 9] * rand_clos[0, 0, 3]
+                xf_ens[0, 0, 10] += xf_ens[0, 0, 10] * rand_clos[0, 0, 3]
+                xf_ens[0, 0, 11] += xf_ens[0, 0, 11] * rand_clos[0, 0, 3]
+                xf_ens[0, 0, 12] += xf_ens[0, 0, 12] * rand_clos[0, 0, 3]
+            else:
+                xf_ens[0, 0, 9] = 0.0
+                xf_ens[0, 0, 10] = 0.0
+                xf_ens[0, 0, 11] = 0.0
+                xf_ens[0, 0, 12] = 0.0
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            if ichoice >= 1:
+                tmp = xf_ens[0, 0, ichoice - 1 - k_mask]
+                xf_ens = tmp
+
+    with computation(PARALLEL), interval(...):
+        if ierr != 20 and ierr != 0:
+            xf_ens = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        if dicycle == 1:
+            xf_dicycle = 0.0
+            if ierr == 0:
+                xk = (xaa0 - aa1) / constants.MBDT
+                if xk < 0.0 and xk > -0.01 * constants.MBDT:
+                    xk = -0.01 * constants.MBDT
+                if xk >= 0.0 and xk < 1.0e-2:
+                    xk = 1.0e-2
+                xff_dicycle = (aa1 - aa1_bl) / tau_ecmwf
+                if xk < 0.0:
+                    xf_dicycle = max(0.0, -xff_dicycle / xk)
+                xf_dicycle = xf_ens[0, 0, 9] - xf_dicycle
+        else:
+            xf_dicycle = 0.0
