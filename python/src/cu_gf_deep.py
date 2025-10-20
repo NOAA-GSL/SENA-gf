@@ -54,6 +54,9 @@ from cu_gf_stencils import (
     cup_output_ens_3d_part3_stencil,
     cup_forcing_ens_3d_part1_stencil,
     cup_forcing_ens_3d_part2_stencil,
+    finalize_deep_convection_part1,
+    finalize_deep_convection_part2,
+    finalize_deep_convection_part3,
 )
 
 logger = logging.getLogger(__name__)
@@ -1215,6 +1218,51 @@ class GFDeepConvection:
             units="none",
             dtype=state.ikind,
         )
+        self.rntot: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.delqev: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.delq2: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.rn: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.evef: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.qevap: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.ccnloss: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.dts: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="s",
+            dtype=state.rkind,
+        )
+        self.fpi: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
 
         # Lookup tables for constants
         self.alpha: Quantity = state.quantity_factory_table.zeros(
@@ -1499,6 +1547,22 @@ class GFDeepConvection:
             externals={},
         )
 
+        self._finalize_deep_convection_part1 = state.stencil_factory.from_dims_halo(
+            func=finalize_deep_convection_part1,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+        self._finalize_deep_convection_part2 = state.stencil_factory.from_dims_halo(
+            func=finalize_deep_convection_part2,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+        self._finalize_deep_convection_part3 = state.stencil_factory.from_dims_halo(
+            func=finalize_deep_convection_part3,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
         # Logging setup time
         end_time = time.perf_counter()
         logging.basicConfig(filename="gf.log", level=logging.DEBUG)
@@ -1576,54 +1640,35 @@ class GFDeepConvection:
         iloop_in = 0
         nens3 = 0
         ki = 0
-        kk = 0
         i = 0
         k = 0
-        jprnt = 0
-        start_k22 = 0
 
         # Real (floating-point) variables
         dz = 0.0
-        dzo = 0.0
-        radius = 0.0
         depth_min = 0.0
         zkbmax = 0.0
-        dh = 0.0
         trash = 0.0
         trash2 = 0.0
 
         # Scalars
-        radius = 0.0
         depth_min = 0.0
-        dh = 0.0
         trash = 0.0
         trash2 = 0.0
         entdo = 0.0
         dp = 0.0
-        subin = 0.0
         detdo = 0.0
         entup = 0.0
         detup = 0.0
-        subdown = 0.0
         entdoj = 0.0
         entupk = 0.0
-        detupk = 0.0
-        totmas = 0.0
-        keep_going = False
         iversion = 1
-        denom = 0.0
-        h_entr = 0.0
         umean = 0.0
         t_star = 0.0
         dq = 0.0
         dtime_max = 0.0
-        sum1 = 0.0
-        sum2 = 0.0
         nv = 0
 
         # Arrays
-        flg = np.zeros((ite - its + 1, jte - jts + 1,), dtype=bool)
-        c1_max = 0.0
         pgcon = 0.0
         blqe = 0.0
         xff_mid0 = 0.0
@@ -1641,55 +1686,12 @@ class GFDeepConvection:
         chem_pwd = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1, nchem))
         chem_pwav = np.zeros((ite - its + 1, jte - jts + 1, nchem))
         chem_psum = np.zeros((ite - its + 1, jte - jts + 1, nchem))
-        trac = np.zeros((kte - kts + 1,))
         trcflx_in = np.zeros((kte - kts + 1,))
-        trcflx_out = np.zeros((kte - kts + 1,))
-        trc = np.zeros((kte - kts + 1,))
-        trco = np.zeros((kte - kts + 1,))
         pwdper = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         massflx = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
 
-
-        # Scalars and arrays for cloud work functions, energy, and other properties
-        ccnloss = np.zeros((ite - its + 1, jte - jts + 1,))
-        sigd = np.zeros((ite - its + 1, jte - jts + 1,))
-
         # Arrays for cloud properties and environmental parameters
         axx = np.zeros((ite - its + 1, jte - jts + 1,))
-
-        # Integer arrays for levels and indices
-        turn = 0
-
-        # Array for rain evaporation parameters
-        zuh2 = np.zeros(40)
-
-        # Arrays for rain evaporation and related calculations
-        rntot = np.zeros((ite - its + 1, jte - jts + 1,))
-        delqev = np.zeros((ite - its + 1, jte - jts + 1,))
-        delq2 = np.zeros((ite - its + 1, jte - jts + 1,))
-        qevap = np.zeros((ite - its + 1, jte - jts + 1,))
-        rn = np.zeros((ite - its + 1, jte - jts + 1,))
-        qcond = np.zeros((ite - its + 1, jte - jts + 1,))
-
-        # Scalars for rain evaporation and energy calculations
-        rain = 0.0
-        t1 = 0.0
-        q1 = 0.0
-        elocp = 0.0
-        evef = 0.0
-        el2orc = 0.0
-        g_rain = 0.0
-        e_dn = 0.0
-        c_up = 0.0
-
-        # Scalars for geometric and physical constants
-        dts = 0.0
-        fp = 0.0
-        fpi = 0.0
-        x_add = 0.0
-
-        # Integer variable
-        itemp = 0
 
         # Set cumulus type
         if imid == 1:
@@ -1701,19 +1703,8 @@ class GFDeepConvection:
             pmin = constants.PMIN_DEEP
             zkbmax = constants.ZKBMAX_DEEP
 
-        # Set constants
-        c1_max = C1
-        elocp = XLV / CP
-        el2orc = (XLV * XLV) / (R_V * CP)
-
-        # Set evaporation factors
-        evfact = 0.25  # Default value
-        evfactl = 0.25  # Default value for land
-
         # Set proportionality constant for pressure gradient
         pgcon = 0.0
-
-        x_add = 0.0
 
         # Set minimum cloud depth (m)
         depth_min = 3000.0
@@ -3409,99 +3400,69 @@ class GFDeepConvection:
                                     chem3d[i, j, k, nv] = chem[i, j, k, nv]
                         wetdpc_deep[i, j, nv] = max(wetdpc_deep[i, j, nv], QAMIN)
 
-        k = 0
-        # Update output tendencies and handle errors
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0 and pre[i, j] > 0.0:
-                    forcing[i, j, 5] = self.sig.field[i, j]  # Adjust index for zero-based indexing
-                    pre[i, j] = max(pre[i, j], 0.0)
-                    xmb_out[i, j] = self.xmb.field[i, j]
-                    outu[i, j, 0] = self.dellu.field[i, j, 0] * self.xmb.field[i, j]
-                    outv[i, j, 0] = self.dellv.field[i, j, 0] * self.xmb.field[i, j]
-                    for k in range(kts + 1, ktop[i, j] + 1):  # Adjust for zero-based indexing
-                        outu[i, j, k] = 0.25 * (self.dellu.field[i, j, k - 1] + 2.0 * self.dellu.field[i, j, k] + self.dellu.field[i, j, k + 1]) * self.xmb.field[i, j]
-                        outv[i, j, k] = 0.25 * (self.dellv.field[i, j, k - 1] + 2.0 * self.dellv.field[i, j, k] + self.dellv.field[i, j, k + 1]) * self.xmb.field[i, j]
-                elif ierr[i, j] != 0 or pre[i, j] == 0.0:
-                    ktop[i, j] = -1
-                    for k in range(kts, kte + 1):  # Adjust for zero-based indexing
-                        outt[i, j, k] = 0.0
-                        outq[i, j, k] = 0.0
-                        outqc[i, j, k] = 0.0
-                        outu[i, j, k] = 0.0
-                        outv[i, j, k] = 0.0
+        self._finalize_deep_convection_part1(
+            forcing=forcing,
+            sig=self.sig,
+            pre=pre,
+            xmb_out=xmb_out,
+            xmb=self.xmb,
+            outt=outt,
+            outq=outq,
+            outqc=outqc,
+            outu=outu,
+            outv=outv,
+            dellu=self.dellu,
+            dellv=self.dellv,
+            ktop=ktop,
+            ierr=ierr,
+            k_mask=self.k_mask,
+        )
 
-        if IRAINEVAP == 1:
-            # Initialize variables for rain evaporation
-            for i in range(its, itf + 1):  # Adjust loop to start at zero
-                for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                    rntot[i, j] = 0.0
-                    delqev[i, j] = 0.0
-                    delq2[i, j] = 0.0
-                    rn[i, j] = 0.0
-                    rntot[i, j] = 0.0
-                    rain = 0.0
-                    if ierr[i, j] == 0:
-                        for k in range(ktop[i, j], -1, -1):  # Reverse loop for zero-based indexing
-                            rain = self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
-                            rntot[i, j] += rain * self.xmb.field[i, j] * 0.001 * dtime
+        self._finalize_deep_convection_part2(
+            rntot=self.rntot,
+            delqev=self.delqev,
+            delq2=self.delq2,
+            rn=self.rn,
+            xland=xland,
+            edt=self.edt,
+            sig=self.sig,
+            ktop=ktop,
+            pwdo=self.pwdo,
+            pwo=self.pwo,
+            edto=edto,
+            xmb=self.xmb,
+            evef=self.evef,
+            qevap=self.qevap,
+            dtime=dtime,
+            qo=qo,
+            tn=tn,
+            p_cup=self.p_cup,
+            qeso=self.qeso,
+            pre=pre,
+            outq=outq,
+            outt=outt,
+            ierr=ierr,
+            k_mask=self.k_mask,
+            found=self.found,
+        )
 
-            for i in range(its, itf + 1):  # Adjust loop to start at zero
-                for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                    qevap[i, j] = 0.0
-                    flg[i, j] = True
-                    if ierr[i, j] == 0:
-                        evef = self.edt.field[i, j] * evfact * self.sig.field[i, j]**2
-                        if 0.5 < xland[i, j] < 1.5:
-                            evef = self.edt.field[i, j] * evfactl * self.sig.field[i, j]**2
-                        for k in range(ktop[i, j], -1, -1):  # Reverse loop for zero-based indexing
-                            rain = self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
-                            rn[i, j] += rain * self.xmb.field[i, j] * 0.001 * dtime
-                            if flg[i, j]:
-                                q1 = qo[i, j, k] + (outq[i, j, k]) * dtime
-                                t1 = tn[i, j, k] + (outt[i, j, k]) * dtime
-                                qcond[i, j] = evef * (q1 - self.qeso.field[i, j, k]) / (1.0 + el2orc * self.qeso.field[i, j, k] / t1**2)
-                                dp = -100.0 * (self.p_cup.field[i, j, k + 1] - self.p_cup.field[i, j, k])
-                                if rn[i, j] > 0.0 and qcond[i, j] < 0.0:
-                                    qevap[i, j] = -qcond[i, j] * (1.0 - math.exp(-0.32 * math.sqrt(dtime * rn[i, j])))
-                                    qevap[i, j] = min(qevap[i, j], rn[i, j] * 1000.0 * G / dp)
-                                    delq2[i, j] = delqev[i, j] + 0.001 * qevap[i, j] * dp / G
-                                if rn[i, j] > 0.0 and qcond[i, j] < 0.0 and delq2[i, j] > rntot[i, j]:
-                                    qevap[i, j] = 1000.0 * G * (rntot[i, j] - delqev[i, j]) / dp
-                                    flg[i, j] = False
-                                if rn[i, j] > 0.0 and qevap[i, j] > 0.0:
-                                    outq[i, j, k] += qevap[i, j] / dtime
-                                    outt[i, j, k] -= elocp * qevap[i, j] / dtime
-                                    rn[i, j] = max(0.0, rn[i, j] - 0.001 * qevap[i, j] * dp / G)
-                                    pre[i, j] -= qevap[i, j] * dp / G / dtime
-                                    pre[i, j] = max(pre[i, j], 0.0)
-                                    delqev[i, j] += 0.001 * dp * qevap[i, j] / G
-
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0:
-                    if AEROEVAP > 1:
-                        # Aerosol scavenging
-                        ccnloss[i, j] = ccn[i, j] * self.pefc.field[i, j] * self.xmb.field[i, j]
-                        ccn[i, j] -= ccnloss[i, j] * SCAV_FACTOR
-
-        # Add heating due to kinetic energy dissipation (from ECMWF)
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0:
-                    dts = 0.0
-                    fpi = 0.0
-                    for k in range(kts, ktop[i, j] + 1):  # Adjust for zero-based indexing
-                        dp = (self.po_cup.field[i, j, k] - self.po_cup.field[i, j, k + 1]) * 100.0
-                        # Total KE dissipation estimate
-                        dts -= (outu[i, j, k] * us[i, j, k] + outv[i, j, k] * vs[i, j, k]) * dp / G
-                        # fpi needed for calculation of conversion to potential energy
-                        fpi += math.sqrt(outu[i, j, k]**2 + outv[i, j, k]**2) * dp
-                    if fpi > 0.0:
-                        for k in range(kts, ktop[i, j] + 1):  # Adjust for zero-based indexing
-                            fp = math.sqrt(outu[i, j, k]**2 + outv[i, j, k]**2) / fpi
-                            outt[i, j, k] += fp * dts * G / CP
-            # print(f"{xmb_out[0]:>20.12E}{pre[0]:>20.12E}")
+        self._finalize_deep_convection_part3(
+            ccnloss=self.ccnloss,
+            ccn=ccn,
+            pefc=self.pefc,
+            xmb=self.xmb,
+            dts=self.dts,
+            fpi=self.fpi,
+            ktop=ktop,
+            po_cup=self.po_cup,
+            outu=outu,
+            outv=outv,
+            us=us,
+            vs=vs,
+            outt=outt,
+            ierr=ierr,
+            k_mask=self.k_mask,
+        )
 
 
 def fct1d3(ktop, n, dt, z, tracr, massflx, trflx_in, dellac, g):

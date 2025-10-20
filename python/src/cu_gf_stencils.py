@@ -5120,3 +5120,184 @@ def cup_forcing_ens_3d_part2_stencil(
                 xf_dicycle = xf_ens[0, 0, 9] - xf_dicycle
         else:
             xf_dicycle = 0.0
+
+
+def finalize_deep_convection_part1(
+    forcing: FloatField, # type: ignore
+    sig: FloatFieldIJ, # type: ignore
+    pre: FloatFieldIJ, # type: ignore
+    xmb_out: FloatFieldIJ, # type: ignore
+    xmb: FloatFieldIJ, # type: ignore
+    outt: FloatField, # type: ignore
+    outq: FloatField, # type: ignore
+    outqc: FloatField, # type: ignore
+    outu: FloatField, # type: ignore
+    outv: FloatField, # type: ignore
+    dellu: FloatField, # type: ignore
+    dellv: FloatField, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+):
+    """
+    Finalizes deep convection calculations.
+    """
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0 and pre > 0.0:
+            forcing[0, 0, 5] = sig
+            pre = max(pre, 0.0)
+            xmb_out = xmb
+            outu = dellu * xmb
+            outv = dellv * xmb
+
+    with computation(FORWARD), interval(1, -1):
+        if ierr == 0 and pre > 0.0:
+            if k_mask <= ktop:
+                outu = 0.25 * (dellu[0, 0, -1] + 2.0 * dellu + dellu[0, 0, 1]) * xmb
+                outv = 0.25 * (dellv[0, 0, -1] + 2.0 * dellv + dellv[0, 0, 1]) * xmb
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr != 0 or pre == 0.0:
+            ktop = -1
+
+    with computation(FORWARD), interval(...):
+        if ierr != 0 or pre == 0.0:
+            outt = 0.0
+            outq = 0.0
+            outqc = 0.0
+            outu = 0.0
+            outv = 0.0
+
+
+def finalize_deep_convection_part2(
+    rntot: FloatFieldIJ, # type: ignore
+    delqev: FloatFieldIJ, # type: ignore
+    delq2: FloatFieldIJ, # type: ignore
+    rn: FloatFieldIJ, # type: ignore
+    xland: FloatFieldIJ, # type: ignore
+    edt: FloatFieldIJ, # type: ignore
+    sig: FloatFieldIJ, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    pwdo: FloatField, # type: ignore
+    pwo: FloatField, # type: ignore
+    edto: FloatFieldIJ, # type: ignore
+    xmb: FloatFieldIJ, # type: ignore
+    evef: FloatFieldIJ, # type: ignore
+    qevap: FloatFieldIJ, # type: ignore
+    dtime: float,
+    qo: FloatField, # type: ignore
+    tn: FloatField, # type: ignore
+    p_cup: FloatField, # type: ignore
+    qeso: FloatField, # type: ignore
+    pre: FloatFieldIJ, # type: ignore
+    outq: FloatField, # type: ignore
+    outt: FloatField, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    found: BoolFieldIJ, # type: ignore
+):
+    """
+    Finalizes deep convection calculations.
+    """
+
+    with computation(FORWARD), interval(0, 1):
+        rntot = 0.0
+        delqev = 0.0
+        delq2 = 0.0
+        rn = 0.0
+        found = True
+        evef = 0.0
+        qevap = 0.0
+        if constants.IRAINEVAP == 1:
+            if ierr == 0:
+                if 0.5 < xland and xland < 1.5:
+                    evef = edt * constants.EVFACTL * sig**2
+                else:
+                    evef = edt * constants.EVFACT * sig**2
+
+    with computation(PARALLEL), interval(...):
+        rain = 0.0
+        qcond = 0.0
+
+    with computation(BACKWARD), interval(...):
+        if constants.IRAINEVAP == 1:
+            if ierr == 0:
+                if k_mask <= ktop:
+                    rain = pwo + edto * pwdo
+                    rntot += rain * xmb * 0.001 * dtime
+
+    with computation(BACKWARD), interval(0, -1):
+        if constants.IRAINEVAP == 1:
+            if ierr == 0:
+                if k_mask <= ktop:
+                    # rain = pwo + edto * pwdo
+                    rn += rain * xmb * 0.001 * dtime
+                    if found:
+                        q1 = qo + outq * dtime
+                        t1 = tn + outt * dtime
+                        qcond = evef * (q1 - qeso) / (1.0 + constants.EL2ORC * qeso / t1**2)
+                        dp = -100.0 * (p_cup[0, 0, 1] - p_cup)
+                        if rn > 0.0 and qcond < 0.0:
+                            qevap = -qcond * (1.0 - exp(-0.32 * sqrt(dtime * rn)))
+                            qevap = min(qevap, rn * 1000.0 * constants.G / dp)
+                            delq2 = delqev + 0.001 * qevap * dp / constants.G
+                        if rn > 0.0 and qcond < 0.0 and delq2 > rntot:
+                            # qevap = 1000.0 * constants.G * (rntot - delqev) / dp
+                            found = False
+                        if rn > 0.0 and qevap > 0.0:
+                            outq += qevap / dtime
+                            outt -= constants.ELOCP * qevap / dtime
+                            rn = max(0.0, rn - 0.001 * qevap * dp / constants.G)
+                            pre -= qevap * dp / constants.G / dtime
+                            pre = max(pre, 0.0)
+                            delqev += 0.001 * dp * qevap / constants.G
+
+
+def finalize_deep_convection_part3(
+    ccnloss: FloatFieldIJ, # type: ignore
+    ccn: FloatFieldIJ, # type: ignore
+    pefc: FloatFieldIJ, # type: ignore
+    xmb: FloatFieldIJ, # type: ignore
+    dts: FloatFieldIJ, # type: ignore
+    fpi: FloatFieldIJ, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    po_cup: FloatField, # type: ignore
+    outu: FloatField, # type: ignore
+    outv: FloatField, # type: ignore
+    us: FloatField, # type: ignore
+    vs: FloatField, # type: ignore
+    outt: FloatField, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+):
+    """
+    Finalize the deep convection calculations.
+    """
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            if constants.AEROEVAP > 1:
+                ccnloss = ccn * pefc * xmb
+                ccn -= ccnloss * constants.SCAV_FACTOR
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            dts = 0.0
+            fpi = 0.0
+
+    with computation(FORWARD), interval(0, -1):
+        if ierr == 0:
+            if k_mask <= ktop:
+                dp = (po_cup - po_cup[0, 0, 1]) * 100.0
+                # Total KE dissipation estimate
+                dts -= (outu * us + outv * vs) * dp / constants.G
+                # fpi needed for calculation of conversion to potential energy
+                fpi += sqrt(outu**2 + outv**2) * dp
+
+    with computation(FORWARD), interval(0, -1):
+        if ierr == 0:
+            if k_mask <= ktop:
+                if fpi > 0.0:
+                    fp = sqrt(outu**2 + outv**2) / fpi
+                    outt += fp * dts * constants.G / constants.CP
