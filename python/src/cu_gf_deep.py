@@ -58,6 +58,7 @@ from cu_gf_stencils import (
     finalize_deep_convection_part1,
     finalize_deep_convection_part2,
     finalize_deep_convection_part3,
+    calculate_moisture_convergence,
 )
 
 logger = logging.getLogger(__name__)
@@ -1270,7 +1271,7 @@ class GFDeepConvection:
             dtype=state.rkind,
         )
         self.xff_mid1: Quantity = state.quantity_factory.zeros(
-            dims=[X_DIM, Y_DIM],        
+            dims=[X_DIM, Y_DIM],
             units="none",
             dtype=state.rkind,
         )
@@ -1581,6 +1582,12 @@ class GFDeepConvection:
         )
         self._finalize_deep_convection_part3 = state.stencil_factory.from_dims_halo(
             func=finalize_deep_convection_part3,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        self._calculate_moisture_convergence = state.stencil_factory.from_dims_halo(
+            func=calculate_moisture_convergence,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
         )
@@ -3121,15 +3128,14 @@ class GFDeepConvection:
             kbcon_m1=self.kbcon_m1,
         )
 
-        # Calculate moisture convergence (mconv)
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                mconv[i, j] = 0
-                if ierr[i, j] != 0:
-                    continue
-                for k in range(ktop[i, j] + 1):  # Loop through levels up to ktop
-                    dq = self.qo_cup.field[i, j, k + 1] - self.qo_cup.field[i, j, k]
-                    mconv[i, j] += omeg[i, j, k] * dq / G
+        self._calculate_moisture_convergence(
+            mconv=mconv,
+            qo_cup=self.qo_cup,
+            omeg=omeg,
+            ktop=ktop,
+            ierr=ierr,
+            k_mask=self.k_mask,
+        )
 
         self._cup_forcing_ens_3d_part1(
             omeg=omeg,
@@ -3478,56 +3484,30 @@ def fct1d3(ktop, n, dt, z, tracr, massflx, trflx_in, dellac, g):
         dellac (array-like): Modified tracer flux (output).
         g (float): Gravitational constant.
     """
-    # Modified tracer flux
-    # trflx_out = np.zeros(n + 1, dtype=np.float64)  # Initialize as a NumPy array with n+1 elements
 
     # Local variable declarations
     k = 0  # Loop index
-    # km1 = 0  # k-1 index
-    # kp1 = 0  # k+1 index
-
-    # Logical variables
-    # def NaN(arg):  # NaN detector
-    #     return not (arg >= 0.0 or arg <- 0.0)
-
-    # error = False  # Error flag
-    # vrbos = True  # Verbose flag
 
     # Real variables (NumPy arrays)
     dtovdz = np.zeros(n, dtype=np.float64)  # Time step divided by grid spacing
-    # trmax = np.zeros(n, dtype=np.float64)  # Maximum tracer value
-    # trmin = np.zeros(n, dtype=np.float64)  # Minimum tracer value
     flx_lo = np.zeros(n + 1, dtype=np.float64)  # Low-order flux
-    # antifx = np.zeros(n + 1, dtype=np.float64)  # Antidiffusive flux
-    # clipped = np.zeros(n + 1, dtype=np.float64)  # Clipped flux
-    # soln_hi = np.zeros(n, dtype=np.float64)  # High-order solution
-    # totlin = np.zeros(n, dtype=np.float64)  # Total flux in
     totlout = np.zeros(n, dtype=np.float64)  # Total flux out
-    # soln_lo = np.zeros(n, dtype=np.float64)  # Low-order solution
-    # clipin = np.zeros(n, dtype=np.float64)  # Clip for incoming flux
     clipout = np.zeros(n, dtype=np.float64)  # Clip for outgoing flux
-    # arg = 0.0  # Temporary variable
 
     # Parameters
     epsil = 1e-22  # Prevent division by zero
-    # damp = 1.0  # Damper for antidiffusive flux (1 = no damping)
 
     for k in range(ktop + 1):  # Adjust for zero-based indexing
         dtovdz[k] = 0.01 * dt / abs(z[k + 1] - z[k]) * g  # Time step / grid spacing
-        # if z[k] == z[k + 1]:
-        #     error = True
 
     for k in range(1, ktop + 1):  # Start from 1 for zero-based indexing
         if massflx[k] >= 0.0:
             flx_lo[k] = massflx[k] * tracr[k - 1]  # Low-order flux, upstream
         else:
             flx_lo[k] = massflx[k] * tracr[k]      # Low-order flux, upstream
-        # antifx[k] = trflx_in[k] - flx_lo[k]        # Antidiffusive flux
 
     flx_lo[0] = trflx_in[0]
     flx_lo[ktop + 1] = trflx_in[ktop + 1]
-    # antifx[0] = 0.0
-    # antifx[ktop + 1] = 0.0
 
     for k in range(ktop + 1):  # Adjust for zero-based indexing
         totlout[k] = max(0.0, flx_lo[k + 1]) - min(0.0, flx_lo[k])  # Total flux out
@@ -3545,5 +3525,4 @@ def fct1d3(ktop, n, dt, z, tracr, massflx, trflx_in, dellac, g):
         flx_lo[ktop + 1] = flx_lo[ktop + 1] * clipout[ktop]
 
     for k in range(ktop + 1):  # Adjust for zero-based indexing
-        # soln_lo[k] = tracr[k] - (flx_lo[k + 1] - flx_lo[k]) * dtovdz[k]  # Low-order solution
         dellac[k] = -(flx_lo[k + 1] - flx_lo[k]) * dtovdz[k] / dt

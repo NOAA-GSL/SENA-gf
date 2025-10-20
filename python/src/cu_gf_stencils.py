@@ -5371,3 +5371,25 @@ def finalize_deep_convection_part3(
                 if fpi > 0.0:
                     fp = sqrt(outu**2 + outv**2) / fpi
                     outt += fp * dts * constants.G / constants.CP
+
+
+def calculate_moisture_convergence(
+    mconv: FloatFieldIJ, # type: ignore
+    qo_cup: FloatField, # type: ignore
+    omeg: FloatField, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+):
+    """
+    Calculates moisture convergence (mconv) based on vertical velocity and specific humidity profiles.
+    """
+
+    with computation(FORWARD), interval(0, 1):
+        mconv = 0.0
+
+    with computation(FORWARD), interval(0, -1):
+        if ierr == 0:
+            if k_mask <= ktop:
+                dq = qo_cup[0, 0, 1] - qo_cup
+                mconv += omeg * dq / constants.G
