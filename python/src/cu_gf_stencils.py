@@ -4768,6 +4768,76 @@ def neg_check_stencil(
             pret *= qmemf
 
 
+def update_ensemble_tendencies_and_precipitation(
+    dellat_ens: FloatField, # type: ignore
+    dellaq_ens: FloatField, # type: ignore
+    dellaqc_ens: FloatField, # type: ignore
+    pwo_ens: FloatField, # type: ignore
+    dellat: FloatField, # type: ignore
+    dellaq: FloatField, # type: ignore
+    dellaqc: FloatField, # type: ignore
+    pwo: FloatField, # type: ignore
+    edto: FloatFieldIJ, # type: ignore
+    pwdo: FloatField, # type: ignore
+    imid: int, # type: ignore
+    ichoice: int, # type: ignore
+    xff_mid0: FloatFieldIJ, # type: ignore
+    xff_mid1: FloatFieldIJ, # type: ignore
+    blqe: FloatFieldIJ, # type: ignore
+    k22: IntFieldIJ32, # type: ignore
+    kpbl: IntFieldIJ32, # type: ignore
+    dhdt: FloatField, # type: ignore
+    po_cup: FloatField, # type: ignore
+    kbcon: IntFieldIJ32, # type: ignore
+    hco: FloatField, # type: ignore
+    heo_cup: FloatField, # type: ignore
+    zws: FloatFieldIJ, # type: ignore
+    forcing: FloatField, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+):
+    """
+    Updates ensemble tendencies and precipitation fields after convection calculations.
+    Check if mid-level convection is enabled and closure choice is valid.
+    """
+
+    with computation(PARALLEL), interval(...):
+        if ierr == 0:
+            dellat_ens = dellat
+            dellaq_ens = dellaq
+            dellaqc_ens = dellaqc
+            pwo_ens = pwo + edto * pwdo
+        else:
+            dellat_ens = 0.0
+            dellaq_ens = 0.0
+            dellaqc_ens = 0.0
+            pwo_ens = 0.0
+
+    with computation(FORWARD), interval(0, 1):
+        if imid == 1 and ichoice <= 2:
+            xff_mid0 = 0.0
+            xff_mid1 = 0.0
+            if ierr == 0:
+                blqe = 0.0
+                # trash = 0.0
+
+    with computation(FORWARD), interval(0, -1):
+        if imid == 1 and ichoice <= 2:
+            if ierr == 0:
+                if k22 < kpbl + 1:
+                    if k_mask <= kpbl:
+                        blqe += 100.0 * dhdt * (po_cup - po_cup[0, 0, 1]) / constants.G
+
+    with computation(FORWARD), interval(0, 1):
+        if imid == 1 and ichoice <= 2:
+            if ierr == 0:
+                if k22 < kpbl + 1:
+                    xff_mid0 = max(0.0, blqe / (max((hco.at(K=kbcon) - heo_cup.at(K=kbcon)), 1.0e1)))
+                    xff_mid0 = min(0.1, xff_mid0)
+                xff_mid1 = min(0.1, 0.03 * zws)
+                forcing[0, 0, 0] = xff_mid0
+                forcing[0, 0, 1] = xff_mid1
+
 def cup_output_ens_3d_part1_stencil(
     outtem: FloatField, # type: ignore
     outq: FloatField, # type: ignore
@@ -4802,8 +4872,8 @@ def cup_output_ens_3d_part2_stencil(
     clos_wei: FloatFieldIJ, # type: ignore
     sig: FloatFieldIJ, # type: ignore
     closure_n: FloatFieldIJ, # type: ignore
-    xff_mid0: float, # type: ignore
-    xff_mid1: float, # type: ignore
+    xff_mid0: FloatFieldIJ, # type: ignore
+    xff_mid1: FloatFieldIJ, # type: ignore
     ierr: IntFieldIJ32, # type: ignore
 ):
     """

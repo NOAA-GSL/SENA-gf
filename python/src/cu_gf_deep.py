@@ -49,6 +49,7 @@ from cu_gf_stencils import (
     update_moist_static_energy_and_buoyancy,
     cup_maximi_stencil,
     rain_evap_below_cloudbase_stencil,
+    update_ensemble_tendencies_and_precipitation,
     cup_output_ens_3d_part1_stencil,
     cup_output_ens_3d_part2_stencil,
     cup_output_ens_3d_part3_stencil,
@@ -1263,6 +1264,21 @@ class GFDeepConvection:
             units="none",
             dtype=state.rkind,
         )
+        self.xff_mid0: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
+        self.xff_mid1: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],        
+            units="none",
+            dtype=state.rkind,
+        )
+        self.blqe: Quantity = state.quantity_factory.zeros(
+            dims=[X_DIM, Y_DIM],
+            units="none",
+            dtype=state.rkind,
+        )
 
         # Lookup tables for constants
         self.alpha: Quantity = state.quantity_factory_table.zeros(
@@ -1520,6 +1536,12 @@ class GFDeepConvection:
             },
         )
 
+        self._update_ensemble_tendencies_and_precipitation = state.stencil_factory.from_dims_halo(
+            func=update_ensemble_tendencies_and_precipitation,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
         self._cup_output_ens_3d_part1 = state.stencil_factory.from_dims_halo(
             func=cup_output_ens_3d_part1_stencil,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
@@ -1643,15 +1665,9 @@ class GFDeepConvection:
         i = 0
         k = 0
 
-        # Real (floating-point) variables
-        dz = 0.0
-        depth_min = 0.0
-        zkbmax = 0.0
-        trash = 0.0
-        trash2 = 0.0
-
         # Scalars
-        depth_min = 0.0
+        dz = 0.0
+        zkbmax = 0.0
         trash = 0.0
         trash2 = 0.0
         entdo = 0.0
@@ -1669,10 +1685,6 @@ class GFDeepConvection:
         nv = 0
 
         # Arrays
-        pgcon = 0.0
-        blqe = 0.0
-        xff_mid0 = 0.0
-        xff_mid1 = 0.0
         hkbo_bl = np.zeros((ite - its + 1, jte - jts + 1,))
         hco_bl = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         chem = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1, nchem))
@@ -1689,9 +1701,6 @@ class GFDeepConvection:
         trcflx_in = np.zeros((kte - kts + 1,))
         pwdper = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
         massflx = np.zeros((ite - its + 1, jte - jts + 1, kte - kts + 1))
-
-        # Arrays for cloud properties and environmental parameters
-        axx = np.zeros((ite - its + 1, jte - jts + 1,))
 
         # Set cumulus type
         if imid == 1:
@@ -3122,10 +3131,6 @@ class GFDeepConvection:
                     dq = self.qo_cup.field[i, j, k + 1] - self.qo_cup.field[i, j, k]
                     mconv[i, j] += omeg[i, j, k] * dq / G
 
-
-        # Assign aa1 to axx
-        axx[:, :] = self.aa1.field[:, :]
-
         self._cup_forcing_ens_3d_part1(
             omeg=omeg,
             zd=zdo,
@@ -3166,41 +3171,34 @@ class GFDeepConvection:
             count=self.count,
         )
 
-        # print("pre(1): ", pre[0], "xmb(0): ", xmb[0])
-        # Update ensemble tendencies and precipitation
-        for k in range(kts, ktf + 1):  # Adjust range for zero-based indexing
-            for i in range(its, itf + 1):  # Adjust loop to start at zero
-                for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                    if ierr[i, j] == 0:
-                        self.dellat_ens.field[i, j, k] = self.dellat.field[i, j, k]
-                        self.dellaq_ens.field[i, j, k] = self.dellaq.field[i, j, k]
-                        self.dellaqc_ens.field[i, j, k] = self.dellaqc.field[i, j, k]
-                        self.pwo_ens.field[i, j, k] = self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
-                    else:
-                        self.dellat_ens.field[i, j, k] = 0.0
-                        self.dellaq_ens.field[i, j, k] = 0.0
-                        self.dellaqc_ens.field[i, j, k] = 0.0
-                        self.pwo_ens.field[i, j, k] = 0.0
-
-        # Check if mid-level convection is enabled and closure choice is valid
-        if imid == 1 and ichoice <= 2:
-            # Update boundary layer quantities
-            for i in range(its, itf + 1):  # Adjust loop to start at zero
-                for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                    xff_mid0 = 0.0
-                    xff_mid1 = 0.0
-                    if ierr[i, j] == 0:
-                        blqe = 0.0
-                        trash = 0.0
-                        if k22[i, j] < kpbl[i, j] + 1:
-                            for k in range(kpbl[i, j] + 1):  # Loop through boundary layer levels
-                                blqe += 100.0 * dhdt[i, j, k] * (self.po_cup.field[i, j, k] - self.po_cup.field[i, j, k + 1]) / G
-                            trash = max((self.hco.field[i, j, kbcon[i, j]] - self.heo_cup.field[i, j, kbcon[i, j]]), 1.0e1)
-                            xff_mid0 = max(0.0, blqe / trash)
-                            xff_mid0 = min(0.1, xff_mid0)
-                        xff_mid1 = min(0.1, 0.03 * self.zws.field[i, j])
-                        forcing[i, j, 0] = xff_mid0
-                        forcing[i, j, 1] = xff_mid1
+        self._update_ensemble_tendencies_and_precipitation(
+            dellat_ens=self.dellat_ens,
+            dellaq_ens=self.dellaq_ens,
+            dellaqc_ens=self.dellaqc_ens,
+            pwo_ens=self.pwo_ens,
+            dellat=self.dellat,
+            dellaq=self.dellaq,
+            dellaqc=self.dellaqc,
+            pwo=self.pwo,
+            edto=edto,
+            pwdo=self.pwdo,
+            imid=imid,
+            ichoice=ichoice,
+            xff_mid0=self.xff_mid0,
+            xff_mid1=self.xff_mid1,
+            blqe=self.blqe,
+            k22=k22,
+            kpbl=kpbl,
+            dhdt=dhdt,
+            po_cup=self.po_cup,
+            kbcon=kbcon,
+            hco=self.hco,
+            heo_cup=self.heo_cup,
+            zws=self.zws,
+            forcing=forcing,
+            ierr=ierr,
+            k_mask=self.k_mask,
+        )
 
         # Call cup_output_ens_3d to output ensemble results
         self._cup_output_ens_3d_part1(
@@ -3223,8 +3221,8 @@ class GFDeepConvection:
             clos_wei=self.clos_wei,
             sig=self.sig,
             closure_n=self.closure_n,
-            xff_mid0=xff_mid0,
-            xff_mid1=xff_mid1,
+            xff_mid0=self.xff_mid0,
+            xff_mid1=self.xff_mid1,
             ierr=ierr,
         )
         self._cup_output_ens_3d_part3(
@@ -3481,38 +3479,38 @@ def fct1d3(ktop, n, dt, z, tracr, massflx, trflx_in, dellac, g):
         g (float): Gravitational constant.
     """
     # Modified tracer flux
-    trflx_out = np.zeros(n + 1, dtype=np.float64)  # Initialize as a NumPy array with n+1 elements
+    # trflx_out = np.zeros(n + 1, dtype=np.float64)  # Initialize as a NumPy array with n+1 elements
 
     # Local variable declarations
     k = 0  # Loop index
-    km1 = 0  # k-1 index
-    kp1 = 0  # k+1 index
+    # km1 = 0  # k-1 index
+    # kp1 = 0  # k+1 index
 
     # Logical variables
-    def NaN(arg):  # NaN detector
-        return not (arg >= 0.0 or arg <- 0.0)
+    # def NaN(arg):  # NaN detector
+    #     return not (arg >= 0.0 or arg <- 0.0)
 
-    error = False  # Error flag
-    vrbos = True  # Verbose flag
+    # error = False  # Error flag
+    # vrbos = True  # Verbose flag
 
     # Real variables (NumPy arrays)
     dtovdz = np.zeros(n, dtype=np.float64)  # Time step divided by grid spacing
-    trmax = np.zeros(n, dtype=np.float64)  # Maximum tracer value
-    trmin = np.zeros(n, dtype=np.float64)  # Minimum tracer value
+    # trmax = np.zeros(n, dtype=np.float64)  # Maximum tracer value
+    # trmin = np.zeros(n, dtype=np.float64)  # Minimum tracer value
     flx_lo = np.zeros(n + 1, dtype=np.float64)  # Low-order flux
-    antifx = np.zeros(n + 1, dtype=np.float64)  # Antidiffusive flux
-    clipped = np.zeros(n + 1, dtype=np.float64)  # Clipped flux
-    soln_hi = np.zeros(n, dtype=np.float64)  # High-order solution
-    totlin = np.zeros(n, dtype=np.float64)  # Total flux in
+    # antifx = np.zeros(n + 1, dtype=np.float64)  # Antidiffusive flux
+    # clipped = np.zeros(n + 1, dtype=np.float64)  # Clipped flux
+    # soln_hi = np.zeros(n, dtype=np.float64)  # High-order solution
+    # totlin = np.zeros(n, dtype=np.float64)  # Total flux in
     totlout = np.zeros(n, dtype=np.float64)  # Total flux out
-    soln_lo = np.zeros(n, dtype=np.float64)  # Low-order solution
-    clipin = np.zeros(n, dtype=np.float64)  # Clip for incoming flux
+    # soln_lo = np.zeros(n, dtype=np.float64)  # Low-order solution
+    # clipin = np.zeros(n, dtype=np.float64)  # Clip for incoming flux
     clipout = np.zeros(n, dtype=np.float64)  # Clip for outgoing flux
-    arg = 0.0  # Temporary variable
+    # arg = 0.0  # Temporary variable
 
     # Parameters
     epsil = 1e-22  # Prevent division by zero
-    damp = 1.0  # Damper for antidiffusive flux (1 = no damping)
+    # damp = 1.0  # Damper for antidiffusive flux (1 = no damping)
 
     for k in range(ktop + 1):  # Adjust for zero-based indexing
         dtovdz[k] = 0.01 * dt / abs(z[k + 1] - z[k]) * g  # Time step / grid spacing
