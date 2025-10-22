@@ -1,22 +1,35 @@
-from ndsl.dsl.gt4py import PARALLEL, computation, interval, BACKWARD, FORWARD, function
+from ndsl.dsl.gt4py import (
+    PARALLEL,
+    computation,
+    interval,
+    BACKWARD,
+    FORWARD,
+    function,
+    IJ,
+    Field,
+    GlobalTable,
+    log,
+    floor,
+    abs,
+    gamma,
+    sqrt,
+    exp,
+)
 from ndsl.dsl.typing import (
     FloatField,
     IntField32,
     IntFieldIJ,
     IntFieldIJ32,
     FloatFieldIJ,
-    FloatFieldK,
     IntFieldK32,
     BoolFieldIJ,
     Float,
-    # GlobalTable
 )
 import cu_gf_constants as constants
-from ndsl.dsl.gt4py import log, floor, abs, gamma, sqrt, exp
-from ndsl.dsl.gt4py import GlobalTable
 
 
 GlobalTable_float = GlobalTable[(float, 30)]
+FloatFieldIJ_Ens = Field[IJ, (Float,(constants.MAXENS3,))]
 
 def initialize_driver_temporaries(
     ccn_gf: FloatFieldIJ, # type: ignore
@@ -886,16 +899,19 @@ def initialize_deep_temporaries(
         xdby = 0.0
 
 def initialize_deep_ens_temporaries(
-  pr_ens: FloatField, # type: ignore
-  xf_ens: FloatField, # type: ignore
+  pr_ens: FloatFieldIJ_Ens, # type: ignore
+  xf_ens: FloatFieldIJ_Ens, # type: ignore
 ):
     """
     Initialize deep convection temporary ens variables.
     """
 
-    with computation(PARALLEL), interval(...):
-        pr_ens = 0.0
-        xf_ens = 0.0
+    with computation(FORWARD), interval(0, 1):
+        member = 0
+        while member < constants.MAXENS3:
+            pr_ens[0, 0][member] = 0.0
+            xf_ens[0, 0][member] = 0.0
+            member += 1
 
 
 def initialize_driver(
@@ -4860,8 +4876,8 @@ def cup_output_ens_3d_part1_stencil(
 
 
 def cup_output_ens_3d_part2_stencil(
-    pr_ens: FloatField, # type: ignore
-    xf_ens: FloatField, # type: ignore
+    pr_ens: FloatFieldIJ_Ens, # type: ignore
+    xf_ens: FloatFieldIJ_Ens, # type: ignore
     imid: int, # type: ignore
     ichoice: int, # type: ignore
     xmb_ave: FloatFieldIJ, # type: ignore
@@ -4880,20 +4896,26 @@ def cup_output_ens_3d_part2_stencil(
     Calculates final output fields including physical tendencies, precipitation, and mass-flux.
     """
 
-    with computation(PARALLEL), interval(...):
+    with computation(FORWARD), interval(0, 1):
         if ierr == 0:
-            if pr_ens <= 0.0:
-                xf_ens = 0.0
+            member = 0
+            while member < constants.MAXENS3:
+                if pr_ens[0, 0][member] <= 0.0:
+                    xf_ens[0, 0][member] = 0.0
+                member += 1
 
     with computation(FORWARD), interval(0, 1):
         xmb = 0.0
         xmb_ave = 0.0
         clos_wei = 0.0
 
-    with computation(FORWARD), interval(...):
+    with computation(FORWARD), interval(0, 1):
         if imid == 0:
             if ierr == 0:
-                xmb_ave += xf_ens
+                member = 0
+                while member < constants.MAXENS3:
+                    xmb_ave += xf_ens[0, 0][member]
+                    member += 1
 
     with computation(FORWARD), interval(0, 1):
         if imid == 0:
@@ -4923,11 +4945,14 @@ def cup_output_ens_3d_part2_stencil(
                 elif ichoice == 2:
                     xmb_ave = sig * xff_mid1
 
-    with computation(FORWARD), interval(...):
+    with computation(FORWARD), interval(0, 1):
         if imid !=0:
             if ierr == 0:
                 if ichoice > 2:
-                    xmb_ave += xf_ens
+                    member = 0
+                    while member < constants.MAXENS3:
+                        xmb_ave += xf_ens[0, 0][member]
+                        member += 1
 
     with computation(FORWARD), interval(0, 1):
         if imid != 0:
@@ -5019,11 +5044,11 @@ def cup_forcing_ens_3d_part2_stencil(
     ierr: IntFieldIJ32, # type: ignore
     ierr2: IntFieldIJ32, # type: ignore
     ierr3: IntFieldIJ32, # type: ignore
-    xf_ens: FloatField, # type: ignore
+    xf_ens: FloatFieldIJ_Ens, # type: ignore
     forcing: FloatField, # type: ignore
     mconv: FloatFieldIJ, # type: ignore
     rand_clos: FloatField, # type: ignore
-    pr_ens: FloatField, # type: ignore
+    pr_ens: FloatFieldIJ_Ens, # type: ignore
     ichoice: int, # type: ignore
     dicycle: int, # type: ignore
     tau_ecmwf: FloatFieldIJ, # type: ignore
@@ -5113,67 +5138,73 @@ def cup_forcing_ens_3d_part2_stencil(
         if ierr == 0:
             if xk < 0.0:
                 if xff_ens3[0, 0, 0] > 0.0:
-                    xf_ens[0, 0, 0] = max(0.0, -xff_ens3[0, 0, 0] / xk)
+                    xf_ens[0, 0][0] = max(0.0, -xff_ens3[0, 0, 0] / xk)
                 if xff_ens3[0, 0, 1] > 0.0:
-                    xf_ens[0, 0, 1] = max(0.0, -xff_ens3[0, 0, 1] / xk)
+                    xf_ens[0, 0][1] = max(0.0, -xff_ens3[0, 0, 1] / xk)
                 if xff_ens3[0, 0, 2] > 0.0:
-                    xf_ens[0, 0, 2] = max(0.0, -xff_ens3[0, 0, 2] / xk)
+                    xf_ens[0, 0][2] = max(0.0, -xff_ens3[0, 0, 2] / xk)
                 if xff_ens3[0, 0, 15] > 0.0:
-                    xf_ens[0, 0, 15] = max(0.0, -xff_ens3[0, 0, 15] / xk)
-                xf_ens[0, 0, 0] += xf_ens[0, 0, 0] * rand_clos
-                xf_ens[0, 0, 1] += xf_ens[0, 0, 1] * rand_clos
-                xf_ens[0, 0, 2] += xf_ens[0, 0, 2] * rand_clos
-                xf_ens[0, 0, 15] += xf_ens[0, 0, 15] * rand_clos
+                    xf_ens[0, 0][15] = max(0.0, -xff_ens3[0, 0, 15] / xk)
+                xf_ens[0, 0][0] += xf_ens[0, 0][0] * rand_clos
+                xf_ens[0, 0][1] += xf_ens[0, 0][1] * rand_clos
+                xf_ens[0, 0][2] += xf_ens[0, 0][2] * rand_clos
+                xf_ens[0, 0][15] += xf_ens[0, 0][15] * rand_clos
             else:
                 xff_ens3[0, 0, 0] = 0.0
                 xff_ens3[0, 0, 1] = 0.0
                 xff_ens3[0, 0, 2] = 0.0
                 xff_ens3[0, 0, 15] = 0.0
 
-            xf_ens[0, 0, 3] = max(0.0, xff_ens3[0, 0, 3])
-            xf_ens[0, 0, 4] = max(0.0, xff_ens3[0, 0, 4])
-            xf_ens[0, 0, 5] = max(0.0, xff_ens3[0, 0, 5])
-            xf_ens[0, 0, 13] = max(0.0, xff_ens3[0, 0, 13])
+            xf_ens[0, 0][3] = max(0.0, xff_ens3[0, 0, 3])
+            xf_ens[0, 0][4] = max(0.0, xff_ens3[0, 0, 4])
+            xf_ens[0, 0][5] = max(0.0, xff_ens3[0, 0, 5])
+            xf_ens[0, 0][13] = max(0.0, xff_ens3[0, 0, 13])
 
-            xf_ens[0, 0, 6] = max(0.0, xff_ens3[0, 0, 6] / max(1.e-3, pr_ens[0, 0, 6]))
-            xf_ens[0, 0, 7] = max(0.0, xff_ens3[0, 0, 7] / max(1.e-3, pr_ens[0, 0, 7]))
-            xf_ens[0, 0, 8] = max(0.0, xff_ens3[0, 0, 8] / max(1.e-3, pr_ens[0, 0, 8]))
-            xf_ens[0, 0, 14] = max(0.0, xff_ens3[0, 0, 14] / max(1.e-3, pr_ens[0, 0, 14]))
+            xf_ens[0, 0][6] = max(0.0, xff_ens3[0, 0, 6] / max(1.e-3, pr_ens[0, 0][6]))
+            xf_ens[0, 0][7] = max(0.0, xff_ens3[0, 0, 7] / max(1.e-3, pr_ens[0, 0][7]))
+            xf_ens[0, 0][8] = max(0.0, xff_ens3[0, 0, 8] / max(1.e-3, pr_ens[0, 0][8]))
+            xf_ens[0, 0][14] = max(0.0, xff_ens3[0, 0, 14] / max(1.e-3, pr_ens[0, 0][14]))
 
-            xf_ens[0, 0, 3] += xf_ens[0, 0, 3] * rand_clos[0, 0, 1]
-            xf_ens[0, 0, 4] += xf_ens[0, 0, 4] * rand_clos[0, 0, 1]
-            xf_ens[0, 0, 5] += xf_ens[0, 0, 5] * rand_clos[0, 0, 1]
-            xf_ens[0, 0, 13] += xf_ens[0, 0, 13] * rand_clos[0, 0, 1]
+            xf_ens[0, 0][3] += xf_ens[0, 0][3] * rand_clos[0, 0, 1]
+            xf_ens[0, 0][4] += xf_ens[0, 0][4] * rand_clos[0, 0, 1]
+            xf_ens[0, 0][5] += xf_ens[0, 0][5] * rand_clos[0, 0, 1]
+            xf_ens[0, 0][13] += xf_ens[0, 0][13] * rand_clos[0, 0, 1]
 
-            xf_ens[0, 0, 6] += xf_ens[0, 0, 6] * rand_clos[0, 0, 2]
-            xf_ens[0, 0, 7] += xf_ens[0, 0, 7] * rand_clos[0, 0, 2]
-            xf_ens[0, 0, 8] += xf_ens[0, 0, 8] * rand_clos[0, 0, 2]
-            xf_ens[0, 0, 14] += xf_ens[0, 0, 14] * rand_clos[0, 0, 2]
+            xf_ens[0, 0][6] += xf_ens[0, 0][6] * rand_clos[0, 0, 2]
+            xf_ens[0, 0][7] += xf_ens[0, 0][7] * rand_clos[0, 0, 2]
+            xf_ens[0, 0][8] += xf_ens[0, 0][8] * rand_clos[0, 0, 2]
+            xf_ens[0, 0][14] += xf_ens[0, 0][14] * rand_clos[0, 0, 2]
 
             if xk < 0.0:
-                xf_ens[0, 0, 9] = max(0.0, -xff_ens3[0, 0, 9] / xk)
-                xf_ens[0, 0, 10] = max(0.0, -xff_ens3[0, 0, 10] / xk)
-                xf_ens[0, 0, 11] = max(0.0, -xff_ens3[0, 0, 11] / xk)
-                xf_ens[0, 0, 12] = max(0.0, -xff_ens3[0, 0, 12] / xk)
-                xf_ens[0, 0, 9] += xf_ens[0, 0, 9] * rand_clos[0, 0, 3]
-                xf_ens[0, 0, 10] += xf_ens[0, 0, 10] * rand_clos[0, 0, 3]
-                xf_ens[0, 0, 11] += xf_ens[0, 0, 11] * rand_clos[0, 0, 3]
-                xf_ens[0, 0, 12] += xf_ens[0, 0, 12] * rand_clos[0, 0, 3]
+                xf_ens[0, 0][9] = max(0.0, -xff_ens3[0, 0, 9] / xk)
+                xf_ens[0, 0][10] = max(0.0, -xff_ens3[0, 0, 10] / xk)
+                xf_ens[0, 0][11] = max(0.0, -xff_ens3[0, 0, 11] / xk)
+                xf_ens[0, 0][12] = max(0.0, -xff_ens3[0, 0, 12] / xk)
+                xf_ens[0, 0][9] += xf_ens[0, 0][9] * rand_clos[0, 0, 3]
+                xf_ens[0, 0][10] += xf_ens[0, 0][10] * rand_clos[0, 0, 3]
+                xf_ens[0, 0][11] += xf_ens[0, 0][11] * rand_clos[0, 0, 3]
+                xf_ens[0, 0][12] += xf_ens[0, 0][12] * rand_clos[0, 0, 3]
             else:
-                xf_ens[0, 0, 9] = 0.0
-                xf_ens[0, 0, 10] = 0.0
-                xf_ens[0, 0, 11] = 0.0
-                xf_ens[0, 0, 12] = 0.0
+                xf_ens[0, 0][9] = 0.0
+                xf_ens[0, 0][10] = 0.0
+                xf_ens[0, 0][11] = 0.0
+                xf_ens[0, 0][12] = 0.0
 
-    with computation(FORWARD), interval(...):
+    with computation(FORWARD), interval(0, 1):
         if ierr == 0:
             if ichoice >= 1:
-                tmp = xf_ens[0, 0, ichoice - 1 - k_mask]
-                xf_ens = tmp
+                member = 0
+                while member < constants.MAXENS3:
+                    tmp = xf_ens[0, 0][ichoice - 1 - k_mask]
+                    xf_ens[0, 0][member] = tmp
+                    member += 1
 
-    with computation(PARALLEL), interval(...):
+    with computation(FORWARD), interval(0, 1):
         if ierr != 20 and ierr != 0:
-            xf_ens = 0.0
+            member = 0
+            while member < constants.MAXENS3:
+                xf_ens[0, 0][member] = 0.0
+                member += 1
 
     with computation(FORWARD), interval(0, 1):
         if dicycle == 1:
@@ -5187,7 +5218,7 @@ def cup_forcing_ens_3d_part2_stencil(
                 xff_dicycle = (aa1 - aa1_bl) / tau_ecmwf
                 if xk < 0.0:
                     xf_dicycle = max(0.0, -xff_dicycle / xk)
-                xf_dicycle = xf_ens[0, 0, 9] - xf_dicycle
+                xf_dicycle = xf_ens[0, 0][9] - xf_dicycle
         else:
             xf_dicycle = 0.0
 
@@ -5393,3 +5424,49 @@ def calculate_moisture_convergence(
             if k_mask <= ktop:
                 dq = qo_cup[0, 0, 1] - qo_cup
                 mconv += omeg * dq / constants.G
+
+def update_precipitation_ensemble(
+    xaa0_ens: FloatFieldIJ, # type: ignore
+    xaa0: FloatFieldIJ, # type: ignore
+    pr_ens: FloatFieldIJ_Ens, # type: ignore
+    pwo: FloatField, # type: ignore
+    edto: FloatFieldIJ, # type: ignore
+    pwdo: FloatField, # type: ignore
+    ktop: IntFieldIJ32, # type: ignore
+    ierr: IntFieldIJ32, # type: ignore
+    k_mask: IntFieldK32, # type: ignore
+    k_index: IntFieldIJ, # type: ignore
+):
+    """
+    Update precipitation and tendencies for ensemble members.
+    """
+
+    with computation(FORWARD), interval(0, 1):
+        xaa0_ens = 0.0
+        k_index = 0
+        if ierr == 0:
+            xaa0_ens = xaa0
+
+    with computation(FORWARD), interval(...):
+        if ierr == 0:
+            member = 0
+            while member < constants.MAXENS3:
+                pr_ens[0, 0][member] += pwo + edto * pwdo
+                member += 1
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            if pr_ens[0, 0][6] < 1.e-6:
+                ierr = 18
+                member = 0
+                while member < constants.MAXENS3:
+                    pr_ens[0, 0][member] = 0.0
+                    member += 1
+
+    with computation(FORWARD), interval(0, 1):
+        if ierr == 0:
+            member = 0
+            while member < constants.MAXENS3:
+                if pr_ens[0, 0][member] < 1.e-5:
+                    pr_ens[0, 0][member] = 0.0
+                member += 1

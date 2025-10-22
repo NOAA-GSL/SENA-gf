@@ -59,6 +59,7 @@ from cu_gf_stencils import (
     finalize_deep_convection_part2,
     finalize_deep_convection_part3,
     calculate_moisture_convergence,
+    update_precipitation_ensemble,
 )
 
 logger = logging.getLogger(__name__)
@@ -1176,21 +1177,21 @@ class GFDeepConvection:
             dtype=state.rkind,
         )
         self.pr_ens: Quantity = state.quantity_factory_ens.zeros(
-            dims=[X_DIM, Y_DIM, Z_DIM],
+            dims=[X_DIM, Y_DIM, "nmembers"],
             units="none",
             dtype=state.rkind,
         )
         self.xf_ens: Quantity = state.quantity_factory_ens.zeros(
-            dims=[X_DIM, Y_DIM, Z_DIM],
+            dims=[X_DIM, Y_DIM, "nmembers"],
             units="none",
             dtype=state.rkind,
         )
-        self.xmb_ave: Quantity = state.quantity_factory_ens.zeros(
+        self.xmb_ave: Quantity = state.quantity_factory.zeros(
             dims=[X_DIM, Y_DIM],
             units="none",
             dtype=state.rkind,
         )
-        self.clos_wei: Quantity = state.quantity_factory_ens.zeros(
+        self.clos_wei: Quantity = state.quantity_factory.zeros(
             dims=[X_DIM, Y_DIM],
             units="none",
             dtype=state.rkind,
@@ -1320,7 +1321,7 @@ class GFDeepConvection:
             externals={},
         )
 
-        self._initialize_deep_ens_temporaries = state.stencil_factory_ens.from_dims_halo(
+        self._initialize_deep_ens_temporaries = state.stencil_factory.from_dims_halo(
             func=initialize_deep_ens_temporaries,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
@@ -1548,7 +1549,7 @@ class GFDeepConvection:
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
         )
-        self._cup_output_ens_3d_part2 = state.stencil_factory_ens.from_dims_halo(
+        self._cup_output_ens_3d_part2 = state.stencil_factory.from_dims_halo(
             func=cup_output_ens_3d_part2_stencil,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
@@ -1564,7 +1565,7 @@ class GFDeepConvection:
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
         )
-        self._cup_forcing_ens_3d_part2 = state.stencil_factory_ens.from_dims_halo(
+        self._cup_forcing_ens_3d_part2 = state.stencil_factory.from_dims_halo(
             func=cup_forcing_ens_3d_part2_stencil,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
@@ -1588,6 +1589,12 @@ class GFDeepConvection:
 
         self._calculate_moisture_convergence = state.stencil_factory.from_dims_halo(
             func=calculate_moisture_convergence,
+            compute_dims=[X_DIM, Y_DIM, Z_DIM],
+            externals={},
+        )
+
+        self._update_precipitation_ensemble = state.stencil_factory.from_dims_halo(
+            func=update_precipitation_ensemble,
             compute_dims=[X_DIM, Y_DIM, Z_DIM],
             externals={},
         )
@@ -3011,40 +3018,18 @@ class GFDeepConvection:
             k_mask=self.k_mask,
         )
 
-        # Update xaa0_ens based on dellat_ens and dellaq_ens
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                self.xaa0_ens.field[i, j] = 0.0
-
-        # Parallel loop to update precipitation ensemble
-        for i in range(its, itf + 1):  # Adjust loop to start at zero
-            for j in range(jts, jtf + 1):  # Adjusted for Python's zero-based indexing
-                if ierr[i, j] == 0:
-                    self.xaa0_ens.field[i, j] = self.xaa0.field[i, j]
-                    for k in range(kts, ktop[i, j] + 1):  # Adjust range for zero-based indexing
-                        for nens3 in range(MAXENS3):  # Loop over ensemble members
-                            if nens3 == 6:
-                                self.pr_ens.field[i, j, nens3] += self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
-                            elif nens3 == 7:
-                                self.pr_ens.field[i, j, nens3] += self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
-                            elif nens3 == 8:
-                                self.pr_ens.field[i, j, nens3] += self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
-                            else:
-                                self.pr_ens.field[i, j, nens3] += self.pwo.field[i, j, k] + edto[i, j] * self.pwdo.field[i, j, k]
-
-                    # Check for small normalized condensate
-                    if self.pr_ens.field[i, j, 6] < 1.e-6:  # Adjust index for zero-based indexing
-                        ierr[i, j] = 18
-                        # Optional error message for non-OpenACC environments
-                        # ierrc[i, j] = "total normalized condensate too small"
-                        # ierrc[i, j] = "total normalized condensate too small"
-                        for nens3 in range(MAXENS3):
-                            self.pr_ens.field[i, j, nens3] = 0.0
-
-                    # Ensure precipitation ensemble values are above threshold
-                    for nens3 in range(MAXENS3):
-                        if self.pr_ens.field[i, j, nens3] < 1.e-5:
-                            self.pr_ens.field[i, j, nens3] = 0.0
+        self._update_precipitation_ensemble(
+            xaa0_ens=self.xaa0_ens,
+            xaa0=self.xaa0,
+            pr_ens=self.pr_ens,
+            pwo=self.pwo,
+            edto=edto,
+            pwdo=self.pwdo,
+            ktop=ktop,
+            ierr=ierr,
+            k_mask=self.k_mask,
+            k_index=self.k_index,
+        )
 
         # Initialize auxiliary variables for error handling and indices
         for i in range(its, itf + 1):  # Adjust loop to start at zero
